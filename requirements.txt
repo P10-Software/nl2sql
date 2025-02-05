@@ -7,6 +7,7 @@ platformdirs==4.3.6
 psycopg2==2.9.10
 pyreadstat==1.2.8
 python-dateutil==2.9.0.post0
+python-dotenv==1.0.1
 pytz==2025.1
 six==1.17.0
 SQLAlchemy==2.0.37

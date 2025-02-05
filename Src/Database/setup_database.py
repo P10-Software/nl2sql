@@ -1,15 +1,18 @@
 import os
-import pyreadstat 
+import pyreadstat
 import psycopg2
 import pandas as pd
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 
 # Database credentials
-USER = "postgres"
-PASSWORD = "postgres"
-HOST = "localhost"
-PORT = "5432"
-DB_NAME = "trial_metadata"
+load_dotenv()
+
+USER = os.getenv('PG_USER')
+PASSWORD = os.getenv('PG_PASSWORD')
+HOST = os.getenv('PG_HOST')
+PORT = os.getenv('PG_PORT')
+DB_NAME = os.getenv('DB_NAME')
 
 def init_db(data_directory: str):
     """
@@ -55,8 +58,8 @@ def _read_sas(path_to_sas: str):
         'Column_Label': meta.column_labels
     })
 
-    engine = create_engine(f'postgresql://{USER}:{PASSWORD}@{HOST}:{PORT}/{DB_NAME}')    
-    
+    engine = create_engine(f'postgresql://{USER}:{PASSWORD}@{HOST}:{PORT}/{DB_NAME}')
+
     try:
         df.to_sql(table_name, engine, if_exists='replace', index=False)
         label_df.to_sql('column_label_lookup', engine, if_exists='append', index=False)

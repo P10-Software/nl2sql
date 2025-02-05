@@ -41,14 +41,20 @@ def analyze_all_sqlite_databases(path_to_sqlite_dir: str):
     total_number_of_duplicate_columns = 0
     for db_path in db_paths:
         number_of_tables, number_of_columns, number_of_duplicate_columns = analyze_sqlite_database(db_path)
-        db_statistics[db_path] = {"number of tables": number_of_tables, "number of columns": number_of_columns, "number_of_duplicate_columns": number_of_duplicate_columns}
+        db_statistics[db_path] = {"number of tables": number_of_tables, "number of columns": number_of_columns, "number of duplicate columns": number_of_duplicate_columns}
         total_number_of_tables += number_of_tables
         total_number_of_columns += number_of_columns
         total_number_of_duplicate_columns += number_of_duplicate_columns
 
-    overall_statistics = {"overall statistics": {"number of databases": len(db_paths), "total number of tables": total_number_of_tables, "total number of columns": total_number_of_columns, 
-                          "total number of duplicate columns": total_number_of_duplicate_columns, "average number of tables per db": total_number_of_tables / len(db_paths),
-                          "average number of columns per db": total_number_of_columns / len(db_paths), "average number of columns per table": total_number_of_columns / total_number_of_tables}}
+    overall_statistics = {"overall statistics": {
+                            "number of databases": len(db_paths), 
+                            "total number of tables": total_number_of_tables, 
+                            "total number of columns": total_number_of_columns, 
+                            "total number of duplicate columns": total_number_of_duplicate_columns, 
+                            "average number of tables per db": total_number_of_tables / len(db_paths),
+                            "average number of columns per db": total_number_of_columns / len(db_paths), 
+                            "average number of columns per table": total_number_of_columns / total_number_of_tables
+                        }}
 
     return overall_statistics | db_statistics
 
@@ -103,8 +109,8 @@ def get_columns_from_table_json_file(file_path: str):
     return table_dict["column_names"]
 
 if __name__ == "__main__":
-    path_to_sqlite_dir = "src/spider2-lite/resource/databases/sqlite"
+    path_to_sqlite_dir = "Src/Spider2Lite/resource/databases/sqlite"
     statistics = analyze_all_sqlite_databases(path_to_sqlite_dir)
 
-    with open("src/sqlite_statistics.json", "w") as file:
+    with open("Src/Spider2Lite/sqlite_statistics.json", "w") as file:
         dump(statistics, file, indent=4)

@@ -1,0 +1,161 @@
+{
+    "overall statistics": {
+        "number of databases": 30,
+        "total number of tables": 432,
+        "total number of columns": 3011,
+        "total number of duplicate columns": 467,
+        "average number of tables per db": 14.4,
+        "average number of columns per db": 100.36666666666666,
+        "average number of columns per table": 6.969907407407407
+    },
+    "src/spider2-lite/resource/databases/sqlite/E_commerce": {
+        "number of tables": 11,
+        "number of columns": 70,
+        "number_of_duplicate_columns": 6
+    },
+    "src/spider2-lite/resource/databases/sqlite/school_scheduling": {
+        "number of tables": 16,
+        "number of columns": 77,
+        "number_of_duplicate_columns": 9
+    },
+    "src/spider2-lite/resource/databases/sqlite/electronic_sales": {
+        "number of tables": 9,
+        "number of columns": 61,
+        "number_of_duplicate_columns": 6
+    },
+    "src/spider2-lite/resource/databases/sqlite/education_business": {
+        "number of tables": 18,
+        "number of columns": 98,
+        "number_of_duplicate_columns": 12
+    },
+    "src/spider2-lite/resource/databases/sqlite/log": {
+        "number of tables": 19,
+        "number of columns": 88,
+        "number_of_duplicate_columns": 14
+    },
+    "src/spider2-lite/resource/databases/sqlite/Brazilian_E_Commerce": {
+        "number of tables": 10,
+        "number of columns": 62,
+        "number_of_duplicate_columns": 12
+    },
+    "src/spider2-lite/resource/databases/sqlite/WWE": {
+        "number of tables": 10,
+        "number of columns": 35,
+        "number_of_duplicate_columns": 3
+    },
+    "src/spider2-lite/resource/databases/sqlite/music": {
+        "number of tables": 11,
+        "number of columns": 64,
+        "number_of_duplicate_columns": 21
+    },
+    "src/spider2-lite/resource/databases/sqlite/EU_soccer": {
+        "number of tables": 9,
+        "number of columns": 233,
+        "number_of_duplicate_columns": 14
+    },
+    "src/spider2-lite/resource/databases/sqlite/EntertainmentAgency": {
+        "number of tables": 13,
+        "number of columns": 76,
+        "number_of_duplicate_columns": 5
+    },
+    "src/spider2-lite/resource/databases/sqlite/northwind": {
+        "number of tables": 15,
+        "number of columns": 95,
+        "number_of_duplicate_columns": 20
+    },
+    "src/spider2-lite/resource/databases/sqlite/delivery_center": {
+        "number of tables": 7,
+        "number of columns": 59,
+        "number_of_duplicate_columns": 6
+    },
+    "src/spider2-lite/resource/databases/sqlite/IPL": {
+        "number of tables": 8,
+        "number of columns": 52,
+        "number_of_duplicate_columns": 6
+    },
+    "src/spider2-lite/resource/databases/sqlite/Airlines": {
+        "number of tables": 8,
+        "number of columns": 35,
+        "number_of_duplicate_columns": 6
+    },
+    "src/spider2-lite/resource/databases/sqlite/f1": {
+        "number of tables": 29,
+        "number of columns": 228,
+        "number_of_duplicate_columns": 53
+    },
+    "src/spider2-lite/resource/databases/sqlite/imdb_movies": {
+        "number of tables": 7,
+        "number of columns": 38,
+        "number_of_duplicate_columns": 3
+    },
+    "src/spider2-lite/resource/databases/sqlite/SQLITE_SAKILA": {
+        "number of tables": 21,
+        "number of columns": 120,
+        "number_of_duplicate_columns": 31
+    },
+    "src/spider2-lite/resource/databases/sqlite/California_Traffic_Collision": {
+        "number of tables": 4,
+        "number of columns": 120,
+        "number_of_duplicate_columns": 3
+    },
+    "src/spider2-lite/resource/databases/sqlite/stacking": {
+        "number of tables": 10,
+        "number of columns": 53,
+        "number_of_duplicate_columns": 9
+    },
+    "src/spider2-lite/resource/databases/sqlite/chinook": {
+        "number of tables": 13,
+        "number of columns": 69,
+        "number_of_duplicate_columns": 21
+    },
+    "src/spider2-lite/resource/databases/sqlite/oracle_sql": {
+        "number of tables": 38,
+        "number of columns": 124,
+        "number_of_duplicate_columns": 15
+    },
+    "src/spider2-lite/resource/databases/sqlite/complex_oracle": {
+        "number of tables": 10,
+        "number of columns": 140,
+        "number_of_duplicate_columns": 6
+    },
+    "src/spider2-lite/resource/databases/sqlite/DB_IMDB": {
+        "number of tables": 13,
+        "number of columns": 50,
+        "number_of_duplicate_columns": 9
+    },
+    "src/spider2-lite/resource/databases/sqlite/city_legislation": {
+        "number of tables": 15,
+        "number of columns": 133,
+        "number_of_duplicate_columns": 19
+    },
+    "src/spider2-lite/resource/databases/sqlite/Baseball": {
+        "number of tables": 26,
+        "number of columns": 352,
+        "number_of_duplicate_columns": 62
+    },
+    "src/spider2-lite/resource/databases/sqlite/modern_data": {
+        "number of tables": 17,
+        "number of columns": 77,
+        "number_of_duplicate_columns": 15
+    },
+    "src/spider2-lite/resource/databases/sqlite/Pagila": {
+        "number of tables": 21,
+        "number of columns": 120,
+        "number_of_duplicate_columns": 31
+    },
+    "src/spider2-lite/resource/databases/sqlite/BowlingLeague": {
+        "number of tables": 12,
+        "number of columns": 56,
+        "number_of_duplicate_columns": 14
+    },
+    "src/spider2-lite/resource/databases/sqlite/AdventureWorks": {
+        "number of tables": 13,
+        "number of columns": 120,
+        "number_of_duplicate_columns": 14
+    },
+    "src/spider2-lite/resource/databases/sqlite/bank_sales_trading": {
+        "number of tables": 19,
+        "number of columns": 106,
+        "number_of_duplicate_columns": 22
+    }
+}

@@ -4,15 +4,18 @@ import psycopg2
 import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
+from src.common.logger import get_logger
 
 # Database credentials
 load_dotenv()
+logger = get_logger(__name__)
 
 USER = os.getenv('PG_USER')
 PASSWORD = os.getenv('PG_PASSWORD')
 HOST = os.getenv('PG_HOST')
 PORT = os.getenv('PG_PORT')
 DB_NAME = os.getenv('DB_NAME')
+
 
 def init_db(data_directory: str):
     """
@@ -63,9 +66,9 @@ def _read_sas(path_to_sas: str):
     try:
         df.to_sql(table_name, engine, if_exists='replace', index=False)
         label_df.to_sql('column_label_lookup', engine, if_exists='append', index=False)
-        print(f'Table {table_name} inserted successfully.')
+        logger.info(f'Table {table_name} inserted successfully.')
     except Exception as e:
-        print("Error: ", e)
+        logger.error("Error: ", e)
 
 
 def _create_db():
@@ -79,14 +82,14 @@ def _create_db():
 
         if not exists:
             cur.execute(f"CREATE DATABASE {DB_NAME}")
-            print(f"Database '{DB_NAME}' created successfully.")
+            logger.info(f"Database '{DB_NAME}' created successfully.")
         else:
-            print(f"Database '{DB_NAME}' already exists.")
+            logger.info(f"Database '{DB_NAME}' already exists.")
 
         cur.close()
         conn.close()
     except Exception as e:
-        print("Error creating database:", e)
+        logger.error("Error creating database:", e)
 
 
 if __name__ == '__main__':
@@ -96,6 +99,7 @@ if __name__ == '__main__':
         try:
             init_db(data_directory)
         except Exception as e:
-            print("Failed: ", e)
+            logger.error("Failed: ", e)
+            print(f"Failed: {e}")
     else:
         print("provided path is not a directory.")

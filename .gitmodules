@@ -1,0 +1,3 @@
+[submodule "libs/archerfisher"]
+	path = libs/archerfisher
+	url = https://github.com/P10-Software/archfisher.git

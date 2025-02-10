@@ -171,3 +171,7 @@ cython_debug/
 .pypirc
 
 # Custom rules
+*.json 
+.temp
+__pycache__
+.vscode

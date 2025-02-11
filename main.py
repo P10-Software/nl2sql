@@ -25,6 +25,12 @@ def evaluate_novo_database_naturalness():
     cur.execute('select "Table_Name" from column_label_lookup;')
     table_identifiers = {result[0] for result in cur.fetchall()}
 
+    #get normalised table names
+    normalized_table_identifiers = set()
+    with open("normalized_table_names.txt", "r", encoding="utf-8") as file:
+        for line in file:
+            normalized_table_identifiers.add(line.strip())
+
     #get column names
     cur.execute('select "Column_Name" from column_label_lookup;')
     column_identifiers = {result[0] for result in cur.fetchall()}
@@ -35,11 +41,15 @@ def evaluate_novo_database_naturalness():
 
 
     naturalness_table_results = evaluate_naturalness(table_identifiers)
+    naturalness_normalized_table_results = evaluate_naturalness(normalized_table_identifiers)
     naturalness_column_results = evaluate_naturalness(column_identifiers)
     naturalness_column_label_results = evaluate_naturalness(column_labels)
 
     with open("table_naturalness_results.json", "w") as file:
         dump(naturalness_table_results, file, indent=4)
+
+    with open("normalized_table_naturalness_results.json", "w") as file:
+        dump(naturalness_normalized_table_results, file, indent=4)
 
     with open("column_naturalness_results.json", "w") as file:
         dump(naturalness_column_results, file, indent=4)
@@ -74,6 +84,25 @@ def evaluate_spider_2_naturalness():
     with open("spider2_column_naturalness_results.json", "w") as file:
         dump(column_naturalness_results, file, indent=4)
 
+def evaluate_kaggle_dbqa_naturalness():
+    with open("KaggleDBQA_tables.json", "r") as file:
+        dataset = load(file)
+
+    tables = set()
+    columns = set()
+    for database in dataset:
+        tables.update(database["table_names"])
+        columns.update({column[1] for column in database["column_names"] if column[1] != "*"})
+
+    table_naturalness_results = evaluate_naturalness(tables)
+    column_naturalness_results = evaluate_naturalness(columns)
+    
+    with open("kaggledbqa_table_naturalness_results.json", "w") as file:
+        dump(table_naturalness_results, file, indent=4)
+    
+    with open("kaggledbqa_column_naturalness_results.json", "w") as file:
+        dump(column_naturalness_results, file, indent=4)
+
 def evaluate_naturalness(indentifiers):
     classifier = CanineIdentifierClassifier()
 
@@ -92,6 +121,7 @@ def evaluate_naturalness(indentifiers):
 def main():
     evaluate_novo_database_naturalness()
     evaluate_spider_2_naturalness()
+    evaluate_kaggle_dbqa_naturalness()
 
 if __name__ == "__main__":
     main()

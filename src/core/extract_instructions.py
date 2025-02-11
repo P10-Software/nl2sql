@@ -62,7 +62,6 @@ def _create_build_instruction_tree(connection_string) -> dict:
     - dict: Dict of tables and columns with their build instructions.
     """
     conn = connection_string
-    conn.autocommit = True
     cursor = conn.cursor()
 
     cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'")
@@ -80,8 +79,7 @@ def _create_build_instruction_tree(connection_string) -> dict:
             'columns': {}
         }
 
-        for column in columns:
-            col_name, data_type, char_length, is_nullable, col_default = column
+        for col_name, data_type, char_length, is_nullable, col_default in columns:
             col_def = f'{col_name} {data_type.upper()}'
 
             if char_length and data_type in ('character varying', 'varchar'):
@@ -134,9 +132,3 @@ def _create_build_instruction(build_instruct_dict: dict, tables_columns: dict, l
                 )
                 sql_statements.append(create_table_sql)
     return "\n\n".join(sql_statements)
-
-
-if __name__ == '__main__':
-    q = "SELECT T1.profile_id FROM plnd_flowch_prof_coll AS T1 WHERE T1.profile_id like \"%8 point profile%\""
-    res = get_query_build_instruct('columns', q)
-    print(res)

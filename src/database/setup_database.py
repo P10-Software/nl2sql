@@ -108,17 +108,16 @@ def _drop_column_label_table():
         cur.close()
         conn.close()
     except Exception as e:
-        print("Error dropping database", e)
+        logger.error("Error dopping the table column_label_lookup. ", e)
 
 
 if __name__ == '__main__':
-    data_directory = input("Provide path to the af data folder: ").strip()
+    data_directory = input("Provide path to the data folder: ").strip()
 
     if os.path.isdir(data_directory):
         try:
             init_db(data_directory)
         except Exception as e:
             logger.error("Failed: ", e)
-            print(f"Failed: {e}")
     else:
-        print("provided path is not a directory.")
+        logger.error("Provided path is not a directory.")

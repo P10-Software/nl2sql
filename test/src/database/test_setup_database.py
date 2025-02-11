@@ -40,4 +40,4 @@ class TestSetupDatabase:
         cur.close()
         conn.close()
 
-        assert res != 0
+        assert res == 997

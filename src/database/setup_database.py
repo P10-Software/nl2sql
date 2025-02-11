@@ -25,6 +25,10 @@ def init_db(data_directory: str):
     Parameters:
     - data_directory (str): Root directory to search for SAS files.
     """
+
+    _create_db()
+    _drop_column_label_table()
+
     sas_files = _find_sas_files(data_directory)
 
     for _, files in sas_files.items():
@@ -34,8 +38,6 @@ def init_db(data_directory: str):
 
 def _find_sas_files(directory_path: str):
     sas_files = {}
-
-    _create_db()
 
     for root, _, files in os.walk(directory_path):
         folder_name = os.path.basename(root)
@@ -92,14 +94,30 @@ def _create_db():
         logger.error("Error creating database:", e)
 
 
+def _drop_column_label_table():
+    """
+    Drop the tables column_label_lookup table to avoid duplicates 
+    """
+    try:
+        conn = psycopg2.connect(dbname=DB_NAME, user=USER, password=PASSWORD, host=HOST, port=PORT)
+        conn.autocommit = True
+        cur = conn.cursor()
+
+        cur.execute("DROP TABLE IF EXISTS column_label_lookup")
+
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.error("Error dopping the table column_label_lookup. ", e)
+
+
 if __name__ == '__main__':
-    data_directory = input("Provide path to the af data folder: ").strip()
+    data_directory = input("Provide path to the data folder: ").strip()
 
     if os.path.isdir(data_directory):
         try:
             init_db(data_directory)
         except Exception as e:
             logger.error("Failed: ", e)
-            print(f"Failed: {e}")
     else:
-        print("provided path is not a directory.")
+        logger.error("Provided path is not a directory.")

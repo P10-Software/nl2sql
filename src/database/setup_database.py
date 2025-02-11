@@ -92,6 +92,10 @@ def _create_db():
         logger.error("Error creating database:", e)
 
 
+def get_conn():
+    return psycopg2.connect(dbname=DB_NAME, user=USER, password=PASSWORD, host=HOST, port=PORT)
+
+
 if __name__ == '__main__':
     data_directory = input("Provide path to the af data folder: ").strip()
 

@@ -1,0 +1,63 @@
+import sqlite3
+import pytest
+from unittest.mock import patch
+from src.core.extract_instructions import get_query_build_instruct
+
+
+@pytest.fixture(scope="function")
+def in_memory_db():
+    conn = sqlite3.connect(':memory:')
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE tab_pln (
+            pln_id TEXT NOT NULL,
+            pln_name TEXT,
+            created_at DATE DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE nu_pln (
+            nu_id TEXT NOT NULL
+        )
+    """)
+    cursor.execute(
+        "INSERT INTO tab_pln (pln_id, pln_name) VALUES ('id111', 'BigJoel')")
+    cursor.execute("INSERT INTO nu_pln (nu_id) VALUES ('id1')")
+    conn.commit()
+    yield conn
+    conn.close()
+
+
+@pytest.mark.parametrize("kind, expected", [
+    ('columns', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL);"),
+    ('tables', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL,\n    pln_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);"),
+    ('full', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL,\n    pln_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);\n\nCREATE TABLE nu_pln (nu_id TEXT NOT NULL);")
+])
+@patch('src.database.setup_database.get_conn')
+@patch('src.core.extract_instructions._create_build_instruction_tree')
+def test_get_query_build_instructions(mock_build_tree, mock_get_conn, in_memory_db, kind, expected):
+    # Arrange
+    mock_get_conn.return_value = in_memory_db
+    mock_build_tree.return_value = {
+        'tab_pln': {
+            'create_table': 'CREATE TABLE tab_pln ({columns});',
+            'columns': {
+                'pln_id': 'pln_id TEXT NOT NULL',
+                'pln_name': 'pln_name TEXT',
+                'created_at': 'created_at DATE DEFAULT CURRENT_TIMESTAMP'
+            }
+        },
+        'nu_pln': {
+            'create_table': 'CREATE TABLE nu_pln ({columns});',
+            'columns': {
+                'nu_id': 'nu_id TEXT NOT NULL'
+            }
+        }
+    }
+    query = "SELECT pln_id FROM tab_pln"
+
+    # Act
+    result = get_query_build_instruct(kind, query)
+
+    # Assert
+    assert result.strip() == expected.strip()

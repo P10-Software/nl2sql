@@ -25,10 +25,10 @@ def execute_query(query: str):
     """
 
     result = None
-    conn = create_psql_connection()
+    conn = get_conn()
     if conn:
         try:
-            conn.autocommit = True
+            # conn.autocommit = True
             cur = conn.cursor()
 
             cur.execute(query)
@@ -42,7 +42,7 @@ def execute_query(query: str):
     return result
 
 
-def create_psql_connection():
+def get_conn():
     """
     Creates and returns the connection to the database
     """

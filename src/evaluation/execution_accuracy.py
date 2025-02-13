@@ -1,7 +1,7 @@
 from src.database.database import execute_query
 
 
-def execution_accuracy(goal_query: str, generated_query: str) -> Bool:
+def execution_accuracy(goal_query: str, generated_query: str) -> bool:
     """
     Implements the exact execution match, comparing the result of executing the goal query and generated query.
     
@@ -17,4 +17,4 @@ def execution_accuracy(goal_query: str, generated_query: str) -> Bool:
     res_goal_query = execute_query(goal_query)
     res_generated_query = execute_query(generated_query)
 
-    return 1 if res_generated_query == res_goal_query else 0
+    return True if res_generated_query == res_goal_query else False

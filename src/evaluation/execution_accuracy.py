@@ -17,4 +17,4 @@ def execution_accuracy(goal_query: str, generated_query: str) -> bool:
     res_goal_query = execute_query(goal_query)
     res_generated_query = execute_query(generated_query)
 
-    return True if res_generated_query == res_goal_query else False
+    return res_generated_query == res_goal_query

@@ -1,6 +1,6 @@
 import sqlite3
-import pytest
 from unittest.mock import patch
+import pytest
 from src.database.database import execute_query
 
 
@@ -39,3 +39,14 @@ def test_execute_query(mock_get_conn, in_memory_db, query, expected_result):
     res = execute_query(query)
 
     assert res == expected_result
+
+
+@patch("src.database.database.get_conn")
+def test_execute_query_logs_error(mock_get_conn, in_memory_db, caplog):
+    mock_get_conn.return_value = in_memory_db
+
+    execute_query("SELECT * FROM unknown_table")
+
+    expected_message = "Error executing query on database: no such table: unknown_table"
+
+    assert any(expected_message in message for message in caplog.messages)

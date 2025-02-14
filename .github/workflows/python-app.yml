@@ -6,10 +6,8 @@ name: Python application
 on:
   push:
     branches: [ "main" ]
-    paths-ignore: 'src/database/setup_database.py'
   pull_request:
     branches: [ "main" ]
-    paths-ignore: 'src/database/setup_database.py'
 
 permissions:
   contents: read
@@ -38,4 +36,4 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
-        python -m pytest test/
+        python -m pytest test/ --ignore=src/database/setup_database.py 

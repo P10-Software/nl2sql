@@ -1,5 +1,5 @@
 import pytest
-from src.core.evaluation_metrics import precision, recall, f1_score
+from src.core.evaluation_metrics import precision, recall, f1_score, execution_accuracy
 
 
 @pytest.mark.parametrize("golden, generated, result", [
@@ -166,3 +166,77 @@ def test_f1_score(golden, generated, result):
 
     # Assert
     assert res == result
+
+
+@pytest.mark.parametrize("golden, generated, expected_result", [
+    # 1. Perfect Match (Execution Accuracy = 1.0)
+    (
+        [[(1, 'Alice'), (2, 'Bob')]],
+        [[(1, 'Alice'), (2, 'Bob')]],
+        {'total_execution_accuracy': 1.0, 'individual_execution_accuracy': {0: 1.0}}
+    ),
+    # 2. Some Correct, Some Extra (Execution Accuracy = 0.0)
+    (
+        [[(1, 'Alice'), (2, 'Bob')]],
+        [[(1, 'Alice'), (3, 'Bravo')]],
+        {'total_execution_accuracy': 0.0, 'individual_execution_accuracy': {0: 0.0}}
+    ),
+    # 3. No Overlap (Execution Accuracy = 0.0)
+    (
+        [[(1, 'Alice'), (2, 'Bob')]],
+        [[(3, 'Bravo'), (4, 'Delta')]],
+        {'total_execution_accuracy': 0.0, 'individual_execution_accuracy': {0: 0.0}}
+    ),
+    # 4. Generated Set is Empty (Execution Accuracy = 0.0)
+    (
+        [[(1, 'Alice'), (2, 'Bob')]],
+        [[]],
+        {'total_execution_accuracy': 0.0, 'individual_execution_accuracy': {0: 0.0}}
+    ),
+    # 5. Gold Set is Empty (Execution Accuracy = 0.0)
+    (
+        [[]],
+        [[(1, 'Alice'), (2, 'Bob')]],
+        {'total_execution_accuracy': 0.0, 'individual_execution_accuracy': {0: 0.0}}
+    ),
+    # 6. Some Missing, Some Extra (Execution Accuracy = 0.0)
+    (
+        [[(1, 'Alice'), (2, 'Bob'), (3, 'Charlie')]],
+        [[(1, 'Alice'), (4, 'Delta')]],
+        {'total_execution_accuracy': 0.0, 'individual_execution_accuracy': {0: 0.0}}
+    ),
+    # 7. Duplicate Predictions (Execution Accuracy = 0.0, as duplicates change the structure)
+    (
+        [[(1, 'Alice'), (2, 'Bob')]],
+        [[(1, 'Alice'), (1, 'Alice'), (2, 'Bob')]],
+        {'total_execution_accuracy': 0.0, 'individual_execution_accuracy': {0: 0.0}}
+    ),
+    # 8. Perfect Match, Multiple Queries (Execution Accuracy = 1.0)
+    (
+        [[(1, 'Alice'), (2, 'Bob')], [(1, 'Bob'), (2, 'Alice')]],
+        [[(1, 'Alice'), (2, 'Bob')], [(1, 'Bob'), (2, 'Alice')]],
+        {'total_execution_accuracy': 1.0, 'individual_execution_accuracy': {0: 1.0, 1: 1.0}}
+    ),
+    # 9. Match and No Match, Multiple Queries (Execution Accuracy = 0.5)
+    (
+        [[(1, 'Alice'), (2, 'Bob')], [(1, 'Bob'), (2, 'Alice')]],
+        [[(1, 'Alice'), (2, 'Bob')], [(1, 'Bob'), (2, 'Alice'), (3, 'Alice')]],
+        {'total_execution_accuracy': 0.5, 'individual_execution_accuracy': {0: 1.0, 1: 0.0}}
+    ),
+    # 10. No Match, Multiple Queries (Execution Accuracy = 0.0)
+    (
+        [[(1, 'Alice'), (2, 'Bob')], [(1, 'Bob'), (2, 'Alice')]],
+        [[], [(1, 'Bob'), (2, 'Alice'), (3, 'Alice')]],
+        {'total_execution_accuracy': 0.0, 'individual_execution_accuracy': {0: 0.0, 1: 0.0}}
+    ),
+], ids=[
+    'full match', 'generated one diff', 'generated full diff', 'empty generated', 'empty gold',
+    'some missing some extra', 'duplicate predictions', 'multiple', 'match and no match', 
+    'multiple no match'
+])
+def test_execution_accuracy_score(golden, generated, expected_result):
+    # Arrange + Act
+    res = execution_accuracy(golden, generated)
+
+    # Assert
+    assert res == expected_result

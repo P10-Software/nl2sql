@@ -11,6 +11,7 @@ HOST = os.getenv('PG_HOST')
 PORT = os.getenv('PG_PORT')
 DB_NAME = os.getenv('DB_NAME')
 
+@pytest.mark.skip(reason="Only runable locally.")
 class TestSetupDatabase:
     def test_db_exists(self):
         conn = psycopg2.connect(dbname="postgres", user=USER, password=PASSWORD, host=HOST, port=PORT)

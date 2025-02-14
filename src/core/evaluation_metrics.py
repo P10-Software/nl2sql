@@ -95,3 +95,31 @@ def f1_score(golden: list[list[tuple]], generated: list[list[tuple]]):
         "total_f1": total_f1,
         "individual_f1s": per_query_f1
     }
+
+
+def execution_accuracy(golden: list[list[tuple]], generated: list[list[tuple]]):
+    """
+    Implements the exact execution match, comparing the result of executing the goal query and generated query.
+
+    Args:
+        - golden (list[list[tuple]]): List of lists, where each sublist contains tuples from executing the nth golden query.
+        - generated (list[list[tuple]]): List of lists, where each sublist contains tuples from executing the nth generated query.
+
+    Returns;
+    - Results (dict): A dictionary with:
+        - "total_execution_accuracy": The average exact match score.
+        - "individual_execution_accuracy": A dictionary mapping query index to its execution accuracy score.
+    """
+
+    per_query_execution_accuracy = {}
+
+    for idx, (gold_res, gen_res) in enumerate(zip(golden, generated)):
+        per_query_execution_accuracy[idx] = gold_res == gen_res
+
+    total_execution_accuracy = sum(per_query_execution_accuracy.values()) / \
+        len(per_query_execution_accuracy) if per_query_execution_accuracy else 0
+
+    return {
+        "total_execution_accuracy": total_execution_accuracy,
+        "individual_execution_accuracy": per_query_execution_accuracy
+    }

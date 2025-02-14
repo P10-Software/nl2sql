@@ -6,8 +6,10 @@ name: Python application
 on:
   push:
     branches: [ "main" ]
+    paths-ignore: 'src/database/setup_database.py'
   pull_request:
     branches: [ "main" ]
+    paths-ignore: 'src/database/setup_database.py'
 
 permissions:
   contents: read

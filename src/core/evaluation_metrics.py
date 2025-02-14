@@ -13,12 +13,12 @@ def precision(golden: list[list[tuple]], generated: list[list[tuple]]):
     """
     per_query_precision = {}
 
-    for idx, (gol_res, gen_res) in enumerate(zip(golden, generated)):
-        gol_set = set(gol_res)
+    for idx, (gold_res, gen_res) in enumerate(zip(golden, generated)):
+        gold_set = set(gold_res)
         gen_set = set(gen_res)
 
-        tp = len(gen_set & gol_set)
-        fp = len(gen_set - gol_set)
+        tp = len(gen_set & gold_set)
+        fp = len(gen_set - gold_set)
 
         precision_score = tp / (tp + fp) if (tp + fp) > 0 else 0
         per_query_precision[idx] = precision_score
@@ -47,12 +47,12 @@ def recall(golden: list[list[tuple]], generated: list[list[tuple]]):
     """
     per_query_recall = {}
 
-    for idx, (gol_res, gen_res) in enumerate(zip(golden, generated)):
-        gol_set = set(gol_res)
+    for idx, (gold_res, gen_res) in enumerate(zip(golden, generated)):
+        gold_set = set(gold_res)
         gen_set = set(gen_res)
 
-        tp = len(gen_set & gol_set)
-        fn = len(gol_set - gen_set)
+        tp = len(gen_set & gold_set)
+        fn = len(gold_set - gen_set)
 
         recall_score = tp / (tp + fn) if (tp + fn) > 0 else 0
         per_query_recall[idx] = recall_score

@@ -34,8 +34,6 @@ class NL2SQLModel(ABC):
         self.prompt_strategy = prompt_strategy
         self.results = {}
 
-        self._enforce_required_attributes()
-
     def run(self, schema_size: SchemaKind):
         logger.info(f"Started benchmarking of {self.__class__.__name__}.")
         for idx, pair in enumerate(tqdm(self.benchmark)):
@@ -43,31 +41,21 @@ class NL2SQLModel(ABC):
             goal = pair['golden_query']
             schema = get_query_build_instruct(schema_size, goal)
             prompt = self.prompt_strategy.get_prompt(schema, question)
-            answer = self._prune_generated_query(self._answer_single_question(prompt))
+            answer = self._answer_single_question(prompt)
             self.results[idx] = {'question': question, 'golden_query': goal, 'golden_result': {}, 'generated_query': answer, 'generated_result': {}}
         logger.info(f"Benchmarking finished for {self.__class__.__name__}.")
         logger.info(f"Running results of database for {self.__class__.__name__}.")
-        for res in self.results:
+        for id, res in self.results.items():
             res['golden_result'] = self._get_query_result(res['golden_query'])
-            res['generated_query'] = self._get_query_result(res['generated_query'])
+            res['generated_result'] = self._get_query_result(res['generated_query'])
         logger.info(f"Executed all queries on the database for {self.__class__.__name__}.")
 
     @abstractmethod
     def generate_report(self):
         raise NotImplementedError("Subclasses should implement this method.")
 
-    def _enforce_required_attributes(self):
-        required_attributes = ['tokenizer', 'model', 'pipe']
-        missing = [attr for attr in required_attributes if getattr(
-            self, attr) is None]
-
-        if missing:
-            raise NotImplementedError(
-                f"The following attributes must be initialized in the subclass: {', '.join(missing)}"
-            )
-
     def _answer_single_question(self, question: str):
-        return (self.pipe(question, return_full_text=False))[0]['generated_text']
+        return self._prune_generated_query((self.pipe(question, return_full_text=False))[0]['generated_text'])
 
     def _prune_generated_query(self, query: str):
         # Prune everything before select

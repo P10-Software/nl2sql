@@ -18,6 +18,14 @@ class PromptStrategy(ABC):
 
 class NL2SQLModel(ABC):
     def __init__(self, connection, benchmark_set: dict, prompt_strategy: PromptStrategy):
+        """
+        Init for any NL2SQL model used for benchmarking, uses huggingface for all models.
+
+        args:
+        - connection: Postgres connection string.
+        - benchmark_set: Dictionary containing the benchmark dataset, format outlined in README.
+        - prompt_strategy: A specialised prompt strategy for the model, should include a method get_prompt(), that builds the desired prompt.
+        """
         self.benchmark = benchmark_set
         self.tokenizer = None
         self.model = None
@@ -80,22 +88,3 @@ class NL2SQLModel(ABC):
         finally:
             cur.close()
         return res
-
-
-class Llama():
-    def __init__(self, benchmark_set: dict):
-        tokenizer = AutoTokenizer.from_pretrained(
-            "meta-llama/Llama-3.3-70B-Instruct", device="cuda")
-        model = AutoModelForCausalLM.from_pretrained(
-            "meta-llama/Llama-3.3-70B-Instruct", device_map="auto")
-        self.pipe = pipeline(TASK, tokenizer=tokenizer,
-                             model=model, max_new_tokens=MAX_NEW_TOKENS)
-        self.benchmark = benchmark_set
-        self.results = None
-
-    def run():
-        pass
-
-    def answer_question(self, question):
-        output = self.pipe(question, return_full_text=False)
-        return output[0]["generated_text"]

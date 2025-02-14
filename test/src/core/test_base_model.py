@@ -80,7 +80,7 @@ def test_prune_generated_query(mock_db_conn, mock_benchmark_set):
 
 
 @pytest.mark.parametrize("schema_kind", ["columns", "tables", "full"])
-@patch("src.core.extract_instructions.get_query_build_instruct", return_value="MOCK SCHEMA")
+@patch("src.core.base_model.get_query_build_instruct", return_value="MOCK SCHEMA")
 def test_run(mock_get_query_build_instruct, mock_db_conn, mock_benchmark_set, mock_logger, schema_kind):
     # Arrange
     model = MockNL2SQLModel(mock_db_conn, mock_benchmark_set)

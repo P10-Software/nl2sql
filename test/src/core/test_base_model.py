@@ -1,0 +1,107 @@
+import pytest
+from src.core.base_model import NL2SQLModel, PromptStrategy
+from unittest.mock import MagicMock, patch, call
+
+
+@pytest.fixture
+def mock_logger():
+    with patch("src.core.base_model.logger") as mock_logger_instance:
+        yield mock_logger_instance
+
+
+class MockPromptStrategy(PromptStrategy):
+    def get_prompt(self, schema, question):
+        return f"MOCK PROMPT: {schema} {question}"
+
+
+class MockNL2SQLModel(NL2SQLModel):
+    def __init__(self, connection, benchmark_set):
+        super().__init__(connection, benchmark_set, MockPromptStrategy())
+        self.tokenizer = MagicMock()
+        self.model = MagicMock()
+        self.pipe = MagicMock(
+            return_value=[{"generated_text": "sure here is the needed sql: SELECT * FROM mock_table;, is that all?"}])
+
+    def generate_report(self):
+        return {"mock_report": True}  # Fix typo from "mock_retport"
+
+
+@pytest.fixture
+def mock_db_conn():
+    """Mocks a database connection."""
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_conn.cursor.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = [("mock_result",)]
+    return mock_conn
+
+
+@pytest.fixture
+def mock_benchmark_set():
+    """Mocks a small benchmark set."""
+    return [{"question": "What are the users?", "golden_query": "SELECT * FROM users;"}]
+
+
+@patch('src.core.extract_instructions.get_query_build_instruct', return_value="MOCK SCHEMA")
+def test_nl2sql_init(mock_get_query_build_instruct, mock_db_conn, mock_benchmark_set):
+    # Arrange + Act
+    model = MockNL2SQLModel(mock_db_conn, mock_benchmark_set)
+
+    # Assert
+    assert model.tokenizer is not None
+    assert model.model is not None
+    assert model.pipe is not None
+    assert model.conn == mock_db_conn
+    assert isinstance(model.prompt_strategy, MockPromptStrategy)
+
+
+def test_answer_single_question(mock_db_conn, mock_benchmark_set):
+    # Arrange
+    model = MockNL2SQLModel(mock_db_conn, mock_benchmark_set)
+    q = "How many users are there"
+
+    # Act
+    res = model._answer_single_question(q)
+
+    # Assert
+    assert res == "SELECT * FROM mock_table;"
+
+
+def test_prune_generated_query():
+    # Arrange
+    model = MockNL2SQLModel(MagicMock(), [])
+    raw_query = "Hello, let's generate some SQL: SELECT name FROM users WHERE age > 30; More text here..."
+
+    # Act
+    res = model._prune_generated_query(raw_query)
+
+    # Assert
+    assert res == "SELECT name FROM users WHERE age > 30;"
+
+
+@pytest.mark.parametrize("schema_kind", ["columns", "tables", "full"])
+@patch("src.core.extract_instructions.get_query_build_instruct", return_value="MOCK SCHEMA")
+def test_run(mock_get_query_build_instruct, mock_db_conn, mock_benchmark_set, mock_logger, schema_kind):
+    # Arrange
+    model = MockNL2SQLModel(mock_db_conn, mock_benchmark_set)
+
+    with patch.object(model, "_answer_single_question", return_value="SELECT * FROM users;"):
+        with patch.object(model, "_get_query_result", return_value=[("mock_result",)]):
+            # Act
+            model.run(schema_size=schema_kind)
+
+    # Assert
+    assert len(model.results) == len(mock_benchmark_set)
+    assert model.results[0]['generated_query'] == "SELECT * FROM users;"
+    assert model.results[0]['golden_result'] == [("mock_result",)]
+    assert model.results[0]['generated_result'] == [("mock_result",)]
+
+    # Ensure logger was called
+    expected_calls = [
+        call.info("Started benchmarking of MockNL2SQLModel."),
+        call.info("Benchmarking finished for MockNL2SQLModel."),
+        call.info("Running results of database for MockNL2SQLModel."),
+        call.info("Executed all queries on the database for MockNL2SQLModel."),
+    ]
+
+    mock_logger.info.assert_has_calls(expected_calls, any_order=False)

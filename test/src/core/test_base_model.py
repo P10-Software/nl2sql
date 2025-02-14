@@ -67,9 +67,9 @@ def test_answer_single_question(mock_db_conn, mock_benchmark_set):
     assert res == "SELECT * FROM mock_table;"
 
 
-def test_prune_generated_query():
+def test_prune_generated_query(mock_db_conn, mock_benchmark_set):
     # Arrange
-    model = MockNL2SQLModel(MagicMock(), [])
+    model = MockNL2SQLModel(mock_db_conn, mock_benchmark_set)
     raw_query = "Hello, let's generate some SQL: SELECT name FROM users WHERE age > 30; More text here..."
 
     # Act

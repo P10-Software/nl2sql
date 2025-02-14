@@ -19,7 +19,7 @@ class PromptStrategy(ABC):
 class NL2SQLModel(ABC):
     def __init__(self, connection, benchmark_set: dict, prompt_strategy: PromptStrategy):
         """
-        Init for any NL2SQL model used for benchmarking, uses huggingface for all models.
+        Init for any NL2SQL model used for benchmarking, uses transformers for all models.
 
         args:
         - connection: Postgres connection string.

@@ -4,6 +4,7 @@ from src.core.extract_instructions import get_query_build_instruct, SchemaKind
 from tqdm import tqdm
 from src.common.logger import get_logger
 import re
+from evaluation_metrics import precision, recall, f1_score
 
 TASK = 'text-generation'
 MAX_NEW_TOKENS = 200
@@ -33,6 +34,7 @@ class NL2SQLModel(ABC):
         self.conn = connection
         self.prompt_strategy = prompt_strategy
         self.results = {}
+        self.analysis = None
 
     def run(self, schema_size: SchemaKind):
         logger.info(f"Started benchmarking of {self.__class__.__name__}.")
@@ -49,6 +51,22 @@ class NL2SQLModel(ABC):
             res['golden_result'] = self._get_query_result(res['golden_query'])
             res['generated_result'] = self._get_query_result(res['generated_query'])
         logger.info(f"Executed all queries on the database for {self.__class__.__name__}.")
+
+    def analyse(self) -> None:
+        """
+        Generates an analysis of the results.
+        Runs metrics of EX, recall, precision and F1. Also analysis SQL errors, categorising by table, column and clause.
+        """
+        if self.results == {}:
+            logger.error("Analysis called on empty result.")
+            return
+        golden_results = [res['golden_result'] for res in self.results.values()]
+        generated_results = [res['generated_result'] for res in self.results.values()]
+        p = precision(golden_results, generated_results)
+        r = recall(golden_results, generated_results)
+        f1 = f1_score(golden_results, generated_results)
+
+        pass
 
     @abstractmethod
     def generate_report(self):

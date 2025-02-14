@@ -1,10 +1,10 @@
 from unittest.mock import patch
 import pytest
-from src.evaluation.execution_accuracy import execution_accuracy
+from src.core.execution_accuracy import execution_accuracy
 
 
 class TestExecutionAccuracy:
-    @patch("src.evaluation.execution_accuracy.execute_query")
+    @patch("src.core.execution_accuracy.execute_query")
     def test_execution_accuracy_match(self, mock_execute_query):
         mock_execute_query.side_effect = [
             [("id1", "Joel"), ("id2", "SmallJoel")],
@@ -17,7 +17,7 @@ class TestExecutionAccuracy:
         assert execution_accuracy(goal_query, generated_gurey)
 
 
-    @patch("src.evaluation.execution_accuracy.execute_query")
+    @patch("src.core.execution_accuracy.execute_query")
     def test_execution_accuracy_different(self, mock_execute_query):
         mock_execute_query.side_effect = [
             [("id1", "Joel"), ("id2", "SmallJoel")],
@@ -29,7 +29,7 @@ class TestExecutionAccuracy:
 
         assert not execution_accuracy(goal_query, generated_gurey)
 
-    @patch("src.evaluation.execution_accuracy.execute_query")
+    @patch("src.core.execution_accuracy.execute_query")
     def test_execution_accuracy_match_distinct(self, mock_execute_query):
         mock_execute_query.side_effect = [
             [("id1", "Joel"), ("id2", "SmallJoel"), ("id2", "SmallJoel")],
@@ -42,7 +42,7 @@ class TestExecutionAccuracy:
         assert not execution_accuracy(goal_query, generated_gurey)
 
 
-    @patch("src.evaluation.execution_accuracy.execute_query")
+    @patch("src.core.execution_accuracy.execute_query")
     def test_execution_accuracy_empty_generated (self, mock_execute_query):
         mock_execute_query.side_effect = [
             [("id1", "Joel"), ("id2", "SmallJoel")],

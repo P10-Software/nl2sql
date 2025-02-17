@@ -1,4 +1,3 @@
-from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 from abc import abstractmethod, ABC
 from src.core.extract_instructions import get_query_build_instruct, SchemaKind
 from tqdm import tqdm
@@ -54,8 +53,9 @@ class NL2SQLModel(ABC):
     def generate_report(self):
         raise NotImplementedError("Subclasses should implement this method.")
 
+    @abstractmethod
     def _answer_single_question(self, question: str):
-        return self._prune_generated_query((self.pipe(question, return_full_text=False))[0]['generated_text'])
+        raise NotImplementedError("Subclasses should implement this method.")
 
     def _prune_generated_query(self, query: str):
         # Prune everything before select

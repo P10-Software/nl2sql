@@ -39,7 +39,7 @@ class XiYanSQLPromptStrategy(PromptStrategy):
     def get_prompt(self, schema, question):
         return self.prompt_template.format(SQL_DIALECT=self.sql_dialect, DDL_INSTRUCTIONS=schema, NL_QUESTION=question, EVIDENCE="")
     
-class Llam3PromptStrategy(PromptStrategy):
+class Llama3PromptStrategy(PromptStrategy):
     def __init__(self, sql_dialect):
         self.sql_dialect = sql_dialect
         self.prompt_template = """

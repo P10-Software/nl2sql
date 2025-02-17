@@ -1,4 +1,4 @@
-from src.core.prompt_strategies import XiYanSQLPromptStrategy, Llam3PromptStrategy, DeepSeekPromptStrategy
+from src.core.prompt_strategies import XiYanSQLPromptStrategy, Llama3PromptStrategy, DeepSeekPromptStrategy
 import pytest
 
 XIYAN_SQL_EXPECTED = """
@@ -59,7 +59,7 @@ DEEPSEEK_EXPECTED = """
 
 @pytest.mark.parametrize(("prompt_class", "expected_prompt"), [
     (XiYanSQLPromptStrategy, XIYAN_SQL_EXPECTED),
-    (Llam3PromptStrategy, LLAMA_EXPECTED),
+    (Llama3PromptStrategy, LLAMA_EXPECTED),
     (DeepSeekPromptStrategy, DEEPSEEK_EXPECTED)
 ])
 def test_prompt_strategies(prompt_class, expected_prompt):

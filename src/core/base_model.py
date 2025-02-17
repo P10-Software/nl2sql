@@ -3,7 +3,7 @@ from src.core.extract_instructions import get_query_build_instruct, SchemaKind
 from tqdm import tqdm
 from src.common.logger import get_logger
 import re
-from src.core.evaluation_metrics import precision, recall, f1_score
+from src.core.evaluation_metrics import precision, recall, f1_score, execution_accuracy
 import sql_metadata
 from collections import Counter
 
@@ -63,9 +63,6 @@ class NL2SQLModel(ABC):
             return
         golden_results = [res['golden_result'] for res in self.results.values()]
         generated_results = [res['generated_result'] for res in self.results.values()]
-        p = precision(golden_results, generated_results)
-        r = recall(golden_results, generated_results)
-        f1 = f1_score(golden_results, generated_results)
 
         golden_sql = [res['golden_query'] for res in self.results.values()]
         generated_sql = [res['generated_query'] for res in self.results.values()]
@@ -73,11 +70,12 @@ class NL2SQLModel(ABC):
         sql_errors = self._analyse_sql(golden_sql, generated_sql)
 
         self.analysis = {
-            'precision': p,
-            'recall': r,
-            'f1 score': f1,
+            'execution accuracy': execution_accuracy(golden_results, generated_results),
+            'precision': precision(golden_results, generated_results),
+            'recall': recall(golden_results, generated_results),
+            'f1 score': f1_score(golden_results, generated_results),
             'SQL mismatches': sql_errors,
-            'total_sql_queries': len(generated_sql)
+            'total sql queries': len(generated_sql)
         }
 
     @abstractmethod
@@ -114,7 +112,8 @@ class NL2SQLModel(ABC):
         error_counts = Counter({
             "table_errors": 0,
             "column_errors": 0,
-            "clause_errors": 0
+            "clause_errors": 0,
+            "distinct_errors": 0
         })
         individual_errors = []
 
@@ -133,6 +132,9 @@ class NL2SQLModel(ABC):
             clause_mismatch_count = sum(1 for _ in mismatches["clauses"])
             error_counts["clause_errors"] += clause_mismatch_count
 
+            if mismatches['distinct']['gold'] != mismatches['distinct']['generated']:
+                error_counts['distinct_errors'] += 1
+
             individual_errors.append({
                 'generated_sql': generated_sql,
                 'errors': mismatches
@@ -150,7 +152,8 @@ class NL2SQLModel(ABC):
         mismatches = {
             'tables': {'gold': [], 'generated': []},
             'columns': {'gold': [], 'generated': []},
-            'clauses': {}
+            'clauses': {},
+            'distinct': {'gold': self._has_dictinct(gold_parser), 'generated': self._has_dictinct(generated_parser)}
         }
 
         gold_tables = set(gold_parser.tables) if gold_parser.tables else set()
@@ -201,3 +204,9 @@ class NL2SQLModel(ABC):
                 clauses[token.normalized].append(" ".join(clause_filter))
 
         return clauses
+
+    def _has_dictinct(self, parser):
+        for token in parser.tokens:
+            if token.is_keyword and token.normalized == 'DISTINCT':
+                return True
+        return False

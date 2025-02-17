@@ -110,31 +110,48 @@ def test_run(mock_get_query_build_instruct, mock_db_conn, mock_benchmark_set, mo
 @pytest.mark.parametrize(
     "gold, generated, expected",
     [
+        # Generated has distinct
+        (
+            "SELECT name FROM names;",
+            "SELECT DISTINCT name FROM names;",
+            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': [], 'generated': []}, 'clauses': {}, 'distinct': {'gold': False, 'generated': True}}
+        ),
+        # Gold has distinct
+        (
+            "SELECT DISTINCT name FROM names;",
+            "SELECT name FROM names;",
+            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': [], 'generated': [
+            ]}, 'clauses': {}, 'distinct': {'gold': True, 'generated': False}}
+        ),
         # Missing column, WHERE clause, and GROUP BY
         (
             "SELECT name, age FROM users WHERE age > 18 GROUP BY age ORDER BY name",
             "SELECT name FROM users ORDER BY name",
-            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': ['name', 'age'], 'generated': ['name']}, 'clauses': {'WHERE': {'gold': ['AGE > 18'], 'generated': []}, 'GROUPBY': {'gold': ['AGE'], 'generated': []}}}
+            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': ['name', 'age'], 'generated': ['name']}, 'clauses': {'WHERE': {
+                'gold': ['AGE > 18'], 'generated': []}, 'GROUPBY': {'gold': ['AGE'], 'generated': []}}, 'distinct': {'gold': False, 'generated': False}}
         ),
         # Different table
         (
             "SELECT id FROM orders",
             "SELECT id FROM transactions",
-            {'tables': {'gold': ['orders'], 'generated': ['transactions']}, 'columns': {'gold': [], 'generated': []}, 'clauses': {}}
+            {'tables': {'gold': ['orders'], 'generated': ['transactions']}, 'columns': {'gold': [
+            ], 'generated': []}, 'clauses': {}, 'distinct': {'gold': False, 'generated': False}}
         ),
         # Identical SQL (no errors)
         (
             "SELECT id, amount FROM transactions WHERE amount > 100",
             "SELECT id, amount FROM transactions WHERE amount > 100",
-            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': [], 'generated': []}, 'clauses': {}}
+            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': [], 'generated': [
+            ]}, 'clauses': {}, 'distinct': {'gold': False, 'generated': False}}
         ),
         (
             "SELECT name, age FROM users WHERE age > 18 GROUP BY age ORDER BY name",
             "SELECT name, age FROM users WHERE age > 18 GROUP BY age ORDER BY age",
-            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': [], 'generated': []}, 'clauses': {'ORDERBY': {'gold': ['NAME '], 'generated': ['AGE ']}}}
+            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': [], 'generated': []}, 'clauses': {
+                'ORDERBY': {'gold': ['NAME '], 'generated': ['AGE ']}}, 'distinct': {'gold': False, 'generated': False}}
         )
     ],
-    ids=['missing column, where and group by', 'different table', 'no errors', 'different order by']
+    ids=['generated extra distinct', 'generated missing distinct', 'missing column, where and group by', 'different table', 'no errors', 'different order by']
 )
 def test_extract_sql_mismatch(mock_db_conn, mock_benchmark_set, gold, generated, expected):
     # Arrange
@@ -165,7 +182,8 @@ def test_analyse_sql():
     expected_total_errors = {
         'table_errors': 1,
         'column_errors': 1,
-        'clause_errors': 3
+        'clause_errors': 3,
+        'distinct_errors': 0
     }
 
     # Act

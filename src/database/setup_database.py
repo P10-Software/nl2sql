@@ -58,9 +58,9 @@ def _read_sas(path_to_sas: str):
     column_names = df.columns
 
     label_df = pd.DataFrame({
-        'Table_Name': table_name,
-        'Column_Name': column_names,
-        'Column_Label': meta.column_labels
+        'table_name': table_name,
+        'column_name': column_names,
+        'column_label': meta.column_labels
     })
 
     engine = create_engine(f'postgresql://{USER}:{PASSWORD}@{HOST}:{PORT}/{DB_NAME}')
@@ -70,7 +70,7 @@ def _read_sas(path_to_sas: str):
         label_df.to_sql('column_label_lookup', engine, if_exists='append', index=False)
         logger.info(f'Table {table_name} inserted successfully.')
     except Exception as e:
-        logger.error("Error: ", e)
+        logger.error("Error: %s", e)
 
 
 def _create_db():
@@ -91,7 +91,7 @@ def _create_db():
         cur.close()
         conn.close()
     except Exception as e:
-        logger.error("Error creating database:", e)
+        logger.error("Error creating database: %s", e)
 
 
 def _drop_column_label_table():
@@ -108,7 +108,7 @@ def _drop_column_label_table():
         cur.close()
         conn.close()
     except Exception as e:
-        logger.error("Error dopping the table column_label_lookup. ", e)
+        logger.error("Error dopping the table column_label_lookup. %s", e)
 
 
 def get_conn():
@@ -122,6 +122,6 @@ if __name__ == '__main__':
         try:
             init_db(data_directory)
         except Exception as e:
-            logger.error("Failed: ", e)
+            logger.error("Failed: %s", e)
     else:
         logger.error("Provided path is not a directory.")

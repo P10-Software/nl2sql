@@ -13,12 +13,12 @@ def precision(golden: list[list[tuple]], generated: list[list[tuple]]):
     """
     per_query_precision = {}
 
-    for idx, (gol_res, gen_res) in enumerate(zip(golden, generated)):
-        gol_set = set(gol_res)
+    for idx, (gold_res, gen_res) in enumerate(zip(golden, generated)):
+        gold_set = set(gold_res)
         gen_set = set(gen_res)
 
-        tp = len(gen_set & gol_set)
-        fp = len(gen_set - gol_set)
+        tp = len(gen_set & gold_set)
+        fp = len(gen_set - gold_set)
 
         precision_score = tp / (tp + fp) if (tp + fp) > 0 else 0
         per_query_precision[idx] = precision_score
@@ -47,12 +47,12 @@ def recall(golden: list[list[tuple]], generated: list[list[tuple]]):
     """
     per_query_recall = {}
 
-    for idx, (gol_res, gen_res) in enumerate(zip(golden, generated)):
-        gol_set = set(gol_res)
+    for idx, (gold_res, gen_res) in enumerate(zip(golden, generated)):
+        gold_set = set(gold_res)
         gen_set = set(gen_res)
 
-        tp = len(gen_set & gol_set)
-        fn = len(gol_set - gen_set)
+        tp = len(gen_set & gold_set)
+        fn = len(gold_set - gen_set)
 
         recall_score = tp / (tp + fn) if (tp + fn) > 0 else 0
         per_query_recall[idx] = recall_score
@@ -94,4 +94,32 @@ def f1_score(golden: list[list[tuple]], generated: list[list[tuple]]):
     return {
         "total_f1": total_f1,
         "individual_f1s": per_query_f1
+    }
+
+
+def execution_accuracy(golden: list[list[tuple]], generated: list[list[tuple]]):
+    """
+    Implements the exact execution match, comparing the result of executing the goal query and generated query.
+
+    Args:
+        - golden (list[list[tuple]]): List of lists, where each sublist contains tuples from executing the nth golden query.
+        - generated (list[list[tuple]]): List of lists, where each sublist contains tuples from executing the nth generated query.
+
+    Returns;
+    - Results (dict): A dictionary with:
+        - "total_execution_accuracy": The average exact match score.
+        - "individual_execution_accuracy": A dictionary mapping query index to its execution accuracy score.
+    """
+
+    per_query_execution_accuracy = {}
+
+    for idx, (gold_res, gen_res) in enumerate(zip(golden, generated)):
+        per_query_execution_accuracy[idx] = gold_res == gen_res
+
+    total_execution_accuracy = sum(per_query_execution_accuracy.values()) / \
+        len(per_query_execution_accuracy) if per_query_execution_accuracy else 0
+
+    return {
+        "total_execution_accuracy": total_execution_accuracy,
+        "individual_execution_accuracy": per_query_execution_accuracy
     }

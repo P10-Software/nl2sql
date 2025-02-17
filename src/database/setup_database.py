@@ -116,12 +116,8 @@ def get_conn():
 
 
 if __name__ == '__main__':
-    data_directory = input("Provide path to the data folder: ").strip()
-
-    if os.path.isdir(data_directory):
-        try:
-            init_db(data_directory)
-        except Exception as e:
-            logger.error("Failed: ", e)
-    else:
-        logger.error("Provided path is not a directory.")
+    DATA_DIRECTORY = "NOVO_SAS_DATA"
+    try:
+        init_db(DATA_DIRECTORY)
+    except Exception as e:
+        logger.error("Failed: ", e)

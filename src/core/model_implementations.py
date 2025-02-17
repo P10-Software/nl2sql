@@ -3,7 +3,7 @@ from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 from os.path import join
 import torch
 
-MODELS_DIRECTORY_PATH = "/work/P10_FILE_STORAGE/models/"
+MODELS_DIRECTORY_PATH = "models/"
 
 class XiYanSQLModel(NL2SQLModel):
     def __init__(self, connection, benchmark_set, prompt_strategy):

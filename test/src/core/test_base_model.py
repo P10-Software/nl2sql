@@ -191,3 +191,53 @@ def test_analyse_sql():
 
     # Assert
     assert result['total_errors'] == expected_total_errors
+
+
+def test_analyse():
+    # Arrange
+    model = MockNL2SQLModel(MagicMock(), MagicMock())
+    model.results = {
+        0: {
+            'question': 'What is the capital of France?',
+            'golden_query': 'SELECT capital FROM countries WHERE name="France"',
+            'golden_result': [('Paris',)],
+            'generated_query': 'SELECT capital FROM countries WHERE name="France"',
+            'generated_result': [('Paris',)]
+        },
+        1: {
+            'question': 'How many people live in Germany?',
+            'golden_query': 'SELECT population FROM countries WHERE name="Germany"',
+            'golden_result': [(83100000,)],
+            'generated_query': 'SELECT population FROM countries WHERE name="Germany"',
+            'generated_result': [(83100000,)]
+        },
+        2: {
+            'question': 'List all countries in Europe.',
+            'golden_query': 'SELECT name FROM countries WHERE continent="Europe"',
+            'golden_result': [('France',), ('Germany',), ('Italy',)],
+            'generated_query': 'SELECT name FROM countries WHERE continent="Europe"',
+            'generated_result': [('France',), ('Germany',), ('Italy',)]
+        },
+        3: {
+            'question': 'What is the GDP of Japan?',
+            'golden_query': 'SELECT gdp FROM countries WHERE name="Japan"',
+            'golden_result': [(5000000,)],  # Correct expected output
+            # Error: wrong WHERE clause, extra column
+            'generated_query': 'SELECT gdp, population FROM countries WHERE namee="Japon"',
+            # Incorrect output due to extra column
+            'generated_result': [(5000000, 126000000)]
+        },
+        4: {
+            'question': 'What is the area of Canada?',
+            'golden_query': 'SELECT area FROM countries WHERE name="Canada"',
+            'golden_result': [(9984670,)],
+            'generated_query': 'SELECT area FROM countries WHERE name="Canada"',
+            'generated_result': [(9984670,)]
+        }
+    }
+
+    # Act
+    model.analyse()
+
+    # Assert
+    assert model.analysis is not None

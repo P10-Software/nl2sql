@@ -105,3 +105,71 @@ def test_run(mock_get_query_build_instruct, mock_db_conn, mock_benchmark_set, mo
     ]
 
     mock_logger.info.assert_has_calls(expected_calls, any_order=False)
+
+
+@pytest.mark.parametrize(
+    "gold, generated, expected",
+    [
+        # Missing column, WHERE clause, and GROUP BY
+        (
+            "SELECT name, age FROM users WHERE age > 18 GROUP BY age ORDER BY name",
+            "SELECT name FROM users ORDER BY name",
+            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': ['name', 'age'], 'generated': ['name']}, 'clauses': {'WHERE': {'gold': ['AGE > 18'], 'generated': []}, 'GROUPBY': {'gold': ['AGE'], 'generated': []}}}
+        ),
+        # Different table
+        (
+            "SELECT id FROM orders",
+            "SELECT id FROM transactions",
+            {'tables': {'gold': ['orders'], 'generated': ['transactions']}, 'columns': {'gold': [], 'generated': []}, 'clauses': {}}
+        ),
+        # Identical SQL (no errors)
+        (
+            "SELECT id, amount FROM transactions WHERE amount > 100",
+            "SELECT id, amount FROM transactions WHERE amount > 100",
+            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': [], 'generated': []}, 'clauses': {}}
+        ),
+        (
+            "SELECT name, age FROM users WHERE age > 18 GROUP BY age ORDER BY name",
+            "SELECT name, age FROM users WHERE age > 18 GROUP BY age ORDER BY age",
+            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': [], 'generated': []}, 'clauses': {'ORDERBY': {'gold': ['NAME '], 'generated': ['AGE ']}}}
+        )
+    ],
+    ids=['missing column, where and group by', 'different table', 'no errors', 'different order by']
+)
+def test_extract_sql_mismatch(mock_db_conn, mock_benchmark_set, gold, generated, expected):
+    # Arrange
+    model = MockNL2SQLModel(mock_db_conn, mock_benchmark_set)
+
+    # Act
+    result = model._extract_sql_mismatches(gold, generated)
+
+    # Assert
+    assert result == expected
+
+
+def test_analyse_sql():
+    # Arrange
+    model = MockNL2SQLModel(MagicMock(), MagicMock())
+    test_gold_set = [
+        "SELECT name FROM names WHERE name > 'elviz';",
+        "SELECT name, age FROM names WHERE age > 18;",
+        "SELECT age FROM names ORDER BY age;",
+        "SELECT age, address FROM names JOIN addresses;"
+    ]
+    test_generated_set = [
+        "SELECT name FROM names;",
+        "SELECT name FROM names WHERE age > 18;",
+        "SELECT age from names;",
+        "SELECT age, address FROM names;"
+    ]
+    expected_total_errors = {
+        'table_errors': 1,
+        'column_errors': 1,
+        'clause_errors': 3
+    }
+
+    # Act
+    result = model._analyse_sql(test_gold_set, test_generated_set)
+
+    # Assert
+    assert result['total_errors'] == expected_total_errors

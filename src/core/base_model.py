@@ -48,7 +48,7 @@ class NL2SQLModel(ABC):
             self.results[idx] = {'question': question, 'golden_query': goal, 'golden_result': {}, 'generated_query': answer, 'generated_result': {}}
         logger.info(f"Benchmarking finished for {self.__class__.__name__}.")
         logger.info(f"Running results of database for {self.__class__.__name__}.")
-        for id, res in self.results.items():
+        for _, res in self.results.items():
             res['golden_result'] = self._get_query_result(res['golden_query'])
             res['generated_result'] = self._get_query_result(res['generated_query'])
         logger.info(f"Executed all queries on the database for {self.__class__.__name__}.")

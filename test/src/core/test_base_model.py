@@ -24,6 +24,9 @@ class MockNL2SQLModel(NL2SQLModel):
 
     def generate_report(self):
         return {"mock_report": True}  # Fix typo from "mock_retport"
+    
+    def _answer_single_question(self, question):
+        return self._prune_generated_query((self.pipe(question, return_full_text=False))[0]['generated_text'])
 
 
 @pytest.fixture

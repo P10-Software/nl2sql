@@ -175,6 +175,7 @@ cython_debug/
 .temp
 __pycache__
 .vscode
+*.html
 
 # ignore .local file containing data
 .local/

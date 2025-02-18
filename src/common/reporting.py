@@ -5,7 +5,14 @@ from src.common.logger import get_logger
 logger = get_logger(__name__)
 
 
-def create_report(models: list[NL2SQLModel]):
+def create_report(models: list[NL2SQLModel], file_location: str):
+    """
+    Builds HTML report based on analysis from all models in param. All models need to have executed their analysis before feeding to method.
+
+    args:
+    - models (list): A list containing all models to build a report for.
+    - file_location: Location where the report will be placed, only include filelocation, not file name ex: ./temp, not ./temp/report.html
+    """
     # Ensure models contain analysis
     for model in models:
         if model.analysis is None:
@@ -115,16 +122,18 @@ def create_report(models: list[NL2SQLModel]):
         # Generate SQL mismatches
         sql_mismatch_data = [
             (
-                entry.get('generated_sql', 'N/A'),
                 entry.get('gold_sql', 'N/A'),
+                entry.get('generated_sql', 'N/A'),
                 ', '.join(entry.get('errors', {}).get(
                     'tables', {}).get('gold', [])) or '✅',
                 ', '.join(entry.get('errors', {}).get(
                     'tables', {}).get('generated', [])) or '✅',
-                ', '.join(set(entry.get('errors', {}).get('columns', {}).get('generated', []))) or '✅',
-                ', '.join(set(entry.get('errors', {}).get('columns', {}).get('gold', []))) or '✅',
+                ', '.join(set(entry.get('errors', {}).get('columns', {}).get('gold', [
+                ])) - set(entry.get('errors', {}).get('columns', {}).get('generated', []))) or '✅',
+                ', '.join(set(entry.get('errors', {}).get('columns', {}).get('generated', [])) - set(entry.get('errors', {}).get('columns', {}).get('gold', [
+                ]))) or '✅',
                 ' | '.join(
-                    f"{clause}: {errors.get('gold', 'N/A')} -> {errors.get('generated', 'N/A')}"
+                    f"{clause}:{errors.get('generated', 'N/A')}"
                     for clause, errors in entry.get('errors', {}).get('clauses', {}).items()
                 ) or '✅',
                 'Mismatch' if entry.get('errors', {}).get('distinct', {}).get('gold', False) != entry.get(
@@ -135,7 +144,7 @@ def create_report(models: list[NL2SQLModel]):
 
         html_content += generate_details_row(
             f"{model_name}-sql_mismatches", "SQL Mismatch Breakdown",
-            ["Generated Query", "Gold Query", "Missing Tables", "Extra Tables",
+            ["Gold Query", "Generated Query", "Missing Tables", "Extra Tables",
                 "Missing Columns", "Extra Columns", "Clause Errors", "Distinct Mismatch"],
             sql_mismatch_data
         )
@@ -146,5 +155,5 @@ def create_report(models: list[NL2SQLModel]):
     </html>
     """
 
-    with open("report.html", "w", encoding="utf-8") as file:
+    with open(file_location + "/report.html", "w", encoding="utf-8") as file:
         file.write(html_content)

@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 from src.core.base_model import NL2SQLModel
 from src.common.reporting import create_report
+import os
 
 
 class MockNL2SQLModel(NL2SQLModel):
@@ -64,9 +65,13 @@ def test_create_report():
     # Arrange
     model = MockNL2SQLModel()
     model2 = MockTwoNL2SQL()
+    file_path = ".temp"
 
     # Act
-    create_report([model, model2])
+    create_report([model, model2], file_path)
 
     # Assert
-    print('test')
+    assert os.path.exists(file_path + "/report.html")
+
+    # Tear Down
+    os.remove(file_path + "/report.html")

@@ -108,6 +108,7 @@ def _read_sas_normalised(path_to_sas, new_table_names) -> None:
 
 
 def _column_name_format(column_name: str) -> str:
+    """ Ensure that the columns comply with postgresql naming rules."""
     return column_name.replace(' ', '_').lower()
 
 
@@ -117,6 +118,8 @@ def _read_sas(path_to_sas: str):
     # meta is all the 'non' visible data, so in our case labels.
     df, meta = pyreadstat.read_sas7bdat(path_to_sas)
 
+    df.columns = df.columns.map(_column_name_format)
+    
     column_names = df.columns
 
     label_df = pd.DataFrame({
@@ -155,7 +158,7 @@ def _create_db():
                 AND pid <> pg_backend_pid();
             """)
 
-            cur.execute("DROP DATABASE {DB_NAME}")
+            cur.execute(f"DROP DATABASE {DB_NAME}")
             logger.info("Database %s dropped successfully.", DB_NAME)
 
         cur.execute(f"CREATE DATABASE {DB_NAME}")
@@ -186,7 +189,7 @@ def _drop_column_label_table():
 
 if __name__ == '__main__':
     try:
-        init_db("NOVO_SAS_DATA")
-        init_normalised_db("NOVO_SAS_DATA", "../data/table_names_normalised.csv") # Normalised DB
+        # init_db(".local/NOVO_SAS_DATA")
+        init_normalised_db(".local/NOVO_SAS_DATA", ".local/table_names_normalised.csv") # Normalised DB
     except Exception as e:
         logger.error("Failed: %s", e)

@@ -133,6 +133,7 @@ class NL2SQLModel(ABC):
 
             individual_errors.append({
                 'generated_sql': generated_sql,
+                'gold_sql': gold_sql,
                 'errors': mismatches
             })
 
@@ -159,13 +160,11 @@ class NL2SQLModel(ABC):
             mismatches['tables']['gold'] = gold_parser.tables
             mismatches['tables']['generated'] = generated_parser.tables
 
-        gold_columns = set(
-            gold_parser.columns_dict['select']) if gold_parser.columns_dict['select'] else set()
-        generated_columns = set(
-            generated_parser.columns_dict['select']) if generated_parser.columns_dict['select'] else set()
+        gold_columns = set(self._extract_columns(gold_parser))
+        generated_columns = set(self._extract_columns(generated_parser))
         if gold_columns != generated_columns:
-            mismatches['columns']['gold'] = gold_parser.columns
-            mismatches['columns']['generated'] = generated_parser.columns
+            mismatches['columns']['gold'] = list(gold_columns)
+            mismatches['columns']['generated'] = list(generated_columns)
 
         gold_clauses = self._extract_clauses(gold_parser)
         generated_clauses = self._extract_clauses(generated_parser)
@@ -179,7 +178,7 @@ class NL2SQLModel(ABC):
             if gold_values != generated_values:
                 clause_errors[clause] = {
                     "gold": gold_values,
-                    "generated": generated_values
+                    "generated": generated_values,
                 }
 
         mismatches['clauses'] = clause_errors
@@ -206,3 +205,14 @@ class NL2SQLModel(ABC):
             if token.is_keyword and token.normalized == 'DISTINCT':
                 return True
         return False
+
+    def _extract_columns(self, parser):
+        columns = []
+        for token in parser.tokens:
+            if token.is_keyword and token.normalized in ['SELECT', 'DISTINCT']:
+                next = token.next_token
+                while next and not next.is_keyword:
+                    if next.normalized != ',':
+                        columns.append(next.normalized.lower())
+                    next = next.next_token
+        return columns

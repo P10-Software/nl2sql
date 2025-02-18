@@ -127,7 +127,7 @@ def test_run(mock_get_query_build_instruct, mock_db_conn, mock_benchmark_set, mo
         (
             "SELECT name, age FROM users WHERE age > 18 GROUP BY age ORDER BY name",
             "SELECT name FROM users ORDER BY name",
-            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': ['name', 'age'], 'generated': ['name']}, 'clauses': {'WHERE': {
+            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': ['age', 'name'], 'generated': ['name']}, 'clauses': {'WHERE': {
                 'gold': ['AGE > 18'], 'generated': []}, 'GROUPBY': {'gold': ['AGE'], 'generated': []}}, 'distinct': {'gold': False, 'generated': False}}
         ),
         # Different table

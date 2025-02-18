@@ -76,7 +76,7 @@ def _parse_column(parser: Parser):
                 next_token = next_token.next_token
                 if next_token.normalized == 'FROM':
                     columns.extend(
-                        [next_token.next_token.value + '.' + s for s in column_names])
+                        [(next_token.next_token.value + '.' + s if '.' not in s else s) for s in column_names])
                     break
 
     return columns

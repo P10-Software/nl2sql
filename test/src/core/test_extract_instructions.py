@@ -83,7 +83,9 @@ def test_sanitise_query(sql, expected):
     ("SELECT age FROM people", {'people': ['age']}),
     ("SELECT age, name FROM people AND SELECT gender FROM genders", {'people': ['age', 'name'], 'genders': ['gender']}),
     ("SELECT name FROM people and SELECT gender FROM people WHERE gender LIKE '% SELECT age FROM people%'", {'people': ['name', 'gender']}),
-    ("SELECT people.name FROM people and SELECT genders.gender FROM genders", {'people': ['name'], 'genders': ['gender']})
+    ("SELECT people.name FROM people and SELECT genders.gender FROM genders", {'people': ['name'], 'genders': ['gender']}),
+    ("SELECT people.name FROM people and SELECT gender FROM genders", {'people': ['name'], 'genders': ['gender']}),
+    ("SELECT T1.name from people as T1", {'people': ['name']})
 ])
 def test_extract_column_table(sql, expected):
     # Arrange + Act

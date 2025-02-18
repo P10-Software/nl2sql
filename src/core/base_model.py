@@ -79,7 +79,7 @@ class NL2SQLModel(ABC):
         }
 
     @abstractmethod
-    def generate_report(self):
+    def _answer_single_question(self):
         """
         Abstract method for answering a single question, should return a non-pruned response.
         """

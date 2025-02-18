@@ -115,16 +115,14 @@ def create_report(models: list[NL2SQLModel]):
         # Generate SQL mismatches
         sql_mismatch_data = [
             (
-                html.escape(entry.get('generated_sql', 'N/A')),
-                html.escape(entry.get('gold_sql', 'N/A')),
+                entry.get('generated_sql', 'N/A'),
+                entry.get('gold_sql', 'N/A'),
                 ', '.join(entry.get('errors', {}).get(
                     'tables', {}).get('gold', [])) or '✅',
                 ', '.join(entry.get('errors', {}).get(
                     'tables', {}).get('generated', [])) or '✅',
-                ', '.join(set(entry.get('errors', {}).get('columns', {}).get('gold', [])) -
-                          set(entry.get('errors', {}).get('columns', {}).get('generated', []))) or '✅',
-                ', '.join(set(entry.get('errors', {}).get('tables', {}).get('generated', [])) -
-                          set(entry.get('errors', {}).get('tables', {}).get('gold', []))) or '✅',
+                ', '.join(set(entry.get('errors', {}).get('columns', {}).get('generated', []))) or '✅',
+                ', '.join(set(entry.get('errors', {}).get('columns', {}).get('gold', []))) or '✅',
                 ' | '.join(
                     f"{clause}: {errors.get('gold', 'N/A')} -> {errors.get('generated', 'N/A')}"
                     for clause, errors in entry.get('errors', {}).get('clauses', {}).items()

@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import MagicMock
 from src.core.base_model import NL2SQLModel
 from src.common.reporting import create_report
@@ -51,6 +50,9 @@ class MockNL2SQLModel(NL2SQLModel):
                          'clauses': {},
                          'distinct': {'gold': False, 'generated': False}}}]},
                 'total sql queries': 5}
+
+    def _answer_single_question(self):
+        return None
 
 
 class MockTwoNL2SQL(MockNL2SQLModel):

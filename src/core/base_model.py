@@ -83,7 +83,9 @@ class NL2SQLModel(ABC):
         raise NotImplementedError("Subclasses should implement this method.")
 
     @abstractmethod
-    def _answer_single_question(self, question: str):
+"""
+Abstract method for answering a single question, should return a non-pruned response.
+"""
         raise NotImplementedError("Subclasses should implement this method.")
 
     def _prune_generated_query(self, query: str):

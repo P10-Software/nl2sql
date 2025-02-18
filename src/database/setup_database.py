@@ -36,6 +36,28 @@ def init_db(data_directory: str):
             _read_sas(sas_file)
 
 
+def init_normalised_db(data_directory: str, table_name_file: str) -> None:
+    """
+    Inits the database with non abbreviated table and column names, based on the raw SAS DB, recursively adds all sas7bdat files as tables.
+    Provide the folder path containing all of the SAS files;
+
+    Parameters:
+    - data_directory (str): Root directory to search for SAS files.
+    - table_name_file: CSV containing abbreviated and non abbreviated table names
+    """
+
+    _create_db()
+    _drop_column_label_table()
+
+    sas_files = _find_sas_files(data_directory)
+
+    table_names = pd.read_csv(table_name_file, header=None, names=["old_name", "new_name"])
+
+    for _, files in sas_files.items():
+        for sas_file in files:
+            _read_sas_normalised(sas_file, table_names)
+
+
 def _find_sas_files(directory_path: str):
     sas_files = {}
 
@@ -47,6 +69,38 @@ def _find_sas_files(directory_path: str):
             sas_files[folder_name] = sas_paths
 
     return sas_files
+
+
+def _read_sas_normalised(path_to_sas, new_table_names) -> None:
+    table_name = os.path.splitext(os.path.basename(path_to_sas))[0]
+
+    # Substitute abbreviated table name with normaised table name
+    table_name = new_table_names.loc[new_table_names['old_name'] == table_name, 'new_name'].values[0]
+
+    if table_name == "sponsor_defined_value_in_list":
+    # meta is all the 'non' visible data, so in our case labels.
+        df, meta = pyreadstat.read_sas7bdat(path_to_sas)
+
+        column_names_df = pd.DataFrame({
+            'old_names': df.columns.tolist(),
+            'new_names': meta.column_labels
+        })
+
+        column_mappings = dict(zip(column_names_df['old_names'], column_names_df['new_names']))
+
+        df.rename(columns=column_mappings, inplace=True)
+
+        # Handle duplicate column labels in sponsor_def_value table.
+        if table_name == "sponsor_defined_value_in_list":
+           df.columns.values[1] = "sponsor_def_submission_value" 
+
+        engine = create_engine(f'postgresql://{USER}:{PASSWORD}@{HOST}:{PORT}/{DB_NAME}')
+
+        try:
+            df.to_sql(table_name, engine, if_exists='replace', index=False)
+            logger.info(f'Table %s inserted successfully.', table_name)
+        except Exception as e:
+            logger.error("Error: %s", e)
 
 
 def _read_sas(path_to_sas: str):
@@ -82,11 +136,22 @@ def _create_db():
         cur.execute(f"SELECT 1 FROM pg_database WHERE datname = '{DB_NAME}'")
         exists = cur.fetchone()
 
-        if not exists:
-            cur.execute(f"CREATE DATABASE {DB_NAME}")
-            logger.info(f"Database '{DB_NAME}' created successfully.")
-        else:
+        if exists:
             logger.info(f"Database '{DB_NAME}' already exists.")
+
+            # Terminate active connections before dropping the database
+            cur.execute(f"""
+                SELECT pg_terminate_backend(pg_stat_activity.pid)
+                FROM pg_stat_activity
+                WHERE pg_stat_activity.datname = '{DB_NAME}'
+                AND pid <> pg_backend_pid();
+            """)
+
+            cur.execute(f"DROP DATABASE {DB_NAME}")
+            logger.info(f"Database '{DB_NAME}' dropped successfully.")
+
+        cur.execute(f"CREATE DATABASE {DB_NAME}")
+        logger.info(f"Database '{DB_NAME}' created successfully.")
 
         cur.close()
         conn.close()
@@ -120,7 +185,8 @@ if __name__ == '__main__':
 
     if os.path.isdir(data_directory):
         try:
-            init_db(data_directory)
+            # init_db(data_directory) # Abbreviated DB
+            init_normalised_db(data_directory, "../data/table_names_normalised.csv") # Normalised DB
         except Exception as e:
             logger.error("Failed: %s", e)
     else:

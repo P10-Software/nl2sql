@@ -2,6 +2,7 @@ from sql_metadata import Parser
 from src.common.logger import get_logger
 from src.database.setup_database import get_conn
 from typing import Literal
+import re
 
 
 SchemaKind = Literal['full', 'tables', 'columns']
@@ -26,9 +27,9 @@ def get_query_build_instruct(kind: SchemaKind, query: str) -> str:
 
 
 def _extract_column_table(query: str):
-    parser = Parser(query)
+    parser = Parser(_sanitise_query(query))
     tables = parser.tables
-    columns = parser.columns
+    columns = _parse_column(parser)
 
     column_table_mapping = {}
 
@@ -48,9 +49,37 @@ def _extract_column_table(query: str):
                 column_table_mapping.setdefault(
                     table_name, []).append(column_name)
             else:
-                column_table_mapping.setdefault('ambiguous', []).append(col)
+                logger.error("ERROR extracting columns, found ambiguity.")
+                raise RuntimeError(f"Ambiguity found in query {query}, quitting.")
 
     return column_table_mapping
+
+
+def _sanitise_query(query: str):
+    return re.sub(r"(LIKE\s*)'[^']*'", r"\1''", query, flags=re.IGNORECASE)
+
+
+def _parse_column(parser: Parser):
+    columns = parser.columns
+    if all('.' in col for col in columns):
+        return columns
+
+    columns = []
+
+    for token in parser.tokens:
+        if token.is_keyword and token.normalized == 'SELECT':
+            next_token = token.next_token
+            column_names = []
+            while next_token is not None:
+                if next_token.value not in ['.', ',']:
+                    column_names.append(next_token.value)
+                next_token = next_token.next_token
+                if next_token.normalized == 'FROM':
+                    columns.extend(
+                        [(next_token.next_token.value + '.' + s if '.' not in s else s) for s in column_names])
+                    break
+
+    return columns
 
 
 def _create_build_instruction_tree(connection_string) -> dict:

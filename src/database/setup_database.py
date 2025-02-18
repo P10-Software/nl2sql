@@ -130,7 +130,7 @@ def _read_sas(path_to_sas: str):
     try:
         df.to_sql(table_name, engine, if_exists='replace', index=False)
         label_df.to_sql('column_label_lookup', engine, if_exists='append', index=False)
-        logger.info(f'Table {table_name} inserted successfully.')
+        logger.info('Table %s inserted successfully.', table_name)
     except Exception as e:
         logger.error("Error: %s", e)
 
@@ -145,7 +145,7 @@ def _create_db():
         exists = cur.fetchone()
 
         if exists:
-            logger.info(f"Database '{DB_NAME}' already exists.")
+            logger.info("Database %s already exists.", DB_NAME)
 
             # Terminate active connections before dropping the database
             cur.execute(f"""
@@ -155,11 +155,11 @@ def _create_db():
                 AND pid <> pg_backend_pid();
             """)
 
-            cur.execute(f"DROP DATABASE {DB_NAME}")
-            logger.info(f"Database '{DB_NAME}' dropped successfully.")
+            cur.execute("DROP DATABASE {DB_NAME}")
+            logger.info("Database %s dropped successfully.", DB_NAME)
 
         cur.execute(f"CREATE DATABASE {DB_NAME}")
-        logger.info(f"Database '{DB_NAME}' created successfully.")
+        logger.info("Database %s created successfully.", DB_NAME)
 
         cur.close()
         conn.close()

@@ -80,12 +80,9 @@ class NL2SQLModel(ABC):
 
     @abstractmethod
     def generate_report(self):
-        raise NotImplementedError("Subclasses should implement this method.")
-
-    @abstractmethod
-"""
-Abstract method for answering a single question, should return a non-pruned response.
-"""
+        """
+        Abstract method for answering a single question, should return a non-pruned response.
+        """
         raise NotImplementedError("Subclasses should implement this method.")
 
     def _prune_generated_query(self, query: str):

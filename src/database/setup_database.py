@@ -185,13 +185,8 @@ def _drop_column_label_table():
 
 
 if __name__ == '__main__':
-    data_directory = input("Provide path to the data folder: ").strip()
-
-    if os.path.isdir(data_directory):
-        try:
-            # init_db(data_directory) # Abbreviated DB
-            init_normalised_db(data_directory, "../data/table_names_normalised.csv") # Normalised DB
-        except Exception as e:
-            logger.error("Failed: %s", e)
-    else:
-        logger.error("Provided path is not a directory.")
+    try:
+        init_db("NOVO_SAS_DATA")
+        init_normalised_db("NOVO_SAS_DATA", "../data/table_names_normalised.csv") # Normalised DB
+    except Exception as e:
+        logger.error("Failed: %s", e)

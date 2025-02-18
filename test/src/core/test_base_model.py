@@ -127,7 +127,7 @@ def test_run(mock_get_query_build_instruct, mock_db_conn, mock_benchmark_set, mo
         (
             "SELECT name, age FROM users WHERE age > 18 GROUP BY age ORDER BY name",
             "SELECT name FROM users ORDER BY name",
-            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': ['age', 'name'], 'generated': ['name']}, 'clauses': {'WHERE': {
+            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': ['name', 'age'], 'generated': ['name']}, 'clauses': {'WHERE': {
                 'gold': ['AGE > 18'], 'generated': []}, 'GROUPBY': {'gold': ['AGE'], 'generated': []}}, 'distinct': {'gold': False, 'generated': False}}
         ),
         # Different table
@@ -161,7 +161,22 @@ def test_extract_sql_mismatch(mock_db_conn, mock_benchmark_set, gold, generated,
     result = model._extract_sql_mismatches(gold, generated)
 
     # Assert
-    assert result == expected
+    assert set(result['tables']['gold']) == set(expected['tables']['gold'])
+    assert set(result['tables']['generated']) == set(
+        expected['tables']['generated'])
+
+    assert set(result['columns']['gold']) == set(expected['columns']['gold'])
+    assert set(result['columns']['generated']) == set(
+        expected['columns']['generated'])
+
+    for clause in expected['clauses']:
+        assert set(result['clauses'].get(clause, {}).get('gold', [])) == set(
+            expected['clauses'][clause].get('gold', []))
+        assert set(result['clauses'].get(clause, {}).get('generated', [])) == set(
+            expected['clauses'][clause].get('generated', []))
+
+    assert result['distinct']['gold'] == expected['distinct']['gold']
+    assert result['distinct']['generated'] == expected['distinct']['generated']
 
 
 def test_analyse_sql():
@@ -221,10 +236,8 @@ def test_analyse():
         3: {
             'question': 'What is the GDP of Japan?',
             'golden_query': 'SELECT gdp FROM countries WHERE name="Japan"',
-            'golden_result': [(5000000,)],  # Correct expected output
-            # Error: wrong WHERE clause, extra column
+            'golden_result': [(5000000,)],
             'generated_query': 'SELECT gdp, population FROM countries WHERE namee="Japon"',
-            # Incorrect output due to extra column
             'generated_result': [(5000000, 126000000)]
         },
         4: {

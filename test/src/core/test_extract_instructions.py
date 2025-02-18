@@ -1,7 +1,7 @@
 import sqlite3
 import pytest
 from unittest.mock import patch
-from src.core.extract_instructions import get_query_build_instruct
+from src.core.extract_instructions import get_query_build_instruct, _sanitise_query, _extract_column_table
 
 
 @pytest.fixture(scope="function")
@@ -61,3 +61,33 @@ def test_get_query_build_instructions(mock_build_tree, mock_get_conn, in_memory_
 
     # Assert
     assert result.strip() == expected.strip()
+
+
+@pytest.mark.parametrize("sql, expected", [
+    ("SELECT name FROM names WHERE name LIKE '%john%';",
+     "SELECT name FROM names WHERE name LIKE '';"),
+    ("SELECT name, age FROM people WHERE name like '%Johnny%' AND age > 18;",
+     "SELECT name, age FROM people WHERE name like '' AND age > 18;"),
+    ("SELECT age FROM people;", "SELECT age FROM people;")
+])
+def test_sanitise_query(sql, expected):
+    # Arrange + Act
+    result = _sanitise_query(sql)
+
+    # Assert
+    assert result == expected
+
+
+@pytest.mark.parametrize("sql, expected", [
+    ("SELECT name, age FROM people WHERE name LIKE '% s.c master%'", {'people': ['name', 'age']}),
+    ("SELECT age FROM people", {'people': ['age']}),
+    ("SELECT age, name FROM people AND SELECT gender FROM genders", {'people': ['age', 'name'], 'genders': ['gender']}),
+    ("SELECT name FROM people and SELECT gender FROM people WHERE gender LIKE '% SELECT age FROM people%'", {'people': ['name', 'gender']}),
+    ("SELECT people.name FROM people and SELECT genders.gender FROM genders", {'people': ['name'], 'genders': ['gender']})
+])
+def test_extract_column_table(sql, expected):
+    # Arrange + Act
+    result = _extract_column_table(sql)
+
+    # Assert
+    assert result == expected

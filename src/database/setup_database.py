@@ -4,6 +4,7 @@ import psycopg2
 import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
+from tqdm import tqdm
 from src.common.logger import get_logger
 
 # Database credentials
@@ -31,14 +32,16 @@ def init_db(data_directory: str):
 
     sas_files = _find_sas_files(data_directory)
 
+    logger.info("Inserting data from all_trial_metadata and GCMD.")
     for _, files in sas_files.items():
-        for sas_file in files:
+        for sas_file in tqdm(files):
             _read_sas(sas_file)
 
 
 def init_normalised_db(data_directory: str, table_name_file: str) -> None:
     """
-    Inits the database with non abbreviated table and column names, based on the raw SAS DB, recursively adds all sas7bdat files as tables.
+    Inits the database with non abbreviated table and column names, based on the raw SAS DB, 
+    recursively adds all sas7bdat files as tables.
     Provide the folder path containing all of the SAS files;
 
     Parameters:
@@ -53,8 +56,9 @@ def init_normalised_db(data_directory: str, table_name_file: str) -> None:
 
     table_names = pd.read_csv(table_name_file, header=None, names=["old_name", "new_name"])
 
+    logger.info("Inserting data from all_trial_metadata and GCMD with natural language.")
     for _, files in sas_files.items():
-        for sas_file in files:
+        for sas_file in tqdm(files):
             _read_sas_normalised(sas_file, table_names)
 
 
@@ -77,30 +81,33 @@ def _read_sas_normalised(path_to_sas, new_table_names) -> None:
     # Substitute abbreviated table name with normaised table name
     table_name = new_table_names.loc[new_table_names['old_name'] == table_name, 'new_name'].values[0]
 
-    if table_name == "sponsor_defined_value_in_list":
     # meta is all the 'non' visible data, so in our case labels.
-        df, meta = pyreadstat.read_sas7bdat(path_to_sas)
+    df, meta = pyreadstat.read_sas7bdat(path_to_sas)
 
-        column_names_df = pd.DataFrame({
-            'old_names': df.columns.tolist(),
-            'new_names': meta.column_labels
-        })
+    column_names_df = pd.DataFrame({
+        'old_names': df.columns.tolist(),
+        'new_names': meta.column_labels
+    })
 
-        column_mappings = dict(zip(column_names_df['old_names'], column_names_df['new_names']))
+    column_mappings = dict(zip(column_names_df['old_names'], column_names_df['new_names']))
 
-        df.rename(columns=column_mappings, inplace=True)
+    df.rename(columns=column_mappings, inplace=True)
+    df.columns = df.columns.map(_column_name_format)
 
-        # Handle duplicate column labels in sponsor_def_value table.
-        if table_name == "sponsor_defined_value_in_list":
-           df.columns.values[1] = "sponsor_def_submission_value" 
+    # Handle duplicate column labels in sponsor_def_value table.
+    if table_name == "sponsor_defined_value_in_list":
+        df.columns.values[1] = "sponsor_def_submission_value"
 
-        engine = create_engine(f'postgresql://{USER}:{PASSWORD}@{HOST}:{PORT}/{DB_NAME}')
+    engine = create_engine(f'postgresql://{USER}:{PASSWORD}@{HOST}:{PORT}/{DB_NAME}')
 
-        try:
-            df.to_sql(table_name, engine, if_exists='replace', index=False)
-            logger.info(f'Table %s inserted successfully.', table_name)
-        except Exception as e:
-            logger.error("Error: %s", e)
+    try:
+        df.to_sql(table_name, engine, if_exists='replace', index=False)
+    except Exception as e:
+        logger.error("Error: %s", e)
+
+
+def _column_name_format(column_name: str) -> str:
+    return column_name.replace(' ', '_').lower()
 
 
 def _read_sas(path_to_sas: str):

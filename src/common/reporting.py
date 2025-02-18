@@ -1,6 +1,7 @@
 import html
 from src.core.base_model import NL2SQLModel
 from src.common.logger import get_logger
+import os
 
 logger = get_logger(__name__)
 
@@ -155,5 +156,7 @@ def create_report(models: list[NL2SQLModel], file_location: str):
     </html>
     """
 
+    if not os.path.isdir(file_location):
+        os.makedirs(file_location)
     with open(file_location + "/report.html", "w", encoding="utf-8") as file:
         file.write(html_content)

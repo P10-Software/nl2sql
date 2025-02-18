@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from tqdm import tqdm
 from src.common.logger import get_logger
+from src.database.database import get_conn
 
 # Database credentials
 load_dotenv()
@@ -171,7 +172,7 @@ def _drop_column_label_table():
     Drop the tables column_label_lookup table to avoid duplicates 
     """
     try:
-        conn = psycopg2.connect(dbname=DB_NAME, user=USER, password=PASSWORD, host=HOST, port=PORT)
+        conn = get_conn()
         conn.autocommit = True
         cur = conn.cursor()
 
@@ -181,10 +182,6 @@ def _drop_column_label_table():
         conn.close()
     except Exception as e:
         logger.error("Error dopping the table column_label_lookup. %s", e)
-
-
-def get_conn():
-    return psycopg2.connect(dbname=DB_NAME, user=USER, password=PASSWORD, host=HOST, port=PORT)
 
 
 if __name__ == '__main__':

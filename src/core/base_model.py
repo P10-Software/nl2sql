@@ -44,7 +44,7 @@ class NL2SQLModel(ABC):
             goal = pair['golden_query']
             schema = get_query_build_instruct(schema_size, goal)
             prompt = self.prompt_strategy.get_prompt(schema, question)
-            answer = self._answer_single_question(prompt)
+            answer = self._prune_generated_query(self._answer_single_question(prompt))
             self.results[idx] = {'question': question, 'golden_query': goal, 'golden_result': {}, 'generated_query': answer, 'generated_result': {}}
         logger.info(f"Benchmarking finished for {self.__class__.__name__}.")
         logger.info(f"Running results of database for {self.__class__.__name__}.")

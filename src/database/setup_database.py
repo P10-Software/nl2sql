@@ -116,8 +116,7 @@ def get_conn():
 
 
 if __name__ == '__main__':
-    DATA_DIRECTORY = "NOVO_SAS_DATA"
     try:
-        init_db(DATA_DIRECTORY)
+        init_db("NOVO_SAS_DATA")
     except Exception as e:
         logger.error("Failed: ", e)

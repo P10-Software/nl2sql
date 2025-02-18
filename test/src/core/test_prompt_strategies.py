@@ -81,4 +81,4 @@ def test_prompt_strategies(prompt_class, expected_prompt):
     prompt = prompt_strategy.get_prompt(schema, question)
 
     # assert
-    assert "".join(prompt.split()) ==  "".join(expected_prompt.split())
+    assert "".join(prompt.split()) == "".join(expected_prompt.split())

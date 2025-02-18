@@ -181,7 +181,7 @@ def _drop_column_label_table():
         cur.close()
         conn.close()
     except Exception as e:
-        logger.error("Error dopping the table column_label_lookup. %s", e)
+        logger.error("Error dropping the table column_label_lookup. %s", e)
 
 
 if __name__ == '__main__':

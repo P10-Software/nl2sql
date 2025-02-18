@@ -14,40 +14,40 @@ def mock_analysis():
             'total_errors': {'table_errors': 0, 'column_errors': 1, 'clause_errors': 1, 'distinct_errors': 0},
             'individual_errors': [
                 {'generated_sql': 'SELECT capital FROM countries WHERE name="France"',
-                 'gold_sql': 'SELECT capital FROM countries WHERE name="France"',
+                 'golden_sql': 'SELECT capital FROM countries WHERE name="France"',
                  'errors': {
-                     'tables': {'gold': [], 'generated': []},
-                     'columns': {'gold': [], 'generated': []},
+                     'tables': {'golden': [], 'generated': []},
+                     'columns': {'golden': [], 'generated': []},
                      'clauses': {},
-                     'distinct': {'gold': False, 'generated': False}}},
+                     'distinct': {'golden': False, 'generated': False}}},
                 {'generated_sql': 'SELECT population FROM countries WHERE name="Germany"',
-                 'gold_sql': 'SELECT population FROM countries WHERE name="Germany"',
+                 'golden_sql': 'SELECT population FROM countries WHERE name="Germany"',
                  'errors': {
-                     'tables': {'gold': [], 'generated': []},
-                     'columns': {'gold': [], 'generated': []},
+                     'tables': {'golden': [], 'generated': []},
+                     'columns': {'golden': [], 'generated': []},
                      'clauses': {},
-                     'distinct': {'gold': False, 'generated': False}}},
+                     'distinct': {'golden': False, 'generated': False}}},
                 {'generated_sql': 'SELECT name FROM countries WHERE continent="Europe"',
-                 'gold_sql': 'SELECT name FROM countries WHERE continent="Europe"',
+                 'golden_sql': 'SELECT name FROM countries WHERE continent="Europe"',
                  'errors': {
-                     'tables': {'gold': [], 'generated': []},
-                     'columns': {'gold': [], 'generated': []},
+                     'tables': {'golden': [], 'generated': []},
+                     'columns': {'golden': [], 'generated': []},
                      'clauses': {},
-                     'distinct': {'gold': False, 'generated': False}}},
+                     'distinct': {'golden': False, 'generated': False}}},
                 {'generated_sql': 'SELECT gdp, population FROM countries WHERE namee="Japon"',
-                 'gold_sql': 'SELECT gdp FROM countries WHERE name="Japan"',
+                 'golden_sql': 'SELECT gdp FROM countries WHERE name="Japan"',
                  'errors': {
-                     'tables': {'gold': [], 'generated': []},
-                     'columns': {'gold': ['gdp'], 'generated': ['gdp', 'population']},
-                     'clauses': {'WHERE': {'gold': ['NAME = JAPAN '], 'generated': ['NAMEE = JAPON ']}},
-                     'distinct': {'gold': False, 'generated': False}}},
+                     'tables': {'golden': [], 'generated': []},
+                     'columns': {'golden': ['gdp'], 'generated': ['gdp', 'population']},
+                     'clauses': {'WHERE': {'golden': ['NAME = JAPAN '], 'generated': ['NAMEE = JAPON ']}},
+                     'distinct': {'golden': False, 'generated': False}}},
                 {'generated_sql': 'SELECT area FROM countries WHERE name="Canada"',
-                 'gold_sql': 'SELECT area FROM countries WHERE name="Canada"',
+                 'golden_sql': 'SELECT area FROM countries WHERE name="Canada"',
                  'errors': {
-                     'tables': {'gold': [], 'generated': []},
-                     'columns': {'gold': [], 'generated': []},
+                     'tables': {'golden': [], 'generated': []},
+                     'columns': {'golden': [], 'generated': []},
                      'clauses': {},
-                     'distinct': {'gold': False, 'generated': False}}}]},
+                     'distinct': {'golden': False, 'generated': False}}}]},
         'total sql queries': 5}
 
 
@@ -158,42 +158,42 @@ def test_analyse_sql():
         (
             "SELECT name FROM names;",
             "SELECT DISTINCT name FROM names;",
-            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': [], 'generated': [
-            ]}, 'clauses': {}, 'distinct': {'gold': False, 'generated': True}}
+            {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': [], 'generated': [
+            ]}, 'clauses': {}, 'distinct': {'golden': False, 'generated': True}}
         ),
         # Gold has distinct
         (
             "SELECT DISTINCT name FROM names;",
             "SELECT name FROM names;",
-            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': [], 'generated': [
-            ]}, 'clauses': {}, 'distinct': {'gold': True, 'generated': False}}
+            {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': [], 'generated': [
+            ]}, 'clauses': {}, 'distinct': {'golden': True, 'generated': False}}
         ),
         # Missing column, WHERE clause, and GROUP BY
         (
             "SELECT name, age FROM users WHERE age > 18 GROUP BY age ORDER BY name",
             "SELECT name FROM users ORDER BY name",
-            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': ['name', 'age'], 'generated': ['name']}, 'clauses': {'WHERE': {
-                'gold': ['AGE > 18'], 'generated': []}, 'GROUPBY': {'gold': ['AGE'], 'generated': []}}, 'distinct': {'gold': False, 'generated': False}}
+            {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': ['name', 'age'], 'generated': ['name']}, 'clauses': {'WHERE': {
+                'golden': ['AGE > 18'], 'generated': []}, 'GROUPBY': {'golden': ['AGE'], 'generated': []}}, 'distinct': {'golden': False, 'generated': False}}
         ),
         # Different table
         (
             "SELECT id FROM orders",
             "SELECT id FROM transactions",
-            {'tables': {'gold': ['orders'], 'generated': ['transactions']}, 'columns': {'gold': [
-            ], 'generated': []}, 'clauses': {}, 'distinct': {'gold': False, 'generated': False}}
+            {'tables': {'golden': ['orders'], 'generated': ['transactions']}, 'columns': {'golden': [
+            ], 'generated': []}, 'clauses': {}, 'distinct': {'golden': False, 'generated': False}}
         ),
         # Identical SQL (no errors)
         (
             "SELECT id, amount FROM transactions WHERE amount > 100",
             "SELECT id, amount FROM transactions WHERE amount > 100",
-            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': [], 'generated': [
-            ]}, 'clauses': {}, 'distinct': {'gold': False, 'generated': False}}
+            {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': [], 'generated': [
+            ]}, 'clauses': {}, 'distinct': {'golden': False, 'generated': False}}
         ),
         (
             "SELECT name, age FROM users WHERE age > 18 GROUP BY age ORDER BY name",
             "SELECT name, age FROM users WHERE age > 18 GROUP BY age ORDER BY age",
-            {'tables': {'gold': [], 'generated': []}, 'columns': {'gold': [], 'generated': []}, 'clauses': {
-                'ORDERBY': {'gold': ['NAME '], 'generated': ['AGE ']}}, 'distinct': {'gold': False, 'generated': False}}
+            {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': [], 'generated': []}, 'clauses': {
+                'ORDERBY': {'golden': ['NAME '], 'generated': ['AGE ']}}, 'distinct': {'golden': False, 'generated': False}}
         )
     ],
     ids=['generated extra distinct', 'generated missing distinct',
@@ -207,19 +207,19 @@ def test_extract_sql_mismatch(gold, generated, expected):
     result = model._extract_sql_mismatches(gold, generated)
 
     # Assert
-    assert set(result['tables']['gold']) == set(expected['tables']['gold'])
+    assert set(result['tables']['golden']) == set(expected['tables']['golden'])
     assert set(result['tables']['generated']) == set(
         expected['tables']['generated'])
 
-    assert set(result['columns']['gold']) == set(expected['columns']['gold'])
+    assert set(result['columns']['golden']) == set(expected['columns']['golden'])
     assert set(result['columns']['generated']) == set(
         expected['columns']['generated'])
 
     for clause in expected['clauses']:
-        assert set(result['clauses'].get(clause, {}).get('gold', [])) == set(
-            expected['clauses'][clause].get('gold', []))
+        assert set(result['clauses'].get(clause, {}).get('golden', [])) == set(
+            expected['clauses'][clause].get('golden', []))
         assert set(result['clauses'].get(clause, {}).get('generated', [])) == set(
             expected['clauses'][clause].get('generated', []))
 
-    assert result['distinct']['gold'] == expected['distinct']['gold']
+    assert result['distinct']['golden'] == expected['distinct']['golden']
     assert result['distinct']['generated'] == expected['distinct']['generated']

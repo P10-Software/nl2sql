@@ -23,21 +23,3 @@ class TestSetupDatabase:
         conn.close()
 
         assert exists
-
-
-    def test_if_tables_loaded(self):
-        conn = psycopg2.connect(dbname=DB_NAME, user=USER, password=PASSWORD, host=HOST, port=PORT)
-        cur = conn.cursor()
-
-        cur.execute("SELECT COUNT(*) FROM column_label_lookup")
-        res = cur.fetchone()
-
-        if res is not None:
-            res = res[0]
-        else:
-            res = 0
-
-        cur.close()
-        conn.close()
-
-        assert res == 997

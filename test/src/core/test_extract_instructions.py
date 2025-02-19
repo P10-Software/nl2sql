@@ -1,7 +1,8 @@
 import sqlite3
-import pytest
 from unittest.mock import patch
-from src.core.extract_instructions import get_query_build_instruct, _sanitise_query, _extract_column_table
+import pytest
+import pandas as pd
+from src.core.extract_instructions import get_query_build_instruct, _sanitise_query, _extract_column_table, _transform_natural_query
 
 
 @pytest.fixture(scope="function")
@@ -57,10 +58,75 @@ def test_get_query_build_instructions(mock_build_tree, mock_get_conn, in_memory_
     query = "SELECT pln_id FROM tab_pln"
 
     # Act
-    result = get_query_build_instruct(kind, query)
+    result = get_query_build_instruct(kind, query, False)
 
     # Assert
     assert result.strip() == expected.strip()
+
+
+@pytest.mark.parametrize("kind, translated_column_table, expected", [
+    ('columns', {'table_plan': ['plan_id']}, "CREATE TABLE table_plan (plan_id TEXT NOT NULL);"),
+    ('tables', {'table_plan': ['plan_id', 'plan_name', 'created_at']}, "CREATE TABLE table_plan (plan_id TEXT NOT NULL,\n    plan_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);"),
+    ('full', {'table_plan': ['plan_id', 'plan_name', 'created_at'], 'nu_plan': ['nu_id']}, "CREATE TABLE table_plan (plan_id TEXT NOT NULL,\n    plan_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);\n\nCREATE TABLE nu_plan (nu_id TEXT NOT NULL);")
+])
+@patch("src.core.extract_instructions._transform_natural_query")
+@patch('src.core.extract_instructions.get_conn')
+@patch('src.core.extract_instructions._create_build_instruction_tree')
+def test_get_query_build_instructions_naturalised(mock_build_tree, mock_get_conn, mock_transform_natural_query, in_memory_db, kind, translated_column_table, expected):
+    # Arrange
+    mock_get_conn.return_value = in_memory_db
+    mock_build_tree.return_value = {
+        'table_plan': {
+            'create_table': 'CREATE TABLE table_plan ({columns});',
+            'columns': {
+                'plan_id': 'plan_id TEXT NOT NULL',
+                'plan_name': 'plan_name TEXT',
+                'created_at': 'created_at DATE DEFAULT CURRENT_TIMESTAMP'
+            }
+        },
+        'nu_plan': {
+            'create_table': 'CREATE TABLE nu_plan ({columns});',
+            'columns': {
+                'nu_id': 'nu_id TEXT NOT NULL'
+            }
+        }
+    }
+
+    mock_transform_natural_query.return_value = translated_column_table
+
+    query = "SELECT pln_id FROM tab_pln"
+
+    # Act
+    result = get_query_build_instruct(kind, query, True)
+
+    print("TEST: ", result)
+
+    # Assert
+    assert result.strip() == expected.strip()
+
+
+@patch("src.core.extract_instructions.pd.read_csv")
+def test_transform_natural_query(mock_read_csv):
+
+    mock_table_names = pd.DataFrame({
+        'old_name': ['tab_pln', 'trl_tp'],
+        'new_name': ['table_plan', 'trial_type']
+    })
+
+    mock_column_names = pd.DataFrame({
+        'old_name': ['trl_id', 'pln_id', 'pln_name'],
+        'new_name': ['trial_id', 'plan_id', 'plan_name']
+    })
+
+    mock_read_csv.side_effect = [mock_table_names, mock_column_names]
+
+    selected_tables_columns = {'tab_pln': ['pln_id', 'pln_name']}
+
+    expected = {'table_plan': ['plan_id', 'plan_name']}
+
+    result = _transform_natural_query(selected_tables_columns)
+
+    assert result == expected
 
 
 @pytest.mark.parametrize("sql, expected", [

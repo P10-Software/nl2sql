@@ -95,7 +95,7 @@ def _read_sas_normalised(path_to_sas, new_table_names) -> None:
 
     # Handle duplicate column labels in sponsor_def_value table.
     if table_name == "sponsor_defined_value_in_list":
-        df.columns.values[1] = "sponsor_def_submission_value"
+        df.columns.values[2] = "sponsor_defined_submission_value"
 
     engine = create_engine(f'postgresql://{USER}:{PASSWORD}@{HOST}:{PORT}/{DB_NAME}')
 

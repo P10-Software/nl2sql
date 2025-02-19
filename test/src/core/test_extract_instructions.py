@@ -57,7 +57,7 @@ def test_get_query_build_instructions(mock_build_tree, mock_get_conn, in_memory_
     query = "SELECT pln_id FROM tab_pln"
 
     # Act
-    result = get_query_build_instruct(kind, query)
+    result = get_query_build_instruct(kind, query, False)
 
     # Assert
     assert result.strip() == expected.strip()

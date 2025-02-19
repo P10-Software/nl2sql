@@ -16,9 +16,11 @@ def get_query_build_instruct(kind: SchemaKind, query: str, natural_names: bool) 
 
     Args:
     - kind (SchemaKind): One of 'full', 'tables', 'columns' specifying how restricted the schema should be.
+    - query: SQL query in string format
+    - natural_names: Boolean values, True for natural_names and False for abbreviated
 
     Returns:
-    - SQL built instructions (sql): SQL instructions specifying how to build the DB.
+    - SQL build instructions (sql): SQL instructions specifying how to build the DB.
     """
     conn = get_conn()
     selected_tables_columns = _extract_column_table(query)

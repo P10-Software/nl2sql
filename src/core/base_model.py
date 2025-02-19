@@ -42,7 +42,7 @@ class NL2SQLModel(ABC):
         for idx, pair in enumerate(tqdm(self.benchmark)):
             question = pair['question']
             goal = pair['golden_query']
-            schema = get_query_build_instruct(schema_size, goal)
+            schema = get_query_build_instruct(schema_size, goal, natural_names=False)
             prompt = self.prompt_strategy.get_prompt(schema, question)
             answer = self._prune_generated_query(self._answer_single_question(prompt))
             self.results[idx] = {'question': question, 'golden_query': goal, 'golden_result': {}, 'generated_query': answer, 'generated_result': {}}

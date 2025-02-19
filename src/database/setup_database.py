@@ -29,7 +29,6 @@ def init_db(data_directory: str):
     """
 
     _create_db()
-    _drop_column_label_table()
 
     sas_files = _find_sas_files(data_directory)
 
@@ -51,7 +50,6 @@ def init_normalised_db(data_directory: str, table_name_file: str) -> None:
     """
 
     _create_db()
-    _drop_column_label_table()
 
     sas_files = _find_sas_files(data_directory)
 
@@ -168,23 +166,6 @@ def _create_db():
         conn.close()
     except Exception as e:
         logger.error("Error creating database: %s", e)
-
-
-def _drop_column_label_table():
-    """
-    Drop the tables column_label_lookup table to avoid duplicates 
-    """
-    try:
-        conn = get_conn()
-        conn.autocommit = True
-        cur = conn.cursor()
-
-        cur.execute("DROP TABLE IF EXISTS column_label_lookup")
-
-        cur.close()
-        conn.close()
-    except Exception as e:
-        logger.error("Error dropping the table column_label_lookup. %s", e)
 
 
 if __name__ == '__main__':

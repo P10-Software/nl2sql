@@ -34,7 +34,7 @@ def get_query_build_instruct(kind: SchemaKind, query: str, natural_names: bool) 
 
 
 def _extract_column_table(query: str) -> dict[str, list[str]]:
-    parser = Parser(_sanitise_query(query))
+    parser = Parser(sanitise_query(query))
     tables = parser.tables
     columns = _parse_column(parser)
 
@@ -83,7 +83,7 @@ def _transform_natural_query(selected_tables_columns: dict[str, list[str]]) -> d
     return updated_dict
 
 
-def _sanitise_query(query: str):
+def sanitise_query(query: str):
     return re.sub(r"(LIKE\s*)'[^']*'", r"\1''", query, flags=re.IGNORECASE)
 
 

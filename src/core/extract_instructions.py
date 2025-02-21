@@ -6,7 +6,7 @@ from src.common.logger import get_logger
 from src.database.setup_database import get_conn
 
 
-SchemaKind = Literal['full', 'tables', 'columns']
+SchemaKind = Literal['Full', 'Tables', 'Columns']
 logger = get_logger(__name__)
 
 
@@ -15,7 +15,7 @@ def get_query_build_instruct(kind: SchemaKind, query: str, natural_names: bool) 
     Find the build instructions of the database based on a query.
 
     Args:
-    - kind (SchemaKind): One of 'full', 'tables', 'columns' specifying how restricted the schema should be.
+    - kind (SchemaKind): One of 'Full', 'Tables', 'Columns' specifying how restricted the schema should be.
     - query: SQL query in string format
     - natural_names: Boolean values, True for natural_names and False for abbreviated
 
@@ -158,14 +158,14 @@ def _create_build_instruction_tree(connection_string) -> dict:
 def _create_build_instruction(build_instruct_dict: dict, tables_columns: dict, level: str) -> str:
     sql_statements = []
 
-    if level == "full":
+    if level == "Full":
         for table, table_info in build_instruct_dict.items():
             create_table_sql = table_info['create_table'].format(
                 columns=",\n    ".join(table_info['columns'].values())
             )
             sql_statements.append(create_table_sql)
 
-    elif level == "tables":
+    elif level == "Tables":
         for table in tables_columns.keys():
             if table in build_instruct_dict:
                 table_info = build_instruct_dict[table]
@@ -174,7 +174,7 @@ def _create_build_instruction(build_instruct_dict: dict, tables_columns: dict, l
                 )
                 sql_statements.append(create_table_sql)
 
-    elif level == "columns":
+    elif level == "Columns":
         for table, selected_columns in tables_columns.items():
             if table in build_instruct_dict:
                 columns_def = []

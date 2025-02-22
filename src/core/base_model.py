@@ -83,11 +83,11 @@ class NL2SQLModel(ABC):
 
         for table in tables:
             if table in table_names_natural['old_name'].values:
-                query.replace(table, table_name_mapping[table])
+                query = query.replace(table, table_name_mapping[table])
 
         for column in columns:
             if column in column_names_natural['old_name'].values:
-                query.replace(column, column_name_mapping[column])
+                query = query.replace(column, column_name_mapping[column])
 
         return query
 

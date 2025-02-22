@@ -1,4 +1,5 @@
 import pytest
+import pandas as pd
 from src.core.base_model import NL2SQLModel, PromptStrategy
 from unittest.mock import MagicMock, patch, call
 
@@ -108,3 +109,33 @@ def test_run(mock_get_query_build_instruct, mock_db_conn, mock_benchmark_set, mo
     ]
 
     mock_logger.info.assert_has_calls(expected_calls, any_order=False)
+
+
+@pytest.mark.parametrize("query, expected", [
+    ("SELECT trl_id FROM tab_pln", "SELECT trial_id FROM table_plan"),
+    ("SELECT trl_id, pln_id FROM tab_pln", "SELECT trial_id, plan_id FROM table_plan"),
+    ("SELECT * FROM tab_pln", "SELECT * FROM table_plan"),
+    ("SELECT trl_id, pln_id FROM tab_pln WHERE trl_id < 10", "SELECT trial_id, plan_id FROM table_plan WHERE trial_id < 10"),
+    ("SELECT trl_id, pln_name FROM tab_pln t, trl_tp p WHERE t.trl_id > 10 and p.pln_name = 'test'", "SELECT trial_id, plan_name FROM table_plan t, trial_type p WHERE t.trial_id > 10 and p.plan_name = 'test'"),
+    # table and column names not in db.
+    ("SELECT unknown FROM some_tab", "SELECT unknown FROM some_tab"),
+    ("SELECT trl_id, unk FROM tab_pln", "SELECT trial_id, unk FROM table_plan"),
+])
+@patch("src.core.base_model.pd.read_csv")
+def test_translate_query_to_natural(mock_read_csv, query, expected):
+    model = MockNL2SQLModel(mock_db_conn, mock_benchmark_set)
+    mock_table_names = pd.DataFrame({
+        'old_name': ['tab_pln', 'trl_tp'],
+        'new_name': ['table_plan', 'trial_type']
+    })
+
+    mock_column_names = pd.DataFrame({
+        'old_name': ['trl_id', 'pln_id', 'pln_name'],
+        'new_name': ['trial_id', 'plan_id', 'plan_name']
+    })
+
+    mock_read_csv.side_effect = [mock_table_names, mock_column_names]
+
+    res = model.translate_query_to_natural(query)
+
+    assert expected == res

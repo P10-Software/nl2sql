@@ -178,7 +178,7 @@ class Reporter:
                 return True
         return False
 
-    def _extract_columns(self, parser, with_columns: bool = False):
+    def _extract_columns(self, parser, with_tables: bool = False):
         columns = []
 
         def get_only_columns(parser):
@@ -191,7 +191,7 @@ class Reporter:
                         next = next.next_token
             return columns
 
-        if with_columns:
+        if with_tables:
             if len(parser.tables) == 1:
                 table = parser.tables[0]
                 columns = get_only_columns(parser)

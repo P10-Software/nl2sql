@@ -30,9 +30,9 @@ def in_memory_db():
 
 
 @pytest.mark.parametrize("kind, expected", [
-    ('columns', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL);"),
-    ('tables', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL,\n    pln_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);"),
-    ('full', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL,\n    pln_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);\n\nCREATE TABLE nu_pln (nu_id TEXT NOT NULL);")
+    ('Columns', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL);"),
+    ('Tables', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL,\n    pln_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);"),
+    ('Full', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL,\n    pln_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);\n\nCREATE TABLE nu_pln (nu_id TEXT NOT NULL);")
 ])
 @patch('src.core.extract_instructions.get_conn')
 @patch('src.core.extract_instructions._create_build_instruction_tree')
@@ -65,9 +65,9 @@ def test_get_query_build_instructions(mock_build_tree, mock_get_conn, in_memory_
 
 
 @pytest.mark.parametrize("kind, translated_column_table, expected", [
-    ('columns', {'table_plan': ['plan_id']}, "CREATE TABLE table_plan (plan_id TEXT NOT NULL);"),
-    ('tables', {'table_plan': ['plan_id', 'plan_name', 'created_at']}, "CREATE TABLE table_plan (plan_id TEXT NOT NULL,\n    plan_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);"),
-    ('full', {'table_plan': ['plan_id', 'plan_name', 'created_at'], 'nu_plan': ['nu_id']}, "CREATE TABLE table_plan (plan_id TEXT NOT NULL,\n    plan_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);\n\nCREATE TABLE nu_plan (nu_id TEXT NOT NULL);")
+    ('Columns', {'table_plan': ['plan_id']}, "CREATE TABLE table_plan (plan_id TEXT NOT NULL);"),
+    ('Tables', {'table_plan': ['plan_id', 'plan_name', 'created_at']}, "CREATE TABLE table_plan (plan_id TEXT NOT NULL,\n    plan_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);"),
+    ('Full', {'table_plan': ['plan_id', 'plan_name', 'created_at'], 'nu_plan': ['nu_id']}, "CREATE TABLE table_plan (plan_id TEXT NOT NULL,\n    plan_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);\n\nCREATE TABLE nu_plan (nu_id TEXT NOT NULL);")
 ])
 @patch("src.core.extract_instructions._transform_natural_query")
 @patch('src.core.extract_instructions.get_conn')

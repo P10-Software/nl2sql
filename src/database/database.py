@@ -24,7 +24,7 @@ def execute_query(query: str):
     - The result of executing the SQL.
     """
 
-    result = None
+    result = []
     conn = get_conn()
     if conn:
         try:
@@ -33,14 +33,13 @@ def execute_query(query: str):
 
             cur.execute(query)
             result = cur.fetchall()
-
-            cur.close()
-            conn.close()
         except Exception as e:
             logger.error(f"Error executing query on database: {e}")
+        finally:
+            cur.close()
+            conn.close()
 
     return result
-
 
 def get_conn():
     """

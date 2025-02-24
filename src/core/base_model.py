@@ -38,21 +38,16 @@ class NL2SQLModel(ABC):
         self.results = {}
         self.analysis = None
 
-    def run(self, schema_size: SchemaKind):
+    def run(self, schema_size: SchemaKind, naturalness: bool):
         logger.info(f"Started benchmarking of {self.__class__.__name__}.")
         for idx, pair in enumerate(tqdm(self.benchmark)):
             question = pair['question']
             goal = pair['golden_query']
-            schema = get_query_build_instruct(schema_size, goal, natural_names=False)
+            schema = get_query_build_instruct(schema_size, goal, naturalness)
             prompt = self.prompt_strategy.get_prompt(schema, question)
             answer = self._prune_generated_query(self._answer_single_question(prompt))
             self.results[idx] = {'question': question, 'golden_query': goal, 'golden_result': {}, 'generated_query': answer, 'generated_result': {}}
         logger.info(f"Benchmarking finished for {self.__class__.__name__}.")
-        logger.info(f"Running results of database for {self.__class__.__name__}.")
-        for _, res in self.results.items():
-            res['golden_result'] = self._get_query_result(res['golden_query'])
-            res['generated_result'] = self._get_query_result(res['generated_query'])
-        logger.info(f"Executed all queries on the database for {self.__class__.__name__}.")
 
     @abstractmethod
     def _answer_single_question(self):
@@ -99,15 +94,3 @@ class NL2SQLModel(ABC):
         query = re.sub(r';.*', ';', query, flags=(re.IGNORECASE | re.DOTALL))
         # Remove \n
         return query.replace("\n", "")
-
-    def _get_query_result(self, query: str):
-        try:
-            cur = self.conn.cursor()
-            cur.execute(query)
-            res = cur.fetchall()
-        except Exception as e:
-            logger.error(f"Error executing query: {query}\n{e}")
-            res = []
-        finally:
-            cur.close()
-        return res

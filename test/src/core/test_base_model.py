@@ -90,22 +90,18 @@ def test_run(mock_get_query_build_instruct, mock_db_conn, mock_benchmark_set, mo
     model = MockNL2SQLModel(mock_db_conn, mock_benchmark_set)
 
     with patch.object(model, "_answer_single_question", return_value="SELECT * FROM users;"):
-        with patch.object(model, "_get_query_result", return_value=[("mock_result",)]):
-            # Act
-            model.run(schema_size=schema_kind)
+        model.run(schema_size=schema_kind, naturalness=False)
 
     # Assert
     assert len(model.results) == len(mock_benchmark_set)
     assert model.results[0]['generated_query'] == "SELECT * FROM users;"
-    assert model.results[0]['golden_result'] == [("mock_result",)]
-    assert model.results[0]['generated_result'] == [("mock_result",)]
+    assert model.results[0]['golden_result'] == {}
+    assert model.results[0]['generated_result'] == {}
 
     # Ensure logger was called
     expected_calls = [
         call.info("Started benchmarking of MockNL2SQLModel."),
         call.info("Benchmarking finished for MockNL2SQLModel."),
-        call.info("Running results of database for MockNL2SQLModel."),
-        call.info("Executed all queries on the database for MockNL2SQLModel."),
     ]
 
     mock_logger.info.assert_has_calls(expected_calls, any_order=False)

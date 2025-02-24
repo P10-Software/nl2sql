@@ -51,8 +51,8 @@ class Reporter:
         self.analysis.append((name, {
             'execution accuracy': execution_accuracy(golden_results, generated_results),
             'precision': precision(list(zip(golden_results, golden_columns)), list(zip(generated_results, generated_columns))),
-            'recall': recall(golden_results, generated_results),
-            'f1 score': f1_score(golden_results, generated_results),
+            'recall': recall(list(zip(golden_results, golden_columns)), list(zip(generated_results, generated_columns))),
+            'f1 score': f1_score(list(zip(golden_results, golden_columns)), list(zip(generated_results, generated_columns))),
             'SQL mismatches': sql_errors,
             'total sql queries': len(generated_sql)
         }))

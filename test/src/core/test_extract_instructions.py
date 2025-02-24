@@ -2,7 +2,7 @@ import sqlite3
 from unittest.mock import patch
 import pytest
 import pandas as pd
-from src.core.extract_instructions import get_query_build_instruct, _sanitise_query, _extract_column_table, _transform_natural_query
+from src.core.extract_instructions import get_query_build_instruct, sanitise_query, _extract_column_table, _transform_natural_query
 
 
 @pytest.fixture(scope="function")
@@ -138,7 +138,7 @@ def test_transform_natural_query(mock_read_csv):
 ])
 def test_sanitise_query(sql, expected):
     # Arrange + Act
-    result = _sanitise_query(sql)
+    result = sanitise_query(sql)
 
     # Assert
     assert result == expected

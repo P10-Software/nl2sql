@@ -1,11 +1,12 @@
 from abc import abstractmethod, ABC
-from src.core.extract_instructions import get_query_build_instruct, SchemaKind
-from tqdm import tqdm
-from src.common.logger import get_logger
 import re
-from src.core.evaluation_metrics import precision, recall, f1_score, execution_accuracy
-import sql_metadata
+from tqdm import tqdm
+import pandas as pd
+from sql_metadata import Parser
 from collections import Counter
+from src.common.logger import get_logger
+from src.core.extract_instructions import get_query_build_instruct, SchemaKind, sanitise_query
+from src.core.evaluation_metrics import precision, recall, f1_score, execution_accuracy
 
 TASK = 'text-generation'
 MAX_NEW_TOKENS = 200
@@ -59,6 +60,37 @@ class NL2SQLModel(ABC):
         Abstract method for answering a single question, should return a non-pruned response.
         """
         raise NotImplementedError("Subclasses should implement this method.")
+
+
+    def translate_query_to_natural(self, query: str) -> str:
+        """
+        Translates an SQL from using abbreviated column and tables names to use more natural_names
+        Uses the column and table natural names CSV files.
+
+        Args:
+        - query (str): SQL query in a string format
+        """
+        parser = Parser(sanitise_query(query))
+        tables = parser.tables
+        columns = parser.columns
+
+        # Load natural column and table names:
+        table_names_natural = pd.read_csv(".local/table_names_normalised.csv", header=None, names=["old_name", "new_name"])
+        column_names_natural = pd.read_csv(".local/column_names_normalised.csv", header=None, names=["old_name", "new_name"])
+
+        table_name_mapping = dict(zip(table_names_natural['old_name'], table_names_natural['new_name']))
+        column_name_mapping = dict(zip(column_names_natural['old_name'], column_names_natural['new_name']))
+
+        for table in tables:
+            if table in table_names_natural['old_name'].values:
+                query = query.replace(table, table_name_mapping[table])
+
+        for column in columns:
+            if column in column_names_natural['old_name'].values:
+                query = query.replace(column, column_name_mapping[column])
+
+        return query
+
 
     def _prune_generated_query(self, query: str):
         # Prune everything before select

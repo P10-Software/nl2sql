@@ -80,7 +80,7 @@ sympy==1.13.1
 tokenizers==0.21.0
 torch==2.6.0
 tqdm==4.67.1
-transformers==4.48.3 "GITHUB_ACTIONS" not in os.environ
+transformers==4.48.3; "GITHUB_ACTIONS" not in os.environ
 triton==3.2.0
 typing_extensions==4.12.2
 tzdata==2025.1

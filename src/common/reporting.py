@@ -2,8 +2,6 @@ import html
 from src.common.logger import get_logger
 from src.core.evaluation_metrics import execution_accuracy, precision, recall, f1_score
 from collections import Counter
-from json import load
-import re
 import sql_metadata
 import os
 
@@ -44,9 +42,9 @@ class Reporter:
                          for res in result.values()]
 
         golden_columns = [self._extract_columns(
-            sql_metadata.Parser(sql)) for sql in golden_sql]
+            sql_metadata.Parser(sql), True) for sql in golden_sql]
         generated_columns = [self._extract_columns(
-            sql_metadata.Parser(sql)) for sql in generated_sql]
+            sql_metadata.Parser(sql), True) for sql in generated_sql]
 
         sql_errors = self._analyse_sql(golden_sql, generated_sql)
 

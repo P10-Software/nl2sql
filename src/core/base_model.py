@@ -81,8 +81,6 @@ def translate_query_to_natural(query: str) -> str:
     column_names_natural = pd.read_csv(".local/column_names_normalised.csv", header=None, names=["old_name", "new_name", "table_name"])
 
     table_name_mapping = dict(zip(table_names_natural['old_name'], table_names_natural['new_name']))
-    column_name_mapping = dict(zip(column_names_natural[('old_name')], column_names_natural['new_name']))
-
     column_name_mapping = { 
         (row['old_name'], row['table_name']): row['new_name']
         for _, row in column_names_natural.iterrows()
@@ -92,20 +90,25 @@ def translate_query_to_natural(query: str) -> str:
     for column in columns:
         if '.' in column:  # Check if column includes the table alias
             table, col_name = column.split('.')
-            if (col_name, table) in column_name_mapping:  # Check if both the column and table exist in mapping
-                new_col_name = column_name_mapping[(col_name, table)]
-                query = query.replace(f' {col_name}', f' {new_col_name}')
-                query = query.replace(f'.{col_name}', f'.{new_col_name}')
+            if (col_name, table_name_mapping[table]) in column_name_mapping:  # Check if both the column and table exist in mapping
+                new_col_name = column_name_mapping[(col_name, table_name_mapping[table])]
+                query = query.replace(f'.{col_name} ', f'.{new_col_name} ')
+                query = query.replace(f'.{col_name},', f'.{new_col_name},')
+                query = query.replace(f'.{col_name})', f'.{new_col_name})')
         else:
             col_name = column
-            table = tables[0]
+            table = table_name_mapping[tables[0]]
             if (col_name, table) in column_name_mapping:  # Check if both the column and table exist in mapping
                 new_col_name = column_name_mapping[(col_name, table)]
-                query = query.replace(f' {col_name}', f' {new_col_name}')
+                query = query.replace(f' {col_name} ', f' {new_col_name} ')
+                query = query.replace(f' {col_name},', f' {new_col_name},')
+                query = query.replace(f' {col_name})', f' {new_col_name})')
 
     # Replace table names in the query
     for table in tables:
         if table in table_name_mapping:
-            query = query.replace(f" {table}", f" {table_name_mapping[table]}")  # Ensure space for full matches
+            query = query.replace(f" {table} ", f" {table_name_mapping[table]} ")  # Ensure space for full matches
+            query = query.replace(f" {table},", f" {table_name_mapping[table]},")  # Ensure space for full matches
+            query = query.replace(f" {table};", f" {table_name_mapping[table]};")  # Ensure space for full matches
 
     return query

@@ -114,8 +114,9 @@ def test_transform_natural_query(mock_read_csv):
     })
 
     mock_column_names = pd.DataFrame({
-        'old_name': ['trl_id', 'pln_id', 'pln_name'],
-        'new_name': ['trial_id', 'plan_id', 'plan_name']
+        'old_name': ['trl_id', 'pln_id', 'pln_id', 'pln_name'],
+        'new_name': ['trial_id', 'some_other_label', 'plan_id', 'plan_name'],
+        'table_name': ['trial_type', 'trial_type', 'table_plan', 'table_plan']
     })
 
     mock_read_csv.side_effect = [mock_table_names, mock_column_names]

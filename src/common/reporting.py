@@ -43,8 +43,12 @@ class Reporter:
 
         golden_columns = [self._extract_columns(
             sql_metadata.Parser(sql), True) for sql in golden_sql]
-        generated_columns = [self._extract_columns(
-            sql_metadata.Parser(sql), True) for sql in generated_sql]
+        try:
+            generated_columns = [self._extract_columns(
+                sql_metadata.Parser(sql), True) for sql in generated_sql]
+        except:
+            generated_columns = []
+            logger.error("Generated is not a query")
 
         sql_errors = self._analyse_sql(golden_sql, generated_sql)
 
@@ -206,7 +210,7 @@ class Reporter:
                             if next_token.value not in [',', '.']:
                                 column_names.append(next_token.value)
                             next_token = next_token.next_token
-                            if next_token.normalized == 'FROM':
+                            if next_token is not None and next_token.normalized == 'FROM':
                                 columns.extend([(next_token.next_token.value + '.' + s if '.' not in s else s) for s in column_names])
                                 break
                 return columns

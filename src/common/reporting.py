@@ -337,15 +337,3 @@ class Reporter:
             os.makedirs(file_location)
         with open(file_location + "/report.html", "w", encoding="utf-8") as file:
             file.write(html_content)
-
-def get_query_result(self, query: str):
-    try:
-        cur = self.conn.cursor()
-        cur.execute(query)
-        res = cur.fetchall()
-    except Exception as e:
-        logger.error(f"Error executing query: {query}\n{e}")
-        res = []
-    finally:
-        cur.close()
-    return res

@@ -170,7 +170,7 @@ def _create_db():
 
 if __name__ == '__main__':
     try:
-        init_db(".local/NOVO_SAS_DATA")
-        #init_normalised_db(".local/NOVO_SAS_DATA", ".local/table_names_normalised.csv") # Normalised DB
+        #init_db(".local/NOVO_SAS_DATA")
+        init_normalised_db(".local/NOVO_SAS_DATA", ".local/table_names_normalised.csv") # Normalised DB
     except Exception as e:
         logger.error("Failed: %s", e)

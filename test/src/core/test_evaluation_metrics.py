@@ -5,49 +5,61 @@ from src.core.evaluation_metrics import precision, recall, f1_score, execution_a
 @pytest.mark.parametrize("golden, generated, result", [
     # 1. Perfect Match
     (
-        [[(1, 'Alice'), (2, 'Bob')]],
-        [[(1, 'Alice'), (2, 'Bob')]],
-        {'total_precision': 1, 'individual_precisions': {0: 1.0}}
+        [([(1, 'Alice'), (2, 'Bob')], ['name'])],
+        [([(1, 'Alice'), (2, 'Bob')], ['name'])],
+        {'total_precision': 1.0, 'individual_precisions': {0: 1.0}}
     ),
     # 2. Some Correct, Some Extra
     (
-        [[(1, 'Alice'), (2, 'Bob')]],
-        [[(1, 'Alice'), (3, 'Bravo')]],
+        [([(1, 'Alice'), (2, 'Bob')], ['name'])],
+        [([(1, 'Alice'), (3, 'Bravo')], ['name'])],
         {'total_precision': 0.5, 'individual_precisions': {0: 0.5}}
     ),
     # 3. No Overlap
     (
-        [[(1, 'Alice'), (2, 'Bob')]],
-        [[(3, 'Bravo'), (4, 'Delta')]],
-        {'total_precision': 0, 'individual_precisions': {0: 0.0}}
+        [([(1, 'Alice'), (2, 'Bob')], ['name'])],
+        [([(3, 'Bravo'), (4, 'Delta')], ['name'])],
+        {'total_precision': 0.0, 'individual_precisions': {0: 0.0}}
     ),
     # 4. Generated Set is Empty
     (
-        [[(1, 'Alice'), (2, 'Bob')]],
-        [[]],
-        {'total_precision': 0, 'individual_precisions': {0: 0.0}}
+        [([(1, 'Alice'), (2, 'Bob')], ['name'])],
+        [([], ['name'])],
+        {'total_precision': 0.0, 'individual_precisions': {0: 0.0}}
     ),
     # 5. Gold Set is Empty
     (
-        [[]],
-        [[(1, 'Alice'), (2, 'Bob')]],
+        [([], ['name'])],
+        [([(1, 'Alice'), (2, 'Bob')], ['name'])],
         {'total_precision': 0.0, 'individual_precisions': {0: 0.0}}
     ),
     # 6. Some Missing, Some Extra
     (
-        [[(1, 'Alice'), (2, 'Bob'), (3, 'Charlie')]],
-        [[(1, 'Alice'), (4, 'Delta')]],
+        [([(1, 'Alice'), (2, 'Bob'), (3, 'Charlie')], ['name'])],
+        [([(1, 'Alice'), (4, 'Delta')], ['name'])],
         {'total_precision': 0.5, 'individual_precisions': {0: 0.5}}
     ),
     # 7. Duplicate Predictions
     (
-        [[(1, 'Alice'), (2, 'Bob')]],
-        [[(1, 'Alice'), (1, 'Alice'), (2, 'Bob')]],
+        [([(1, 'Alice'), (2, 'Bob')], ['name'])],
+        [([(1, 'Alice'), (1, 'Alice'), (2, 'Bob')], ['name'])],
+        {'total_precision': 0.67, 'individual_precisions': {0: 0.67}}
+    ),
+    # 8. Duplicate columns
+    (
+        [([(1, 'Alice'), (2, 'Bob')], ['people.name'])],
+        [([(1, 'Alice', 'Alice'), (2, 'Bob', 'Bob')], ['people.name', 'people.name'])],
         {'total_precision': 1.0, 'individual_precisions': {0: 1.0}}
+    ),
+    # 9. Different columns
+    (
+        [([(1, 'Alice'), (2, 'Bob')], ['people.name'])],
+        [([(1, 'Alice', 'Alice'), (2, 'Bob', 'Bob')], ['people.name', 'admins.name'])],
+        {'total_precision': 0.5, 'individual_precisions': {0: 0.5}}
     )
 ], ids=[
     'full match', 'generated one diff', 'generated full diff', 'empty generated', 'empty gold',
-    'some missing some extra', 'duplicate predictions'
+    'some missing some extra', 'duplicate predictions', 'duplicate columns', 'different columns'
 ])
 def test_precision(golden, generated, result):
     # Arrange + Act

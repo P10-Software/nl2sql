@@ -65,18 +65,20 @@ def _extract_column_table(query: str) -> dict[str, list[str]]:
 def _transform_natural_query(selected_tables_columns: dict[str, list[str]]) -> dict[str, list[str]]:
     """ Transform tables and column names in query to be more natural. """
     table_names = pd.read_csv(".local/table_names_normalised.csv", header=None, names=["old_name", "new_name"])
-    column_names = pd.read_csv(".local/column_names_normalised.csv", header=None, names=["old_name", "new_name"])
+    column_names = pd.read_csv(".local/column_names_normalised.csv", header=None, names=["old_name", "new_name", "table_name"])
 
     table_mapping = dict(zip(table_names['old_name'], table_names['new_name']))
-    column_mapping = dict(zip(column_names['old_name'], column_names['new_name']))
-    
+    column_name_mapping = { 
+        (row['old_name'], row['table_name']): row['new_name']
+        for _, row in column_names.iterrows()
+    }    
     updated_dict = {}
 
     for key, values in selected_tables_columns.items():
         # Replace key if found, otherwise keep the original
         new_table = table_mapping.get(key, key)
 
-        new_values = [column_mapping.get(val, val) for val in values]
+        new_values = [column_name_mapping[(column, new_table)] for  column in values]
 
         updated_dict[new_table] = new_values
 

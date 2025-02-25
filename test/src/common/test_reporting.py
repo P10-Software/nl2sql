@@ -165,14 +165,14 @@ def test_analyse_sql():
             "SELECT name FROM names;",
             "SELECT DISTINCT name FROM names;",
             {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': [], 'generated': [
-            ]}, 'clauses': {}, 'distinct': {'golden': False, 'generated': True, 'not_query': 0}}
+            ]}, 'clauses': {}, 'distinct': {'golden': False, 'generated': True}, 'not_query': 0}
         ),
         # Gold has distinct
         (
             "SELECT DISTINCT name FROM names;",
             "SELECT name FROM names;",
             {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': [], 'generated': [
-            ]}, 'clauses': {}, 'distinct': {'golden': True, 'generated': False, 'not_query': 0}}
+            ]}, 'clauses': {}, 'distinct': {'golden': True, 'generated': False}, 'not_query': 0}
         ),
         # Missing column, WHERE clause, and GROUP BY
         (
@@ -207,10 +207,16 @@ def test_analyse_sql():
             "SELECT name, age FROM users WHERE age > 18 GROUP BY age ORDER BY age",
             {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': [], 'generated': []}, 'clauses': {
                 'ORDERBY': {'golden': ['NAME '], 'generated': ['AGE ']}}, 'distinct': {'golden': False, 'generated': False}, 'not_query': 0}
+        ),
+        (
+            "SELECT T1.cdw_partition_key, T1.profile_id FROM planned_profile AS T1",
+            "SELECT profile_id AS unique_identifier, cdw_partition_key AS partition_key FROM planned_profile",
+            {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': [], 'generated': []}, 'clauses': {
+                'ORDERBY': {'golden': [], 'generated': []}}, 'distinct': {'golden': False, 'generated': False}, 'not_query': 0}
         )
     ],
     ids=['generated extra distinct', 'generated missing distinct',
-         'missing column, where and group by', 'different table', 'generated is not a query' ,'no errors', 'different order by']
+         'missing column, where and group by', 'different table', 'generated is not a query' ,'no errors', 'different order by', 'alias for column']
 )
 def test_extract_sql_mismatch(gold, generated, expected):
     # Arrange
@@ -236,3 +242,4 @@ def test_extract_sql_mismatch(gold, generated, expected):
 
     assert result['distinct']['golden'] == expected['distinct']['golden']
     assert result['distinct']['generated'] == expected['distinct']['generated']
+    assert result['not_query'] == expected['not_query']

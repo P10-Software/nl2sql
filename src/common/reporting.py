@@ -43,8 +43,12 @@ class Reporter:
 
         golden_columns = [self._extract_columns(
             sql_metadata.Parser(sql), True) for sql in golden_sql]
-        generated_columns = [self._extract_columns(
-            sql_metadata.Parser(sql), True) for sql in generated_sql]
+        try:
+            generated_columns = [self._extract_columns(
+                sql_metadata.Parser(sql), True) for sql in generated_sql]
+        except:
+            generated_columns = []
+            logger.error("Generated is not a query")
 
         sql_errors = self._analyse_sql(golden_sql, generated_sql)
 
@@ -165,7 +169,10 @@ class Reporter:
                 curr_tok = token.next_token
                 clause_filter = []
                 while curr_tok and not curr_tok.is_keyword:
-                    clause_filter.append(curr_tok.normalized)
+                    if curr_tok.is_name and '.' in curr_tok.normalized:
+                        clause_filter.append(curr_tok.normalized.split('.')[1])
+                    else:
+                        clause_filter.append(curr_tok.normalized)
                     curr_tok = curr_tok.next_token
 
                 clauses[token.normalized].append(" ".join(clause_filter))
@@ -182,13 +189,11 @@ class Reporter:
         columns = []
 
         def get_only_columns(parser):
-            for token in parser.tokens:
-                if token.is_keyword and token.normalized in ['SELECT', 'DISTINCT']:
-                    next = token.next_token
-                    while next and not next.is_keyword:
-                        if next.normalized != ',':
-                            columns.append(next.normalized.lower())
-                        next = next.next_token
+            for column in parser.columns_dict['select']:
+                if '.' in column:
+                    columns.append(column.split('.')[1])
+                else:
+                    columns.append(column)
             return columns
 
         if with_tables:
@@ -205,7 +210,7 @@ class Reporter:
                             if next_token.value not in [',', '.']:
                                 column_names.append(next_token.value)
                             next_token = next_token.next_token
-                            if next_token.normalized == 'FROM':
+                            if next_token is not None and next_token.normalized == 'FROM':
                                 columns.extend([(next_token.next_token.value + '.' + s if '.' not in s else s) for s in column_names])
                                 break
                 return columns

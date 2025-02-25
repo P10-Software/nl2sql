@@ -2,7 +2,7 @@ from src.core.model_implementations import LlamaModel, DeepSeekLlamaModel, DeepS
 from src.core.prompt_strategies import Llama3PromptStrategy, DeepSeekPromptStrategy, XiYanSQLPromptStrategy
 from src.database.setup_database import get_conn
 from src.database.database import execute_query
-from src.core.base_model import NL2SQLModel
+from src.core.base_model import NL2SQLModel, translate_query_to_natural
 from json import load, dump
 from src.common.logger import get_logger
 from src.common.reporting import Reporter
@@ -13,7 +13,7 @@ SQL_DIALECT = "postgres"
 SCHEMA_SIZES = ["Full", "Tables", "Columns"]
 DATASET_PATH = ".local/EX.json"
 RESULTS_DIR = "results"
-NATURALNESS = "Abbreviated"
+NATURALNESS = "Normalized"
 MODEL = "XiYan"
 
 def load_dataset(dataset_path: str):
@@ -49,7 +49,6 @@ if __name__ == "__main__":
         model.run(schema_size, NATURALNESS == "Normalized")
         save_results(f"{RESULTS_DIR}/{MODEL}/{NATURALNESS}/{MODEL}{schema_size}{NATURALNESS}.json", model)
         model.results = []
-
     # Load results, execute queries and add to reporter
     reporter = Reporter()
 
@@ -60,8 +59,12 @@ if __name__ == "__main__":
 
         logger.info(f"Running results of database for {path}.")
         for res in results.values():
+            if NATURALNESS == "Normalized":
+                res['golden_query'] = translate_query_to_natural(res['golden_query'])
+
             res['golden_result'] = execute_query(res['golden_query'])
             res['generated_result'] = execute_query(res['generated_query'])
+
         logger.info(f"Executed all queries on the database for {path}.")
     
         reporter.add_result(results, result_file_name.split('.')[0])

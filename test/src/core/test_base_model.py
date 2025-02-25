@@ -117,7 +117,9 @@ def test_run(mock_get_query_build_instruct, mock_db_conn, mock_benchmark_set, mo
     ("SELECT unknown FROM some_tab;", "SELECT unknown FROM some_tab;"),
     ("SELECT trl_id, unk FROM tab_pln;", "SELECT trial_id, unk FROM table_plan;"),
     ("SELECT t1.trl_id FROM tab_pln AS t1;", "SELECT t1.trial_id FROM table_plan AS t1;"),
-    ("SELECT t1.pop FROM trl_pop AS t1;", "SELECT t1.population FROM trial_population AS t1;")
+    ("SELECT t1.pop FROM trl_pop AS t1;", "SELECT t1.population FROM trial_population AS t1;"),
+    ("SELECT t1.pop as p FROM trl_pop as t1;", "SELECT t1.population as p FROM trial_population as t1;"),
+    ("SELECT t1.pop as p, t2.trl_id as id FROM trl_pop as t1, tab_pln as t2;", "SELECT t1.population as p, t2.trial_id as id FROM trial_population as t1, table_plan as t2;")
 ])
 @patch("src.core.base_model.pd.read_csv")
 def test_translate_query_to_natural(mock_read_csv, query, expected):

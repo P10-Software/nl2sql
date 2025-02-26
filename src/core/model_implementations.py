@@ -84,5 +84,8 @@ class LlamaModel(NL2SQLModel):
             max_new_tokens=1024,
         )[0]['generated_text']
     
-    def _prune_generated_query(self, query):
-        return super()._prune_generated_query(query) + ";"
+    def _prune_generated_query(self, query: str):
+        if ';' in query:
+            return super()._prune_generated_query(query)
+        else:
+            return super()._prune_generated_query(query) + ";"

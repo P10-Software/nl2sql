@@ -20,20 +20,18 @@ class XiYanSQLPromptStrategy(PromptStrategy):
     def __init__(self, sql_dialect):
         self.sql_dialect = sql_dialect
         self.prompt_template = """
-            你是一名{SQL_DIALECT}专家，现在需要阅读并理解下面的【数据库schema】描述，以及可能用到的【参考信息】，并运用{SQL_DIALECT}知识生成sql语句回答【用户问题】。
-            【用户问题】
-            {NL_QUESTION}
+            You are now a {SQL_DIALECT} data analyst, and you are given a database schema as follows:
 
-            【数据库schema】
+            【Schema】
             {DDL_INSTRUCTIONS}
 
-            【参考信息】
-            {EVIDENCE}
-
-            【用户问题】
+            【Question】
             {NL_QUESTION}
 
-            ```sql
+            【Evidence】
+            {EVIDENCE}
+
+            Please read and understand the database schema carefully, and generate an executable SQL based on the user's question and evidence. The generated SQL is protected by ```sql and ```.
         """
 
     def get_prompt(self, schema, question):

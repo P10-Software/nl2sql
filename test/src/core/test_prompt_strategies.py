@@ -2,11 +2,8 @@ from src.core.prompt_strategies import XiYanSQLPromptStrategy, Llama3PromptStrat
 import pytest
 
 XIYAN_SQL_EXPECTED = """
-    你是一名Postgres专家，现在需要阅读并理解下面的【数据库schema】描述，以及可能用到的【参考信息】，并运用Postgres知识生成sql语句回答【用户问题】。
-    【用户问题】
-    What is the age of bob?
-
-    【数据库schema】
+    You are now a Postgres data analyst, and you are given a database schema as follows:
+    【Schema】
     CREATE TABLE People (
         PersonID INT PRIMARY KEY AUTO_INCREMENT,
         FirstName VARCHAR(50) NOT NULL,
@@ -14,15 +11,11 @@ XIYAN_SQL_EXPECTED = """
         Age INT CHECK (Age >= 0),
         DateOfBirth DATE,
     );
-
-
-    【参考信息】
-
-
-    【用户问题】
+    【Question】
     What is the age of bob?
+    【Evidence】
 
-    ```sql
+    Please read and understand the database schema carefully, and generate an executable SQL based on the user's question and evidence. The generated SQL is protected by ```sql and ```.
 """
 
 LLAMA_EXPECTED = """

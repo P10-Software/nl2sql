@@ -14,7 +14,7 @@ SCHEMA_SIZES = ["Full", "Tables", "Columns"]
 DATASET_PATH = ".local/EX.json"
 RESULTS_DIR = "results"
 NATURALNESS = "Normalized"
-MODEL = "XiYan"
+MODEL = "Llama"
 
 def load_dataset(dataset_path: str):
     with open(dataset_path, "r") as file:
@@ -36,19 +36,20 @@ if __name__ == "__main__":
             model = XiYanSQLModel(connection, dataset, prompt_strategy)
         case "DeepSeekQwen":
             prompt_strategy = DeepSeekPromptStrategy(SQL_DIALECT)
-            model = DeepSeekQwenModel(connection, dataset)
+            model = DeepSeekQwenModel(connection, dataset, prompt_strategy)
         case "Llama":
             prompt_strategy = Llama3PromptStrategy(SQL_DIALECT)
-            model = LlamaModel(connection, dataset)
+            model = LlamaModel(connection, dataset, prompt_strategy)
         case "DeepSeekLlama":
             prompt_strategy = DeepSeekPromptStrategy(SQL_DIALECT)
-            model = DeepSeekLlamaModel(connection, dataset)
+            model = DeepSeekLlamaModel(connection, dataset, prompt_strategy)
 
     # Run models and save generated queries
     for schema_size in SCHEMA_SIZES:
         model.run(schema_size, NATURALNESS == "Normalized")
         save_results(f"{RESULTS_DIR}/{MODEL}/{NATURALNESS}/{MODEL}{schema_size}{NATURALNESS}.json", model)
-        model.results = []
+        model.results = {}
+
     # Load results, execute queries and add to reporter
     reporter = Reporter()
 

@@ -56,6 +56,13 @@ class NL2SQLModel(ABC):
         """
         raise NotImplementedError("Subclasses should implement this method.")
 
+    @abstractmethod
+    def _answer_single_prompt_with_transition_scores(self):
+        """
+        Abstract method for answering a single question while also considering the confidence of each generated token, should return a non-pruned response in the form of a dict with tokens and transition scores.
+        """
+        raise NotImplementedError("Subclasses should implement this method.")
+
     def _prune_generated_query(self, query: str):
         # Prune everything before select
         query = re.sub(r'^(.*?)SELECT', 'SELECT', query, flags=(re.IGNORECASE | re.DOTALL))

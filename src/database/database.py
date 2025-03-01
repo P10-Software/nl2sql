@@ -1,36 +1,34 @@
 import os
-import psycopg2
+import sqlite3
 from dotenv import load_dotenv
 from src.common.logger import get_logger
 
 load_dotenv()
 logger = get_logger(__name__)
 
-USER = os.getenv('PG_USER')
-PASSWORD = os.getenv('PG_PASSWORD')
-HOST = os.getenv('PG_HOST')
-PORT = os.getenv('PG_PORT')
 DB_NAME = os.getenv('DB_NAME')
+DB_PATH = os.getenv('DB_PATH')
+DB_PATH_NATURAL = os.getenv('DB_PATH_NATURAL')
 
 
-def execute_query(query: str):
+def execute_query(query: str, natural: bool):
     """
     Executes a query on the database and returns the raw answer
 
     Args:
     - query: SQL query as a string.
+    - natural: Bool value to determine if it should connect to natural or abbreviated DB.
 
     Returns:
     - The result of executing the SQL.
     """
 
     result = []
-    conn = get_conn()
+    conn = get_conn(natural=natural)
+    cur = conn.cursor()
+
     if conn:
         try:
-            # conn.autocommit = True
-            cur = conn.cursor()
-
             cur.execute(query)
             result = cur.fetchall()
         except Exception as e:
@@ -41,15 +39,24 @@ def execute_query(query: str):
 
     return result
 
-def get_conn():
+def get_conn(natural: bool) -> sqlite3.Connection:
     """
     Creates and returns the connection to the database
-    """
-    conn = None
 
-    try:
-        conn = psycopg2.connect(dbname=DB_NAME, user=USER, password=PASSWORD, host=HOST, port=PORT)
-    except Exception as e:
-        logger.error(f"Error connecting to database {DB_NAME}: {e}")
+    Args:
+    - natural: Bool value to determine if it should connect to natural or abbreviated DB.
+    """
+    db_path = DB_PATH_NATURAL if natural else DB_PATH
+
+    conn = sqlite3.connect(f'{db_path}')
+
+    _check_connection(conn)
 
     return conn
+
+
+def _check_connection(conn: sqlite3.Connection) -> None:
+    try:
+        conn.execute("PRAGMA database_list")
+    except Exception as e:
+        logger.error(f"Error connecting to database {DB_NAME}: {e}")

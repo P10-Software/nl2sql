@@ -50,7 +50,7 @@ def get_conn(natural: bool) -> sqlite3.Connection:
 
     conn = sqlite3.connect(f'{db_path}')
 
-    # _check_connection(conn)
+    _check_connection(conn)
 
     return conn
 

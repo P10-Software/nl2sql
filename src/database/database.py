@@ -36,7 +36,6 @@ def execute_query(query: str, natural: bool):
         finally:
             cur.close()
             conn.close()
-
     return result
 
 def get_conn(natural: bool) -> sqlite3.Connection:

@@ -36,7 +36,7 @@ def in_memory_db():
 def test_execute_query(mock_get_conn, in_memory_db, query, expected_result):
     mock_get_conn.return_value = in_memory_db
 
-    res = execute_query(query)
+    res = execute_query(query, natural=False)
 
     assert res == expected_result
 
@@ -45,7 +45,7 @@ def test_execute_query(mock_get_conn, in_memory_db, query, expected_result):
 def test_execute_query_logs_error(mock_get_conn, in_memory_db, caplog):
     mock_get_conn.return_value = in_memory_db
 
-    execute_query("SELECT * FROM unknown_table")
+    execute_query("SELECT * FROM unknown_table", natural=False)
 
     expected_message = "Error executing query on database: no such table: unknown_table"
 

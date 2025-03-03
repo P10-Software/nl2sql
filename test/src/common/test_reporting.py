@@ -166,14 +166,14 @@ def test_analyse_sql():
             "SELECT name FROM names;",
             "SELECT DISTINCT name FROM names;",
             {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': [], 'generated': [
-            ]}, 'clauses': {}, 'distinct': {'golden': False, 'generated': True, 'not_query': 0}}
+            ]}, 'clauses': {}, 'distinct': {'golden': False, 'generated': True}, 'not_query': 0}
         ),
         # Gold has distinct
         (
             "SELECT DISTINCT name FROM names;",
             "SELECT name FROM names;",
             {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': [], 'generated': [
-            ]}, 'clauses': {}, 'distinct': {'golden': True, 'generated': False, 'not_query': 0}}
+            ]}, 'clauses': {}, 'distinct': {'golden': True, 'generated': False}, 'not_query': 0}
         ),
         # Missing column, WHERE clause, and GROUP BY
         (

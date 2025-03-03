@@ -1,6 +1,7 @@
 import html
 from src.common.logger import get_logger
 from src.core.evaluation_metrics import execution_accuracy, precision, recall, f1_score
+from src.database import database
 from collections import Counter
 import sql_metadata
 import os
@@ -41,25 +42,20 @@ class Reporter:
         generated_sql = [res['generated_query']
                          for res in result.values()]
 
-        golden_columns = [self._extract_columns(
-            sql_metadata.Parser(sql), True) for sql in golden_sql]
-        try:
-            generated_columns = [self._extract_columns(
-                sql_metadata.Parser(sql), True) for sql in generated_sql]
-        except:
-            generated_columns = []
-            logger.error("Generated is not a query")
-
         sql_errors = self._analyse_sql(golden_sql, generated_sql)
+
+        precision_score = precision(golden_results, generated_results)
+        recall_score = recall(golden_results, generated_results)
 
         self.analysis.append((name, {
             'execution accuracy': execution_accuracy(golden_results, generated_results),
-            'precision': precision(list(zip(golden_results, golden_columns)), list(zip(generated_results, generated_columns))),
-            'recall': recall(list(zip(golden_results, golden_columns)), list(zip(generated_results, generated_columns))),
-            'f1 score': f1_score(list(zip(golden_results, golden_columns)), list(zip(generated_results, generated_columns))),
+            'precision': precision_score,
+            'recall': recall_score,
+            'f1 score': f1_score(precision_score, recall_score),
             'SQL mismatches': sql_errors,
             'total sql queries': len(generated_sql)
         }))
+        print("did it")
 
     def _analyse_sql(self, golden_sql_list, generated_sql_list):
         """
@@ -150,7 +146,7 @@ class Reporter:
 
             return mismatches
 
-        except:
+        except Exception:
             return {
                 'tables': {'golden': [], 'generated': []},
                 'columns': {'golden': [], 'generated': []},
@@ -158,8 +154,6 @@ class Reporter:
                 'distinct': {'golden': False, 'generated': False},
                 'not_query': True
             }
-    
-
 
     def _extract_clauses(self, parser):
         clauses = {'WHERE': [], 'JOIN': [], 'GROUPBY': [], 'ORDERBY': []}
@@ -184,38 +178,6 @@ class Reporter:
             if token.is_keyword and token.normalized == 'DISTINCT':
                 return True
         return False
-
-    def _extract_columns(self, parser, with_tables: bool = False):
-        columns = []
-
-        def get_only_columns(parser):
-            for column in parser.columns_dict['select']:
-                if '.' in column:
-                    columns.append(column.split('.')[1])
-                else:
-                    columns.append(column)
-            return columns
-
-        if with_tables:
-            if len(parser.tables) == 1:
-                table = parser.tables[0]
-                columns = get_only_columns(parser)
-                return [table + col for col in columns]
-            else:
-                for token in parser.tokens:
-                    if token.is_keyword and token.normalized in ['SELECT', 'DISTINCT']:
-                        next_token = token.next_token
-                        column_names = []
-                        while next_token is not None:
-                            if next_token.value not in [',', '.']:
-                                column_names.append(next_token.value)
-                            next_token = next_token.next_token
-                            if next_token is not None and next_token.normalized == 'FROM':
-                                columns.extend([(next_token.next_token.value + '.' + s if '.' not in s else s) for s in column_names])
-                                break
-                return columns
-        else:
-            return get_only_columns(parser)
 
     def create_report(self, file_location: str):
         """

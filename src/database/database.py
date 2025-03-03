@@ -38,7 +38,6 @@ def execute_query(query: str):
         finally:
             cur.close()
             conn.close()
-
     return result
 
 def get_conn():

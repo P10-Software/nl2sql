@@ -1,6 +1,7 @@
 from src.common.reporting import Reporter
 import os
 import pytest
+from sql_metadata import Parser
 
 
 @pytest.fixture
@@ -62,37 +63,37 @@ def mock_results():
         0: {
             'question': 'What is the capital of France?',
             'golden_query': 'SELECT capital FROM countries WHERE name="France"',
-            'golden_result': [(1, 'Paris',)],
+            'golden_result': [('Paris',)],
             'generated_query': 'SELECT capital FROM countries WHERE name="France"',
-            'generated_result': [(1, 'Paris',)]
+            'generated_result': [('Paris',)]
         },
         1: {
             'question': 'How many people live in Germany?',
             'golden_query': 'SELECT population FROM countries WHERE name="Germany"',
-            'golden_result': [(1, 83100000,)],
+            'golden_result': [(83100000,)],
             'generated_query': 'SELECT population FROM countries WHERE name="Germany"',
-            'generated_result': [(1, 83100000,)]
+            'generated_result': [(83100000,)]
         },
         2: {
             'question': 'List all countries in Europe.',
             'golden_query': 'SELECT name FROM countries WHERE continent="Europe"',
-            'golden_result': [(1, 'France',), (2, 'Germany',), (3, 'Italy',)],
+            'golden_result': [('France',), ('Germany',), ('Italy',)],
             'generated_query': 'SELECT name FROM countries WHERE continent="Europe"',
-            'generated_result': [(1, 'France',), (2, 'Germany',), (3, 'Italy',)]
+            'generated_result': [('France',), ('Germany',), ('Italy',)]
         },
         3: {
             'question': 'What is the GDP of Japan?',
             'golden_query': 'SELECT gdp FROM countries WHERE name="Japan"',
-            'golden_result': [(1, 5000000,)],
+            'golden_result': [(5000000,)],
             'generated_query': 'SELECT gdp, population FROM countries WHERE namee="Japon"',
-            'generated_result': [(1, 5000000, 126000000)]
+            'generated_result': [(5000000, 126000000)]
         },
         4: {
             'question': 'What is the area of Canada?',
             'golden_query': 'SELECT area FROM countries WHERE name="Canada"',
-            'golden_result': [(1, 9984670,)],
+            'golden_result': [(9984670,)],
             'generated_query': 'SELECT area FROM countries WHERE name="Canada"',
-            'generated_result': [(1, 9984670,)]
+            'generated_result': [(9984670,)]
         }
     }
 
@@ -242,3 +243,15 @@ def test_extract_sql_mismatch(gold, generated, expected):
 
     assert result['distinct']['golden'] == expected['distinct']['golden']
     assert result['distinct']['generated'] == expected['distinct']['generated']
+
+def test_extract_columns():
+    # Arrange
+    model = Reporter()
+    sql = "SELECT country, MIN(lower_range) AS min_lower_range, MAX(lower_range) AS max_lower_range FROM plnd_find_normal_range GROUP BY country;"
+    parser = Parser(sql)
+
+    # Act
+    res = model._extract_columns(parser=parser, with_tables=True)
+
+    # Assert
+    print(res)

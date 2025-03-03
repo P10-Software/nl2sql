@@ -1,4 +1,5 @@
 from collections import Counter
+import pandas as pd
 
 
 def precision(golden: list[list[tuple]], generated: list[list[tuple]]):
@@ -17,41 +18,17 @@ def precision(golden: list[list[tuple]], generated: list[list[tuple]]):
 
     precision_scores = {}  # Store precision per query
 
-    for idx, ((gen_results, gen_columns), (gold_results, gold_columns)) in enumerate(zip(generated, golden)):
-        gen_col_vals = {}
-        for i, col in enumerate(set(gen_columns)):
-            gen_col_vals[col] = []
-            for row in gen_results:
-                gen_col_vals[col].append(row[i+1])
+    for idx, (gen_res, gold_res) in enumerate(zip(generated, golden)):
 
-        gold_col_vals = {}
-        for i, col in enumerate(set(gold_columns)):
-            gold_col_vals[col] = []
-            for row in gold_results:
-                gold_col_vals[col].append(row[i+1])
+        gen_counts = Counter(gen_res)
+        gold_counts = Counter(gold_res)
 
-        column_precision = {}
-        all_cols = set((gen_col_vals.keys()) | set(gold_col_vals.keys()))
+        true_positive = sum(min(gen_counts[row], gold_counts[row]) for row in gen_counts)
+        false_positive = sum(gen_counts[row] - min(gen_counts[row], gold_counts[row]) for row in gen_counts)
 
-        for col in all_cols:
-            gold_val = gold_col_vals.get(col, [])
-            gen_val = gen_col_vals.get(col, [])
+        precision_scores[idx] = round((true_positive / (true_positive + false_positive)), 2) if (true_positive + false_positive) > 0 else 0.00
 
-            if not gen_val:
-                column_precision[col] = 0.0
-                continue
-
-            gold_counter = Counter(gold_val)
-            gen_counter = Counter(gen_val)
-
-            tp = sum(min(gen_counter[val], gold_counter[val]) for val in gen_counter)
-
-            column_precision[col] = tp/len(gen_val)
-        sql_precision = round(sum(column_precision.values()) / len(column_precision), 2) if column_precision else 0.0
-
-        precision_scores[idx] = sql_precision
-
-    total_precision = round(sum(precision_scores.values()) / len(precision_scores), 2) if precision_scores else 0.0
+    total_precision = round((sum(precision_scores.values())/len(precision_scores)), 2) if len(precision_scores) > 0 else 0.00
 
     return {
         'total_precision': total_precision,
@@ -74,44 +51,16 @@ def recall(golden: list[list[tuple]], generated: list[list[tuple]]):
     """
     per_query_recall = {}
 
-    for idx, ((gen_results, gen_columns), (gold_results, gold_columns)) in enumerate(zip(generated, golden)):
-        gen_col_vals = {}
-        for i, col in enumerate(set(gen_columns)):
-            gen_col_vals[col] = []
-            for row in gen_results:
-                gen_col_vals[col].append(row[i+1])
+    for idx, (gen_results, gold_results) in enumerate(zip(generated, golden)):
+        gold_counts = Counter(gold_results)
+        gen_counts = Counter(gen_results)
 
-        gold_col_vals = {}
-        for i, col in enumerate(set(gold_columns)):
-            gold_col_vals[col] = []
-            for row in gold_results:
-                gold_col_vals[col].append(row[i+1])
+        true_positive = sum(min(gen_counts[row], gold_counts[row]) for row in gold_counts)
+        total_positive = sum(gold_counts.values())
 
-        column_precision = {}
-        all_cols = set((gen_col_vals.keys()) | set(gold_col_vals.keys()))
+        per_query_recall[idx] = round((true_positive / total_positive), 2) if total_positive > 0 else 0.00
 
-        for col in all_cols:
-            gold_val = gold_col_vals.get(col, [])
-            gen_val = gen_col_vals.get(col, [])
-
-            if not gen_val and gold_val:
-                column_precision[col] = 0.0
-                continue
-            if not gold_val:
-                column_precision[col] = 1.0
-                continue
-
-            gold_counter = Counter(gold_val)
-            gen_counter = Counter(gen_val)
-
-            tp = sum(min(gen_counter[val], gold_counter[val]) for val in gen_counter)
-
-            column_precision[col] = tp/len(gold_val)
-        sql_precision = round(sum(column_precision.values()) / len(column_precision), 2) if column_precision else 0.0
-
-        per_query_recall[idx] = sql_precision
-
-    total_recall = round(sum(per_query_recall.values()) / len(per_query_recall), 2) if per_query_recall else 0.0
+    total_recall = round(sum(per_query_recall.values()) / len(per_query_recall), 2) if per_query_recall else 0.00
 
     return {
         'total_recall': total_recall,
@@ -119,7 +68,7 @@ def recall(golden: list[list[tuple]], generated: list[list[tuple]]):
     }
 
 
-def f1_score(golden: list[list[tuple]], generated: list[list[tuple]]):
+def f1_score(precision, recall):
     """
     Calculates F1-score per question in sets, considering database query results.
 
@@ -132,8 +81,8 @@ def f1_score(golden: list[list[tuple]], generated: list[list[tuple]]):
         - "total_f1": The average F1-score across all queries.
         - "individual_f1s": A dictionary mapping query index to its F1-score.
     """
-    precision_scores = precision(golden, generated)
-    recall_scores = recall(golden, generated)
+    precision_scores = precision
+    recall_scores = recall
     per_query_f1 = {}
 
     for idx in precision_scores["individual_precisions"]:

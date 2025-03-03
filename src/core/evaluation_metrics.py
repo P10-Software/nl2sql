@@ -16,19 +16,24 @@ def precision(golden: list[list[tuple]], generated: list[list[tuple]]):
         - "individual_precisions": A dictionary mapping query index to its precision score.
     """
 
-    precision_scores = {}  # Store precision per query
+    precision_scores = {}
 
     for idx, (gen_res, gold_res) in enumerate(zip(generated, golden)):
 
-        gen_counts = Counter(gen_res)
-        gold_counts = Counter(gold_res)
+        gen_counts = Counter([elem for row in gen_res for elem in row])
+        gold_counts = Counter([elem for row in gold_res for elem in row])
 
-        true_positive = sum(min(gen_counts[row], gold_counts[row]) for row in gen_counts)
-        false_positive = sum(gen_counts[row] - min(gen_counts[row], gold_counts[row]) for row in gen_counts)
+        true_positive = sum(
+            min(gen_counts[element], gold_counts[element]) for element in gen_counts)
 
-        precision_scores[idx] = round((true_positive / (true_positive + false_positive)), 2) if (true_positive + false_positive) > 0 else 0.00
+        false_positive = sum(
+            gen_counts[element] - min(gen_counts[element], gold_counts[element]) for element in gen_counts)
 
-    total_precision = round((sum(precision_scores.values())/len(precision_scores)), 2) if len(precision_scores) > 0 else 0.00
+        precision_scores[idx] = round(
+            (true_positive / (true_positive + false_positive)), 2) if (true_positive + false_positive) > 0 else 0.00
+
+    total_precision = round(sum(precision_scores.values(
+    )) / len(precision_scores), 2) if precision_scores else 0.00
 
     return {
         'total_precision': total_precision,
@@ -38,11 +43,11 @@ def precision(golden: list[list[tuple]], generated: list[list[tuple]]):
 
 def recall(golden: list[list[tuple]], generated: list[list[tuple]]):
     """
-    Calculates recall per question in sets, considering database query results.
+    Calculates recall per query by comparing individual elements in database query results.
 
     Args:
-    - golden (list[list[tuple]]): List of lists, where each sublist contains tuples from executing the nth golden query.
-    - generated (list[list[tuple]]): List of lists, where each sublist contains tuples from executing the nth generated query.
+    - golden (list[list[tuple]]): List of lists containing tuples from the nth golden query.
+    - generated (list[list[tuple]]): List of lists containing tuples from the nth generated query.
 
     Returns:
     - results (dict): A dictionary with:
@@ -51,16 +56,20 @@ def recall(golden: list[list[tuple]], generated: list[list[tuple]]):
     """
     per_query_recall = {}
 
-    for idx, (gen_results, gold_results) in enumerate(zip(generated, golden)):
-        gold_counts = Counter(gold_results)
-        gen_counts = Counter(gen_results)
+    for idx, (gen_res, gold_res) in enumerate(zip(generated, golden)):
+        gen_counts = Counter([elem for row in gen_res for elem in row])
+        gold_counts = Counter([elem for row in gold_res for elem in row])
 
-        true_positive = sum(min(gen_counts[row], gold_counts[row]) for row in gold_counts)
+        true_positive = sum(
+            min(gen_counts[element], gold_counts[element]) for element in gold_counts)
+
         total_positive = sum(gold_counts.values())
 
-        per_query_recall[idx] = round((true_positive / total_positive), 2) if total_positive > 0 else 0.00
+        per_query_recall[idx] = 0.00 if total_positive == 0 else round(
+            (true_positive / total_positive), 2)
 
-    total_recall = round(sum(per_query_recall.values()) / len(per_query_recall), 2) if per_query_recall else 0.00
+    total_recall = round(sum(per_query_recall.values()) /
+                         len(per_query_recall), 2) if per_query_recall else 0.00
 
     return {
         'total_recall': total_recall,

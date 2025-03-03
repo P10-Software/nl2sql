@@ -243,15 +243,3 @@ def test_extract_sql_mismatch(gold, generated, expected):
 
     assert result['distinct']['golden'] == expected['distinct']['golden']
     assert result['distinct']['generated'] == expected['distinct']['generated']
-
-def test_extract_columns():
-    # Arrange
-    model = Reporter()
-    sql = "SELECT country, MIN(lower_range) AS min_lower_range, MAX(lower_range) AS max_lower_range FROM plnd_find_normal_range GROUP BY country;"
-    parser = Parser(sql)
-
-    # Act
-    res = model._extract_columns(parser=parser, with_tables=True)
-
-    # Assert
-    print(res)

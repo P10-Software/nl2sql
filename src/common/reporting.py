@@ -179,6 +179,39 @@ class Reporter:
                 return True
         return False
 
+    def _extract_columns(self, parser, with_tables: bool = False):
+        columns = []
+
+        def get_only_columns(parser):
+            for column in parser.columns_dict['select']:
+                if '.' in column:
+                    columns.append(column.split('.')[1])
+                else:
+                    columns.append(column)
+            return columns
+
+        if with_tables:
+            if len(parser.tables) == 1:
+                table = parser.tables[0]
+                columns = get_only_columns(parser)
+                return [table + col for col in columns]
+            else:
+                for token in parser.tokens:
+                    if token.is_keyword and token.normalized in ['SELECT', 'DISTINCT']:
+                        next_token = token.next_token
+                        column_names = []
+                        while next_token is not None:
+                            if next_token.value not in [',', '.']:
+                                column_names.append(next_token.value)
+                            next_token = next_token.next_token
+                            if next_token is not None and next_token.normalized == 'FROM':
+                                columns.extend(
+                                    [(next_token.next_token.value + '.' + s if '.' not in s else s) for s in column_names])
+                                break
+                return columns
+        else:
+            return get_only_columns(parser)
+
     def create_report(self, file_location: str):
         """
         Builds HTML report based on analysis from all models in param. All models need to have executed their analysis before feeding to method.

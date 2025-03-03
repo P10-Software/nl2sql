@@ -1,7 +1,6 @@
 import html
 from src.common.logger import get_logger
 from src.core.evaluation_metrics import execution_accuracy, precision, recall, f1_score
-from src.database import database
 from collections import Counter
 import sql_metadata
 import os
@@ -55,7 +54,6 @@ class Reporter:
             'SQL mismatches': sql_errors,
             'total sql queries': len(generated_sql)
         }))
-        print("did it")
 
     def _analyse_sql(self, golden_sql_list, generated_sql_list):
         """

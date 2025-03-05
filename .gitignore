@@ -177,5 +177,8 @@ __pycache__
 .vscode
 *.html
 
-# ignore .local file containing data
+# ignore .local folder containing data
 .local/
+
+# Mac .DS_store
+.DS_store/

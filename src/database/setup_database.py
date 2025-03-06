@@ -103,7 +103,7 @@ def _read_sas_normalised(path_to_sas, new_table_names) -> None:
 
 
 def _column_name_format(column_name: str) -> str:
-    """ Ensure that the columns comply with postgresql naming rules."""
+    """ Ensure that the columns comply with database naming rules."""
     return column_name.replace(' ', '_').lower()
 
 

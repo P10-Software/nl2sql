@@ -9,7 +9,7 @@ from src.common.reporting import Reporter
 import os
 
 logger = get_logger(__name__)
-SQL_DIALECT = "postgres"
+SQL_DIALECT = "SQLite"
 SCHEMA_SIZES = ["Full", "Tables", "Columns"]
 DATASET_PATH = ".local/EX.json"
 RESULTS_DIR = "results"

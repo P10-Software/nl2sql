@@ -25,7 +25,7 @@ class NL2SQLModel(ABC):
         Init for any NL2SQL model used for benchmarking, uses transformers for all models.
 
         args:
-        - connection: Postgres connection string.
+        - connection: Database connection.
         - benchmark_set: Dictionary containing the benchmark dataset, format outlined in README.
         - prompt_strategy: A specialised prompt strategy for the model, should include a method get_prompt(), that builds the desired prompt.
         """

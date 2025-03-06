@@ -9,6 +9,7 @@ logger = get_logger(__name__)
 DB_NAME = os.getenv('DB_NAME')
 DB_PATH = os.getenv('DB_PATH')
 DB_PATH_NATURAL = os.getenv('DB_PATH_NATURAL')
+DB_NATURAL = os.getenv('DB_NATURAL')
 
 
 def execute_query(query: str, natural: bool):
@@ -24,7 +25,7 @@ def execute_query(query: str, natural: bool):
     """
 
     result = []
-    conn = get_conn(natural=natural)
+    conn = get_conn()
     cur = conn.cursor()
 
     if conn:
@@ -38,14 +39,19 @@ def execute_query(query: str, natural: bool):
             conn.close()
     return result
 
-def get_conn(natural: bool) -> sqlite3.Connection:
+def get_conn(natural="default") -> sqlite3.Connection:
     """
     Creates and returns the connection to the database
 
     Args:
     - natural: Bool value to determine if it should connect to natural or abbreviated DB.
     """
-    db_path = DB_PATH_NATURAL if natural else DB_PATH
+    if natural == "natural":
+        db_path = DB_PATH_NATURAL
+    elif natural == "abbreviated":
+        db_path = DB_PATH
+    else:
+        db_path = DB_PATH_NATURAL if DB_NATURAL == "natural" else DB_PATH
 
     conn = sqlite3.connect(f'{db_path}')
 

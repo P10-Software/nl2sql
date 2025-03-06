@@ -92,7 +92,7 @@ def _read_sas_normalised(path_to_sas, new_table_names) -> None:
     if table_name == "sponsor_defined_value_in_list":
         df.columns.values[2] = "sponsor_defined_submission_value"
 
-    conn = get_conn(natural=True)
+    conn = get_conn(natural="natural")
 
     try:
         df.to_sql(table_name, conn, if_exists='replace', index=False)
@@ -123,7 +123,7 @@ def _read_sas(path_to_sas: str):
         'column_label': meta.column_labels
     })
 
-    conn = get_conn(natural=False)
+    conn = get_conn(natural="abbreviated")
 
     try:
         df.to_sql(table_name, conn, if_exists='replace', index=False)

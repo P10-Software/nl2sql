@@ -46,13 +46,17 @@ class NL2SQLModel(ABC):
         self.prompt_strategy = prompt_strategy
         self.results = {}
         self.analysis = None
+        self.mschema = False
 
     def run(self, schema_size: SchemaKind, naturalness: bool):
         logger.info(f"Started benchmarking of {self.__class__.__name__}.")
         for idx, pair in enumerate(tqdm(self.benchmark)):
             question = pair['question']
             goal = pair['golden_query']
-            schema = get_query_build_instruct(schema_size, goal, naturalness)
+            if self.mschema:
+                schema = _generate_mschema()
+            else:
+                schema = get_query_build_instruct(schema_size, goal, naturalness)
             prompt = self.prompt_strategy.get_prompt(schema, question)
             answer = self._prune_generated_query(self._answer_single_question(prompt))
             self.results[idx] = {'question': question, 'golden_query': goal, 'golden_result': {}, 'generated_query': answer, 'generated_result': {}}

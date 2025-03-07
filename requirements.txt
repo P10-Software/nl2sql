@@ -89,3 +89,4 @@ wheel==0.42.0
 xonsh==0.14.4
 Werkzeug==3.0.6
 zipp==3.21.0
+git+https://github.com/P10-Software/mschema.git@main

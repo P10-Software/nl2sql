@@ -9,7 +9,6 @@ from src.database.database import get_conn
 load_dotenv()
 logger = get_logger(__name__)
 
-DB_NAME = os.getenv('DB_NAME')
 DB_PATH = os.getenv('DB_PATH')
 DB_PATH_NATURAL = os.getenv('DB_PATH_NATURAL')
 

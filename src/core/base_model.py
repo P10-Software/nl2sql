@@ -1,17 +1,26 @@
+import os
 from abc import abstractmethod, ABC
 import re
 from tqdm import tqdm
 import pandas as pd
 from sql_metadata import Parser
-from collections import Counter
+from sqlalchemy import create_engine
+from dotenv import load_dotenv
 from src.common.logger import get_logger
 from src.core.extract_instructions import get_query_build_instruct, SchemaKind, sanitise_query
 from src.core.evaluation_metrics import precision, recall, f1_score, execution_accuracy
+from mschema.schema_engine import SchemaEngine
+
+logger = get_logger(__name__)
+load_dotenv()
 
 TASK = 'text-generation'
 MAX_NEW_TOKENS = 200
-logger = get_logger(__name__)
 
+DB_NAME = os.getenv('DB_NAME')
+DB_PATH = os.getenv('DB_PATH')
+DB_PATH_NATURAL = os.getenv('DB_PATH_NATURAL')
+DB_NATURAL = os.getenv('DB_NATURAL')
 
 class PromptStrategy(ABC):
     @abstractmethod
@@ -63,7 +72,19 @@ class NL2SQLModel(ABC):
         query = re.sub(r';.*', ';', query, flags=(re.IGNORECASE | re.DOTALL))
         # Remove \n
         return query.replace("\n", "")
-    
+
+def _generate_mschema():
+    """
+    Generate schema to M-schema DDL format with additional information
+    """
+
+    db_engine = create_engine(f'sqlite:///{DB_PATH_NATURAL}')
+
+    # 2.Construct M-Schema
+    schema_engine = SchemaEngine(engine=db_engine, db_name=DB_NAME)
+    mschema = schema_engine.mschema
+    return mschema.to_mschema()
+
 def translate_query_to_natural(query: str) -> str:
     """
     Translates an SQL from using abbreviated column and tables names to use more natural_names
@@ -112,3 +133,6 @@ def translate_query_to_natural(query: str) -> str:
             query = query.replace(f" {table};", f" {table_name_mapping[table]};")  # Ensure space for full matches
 
     return query
+
+if __name__ == "__main__":
+    _generate_mschema()

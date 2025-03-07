@@ -80,7 +80,6 @@ def _generate_mschema():
 
     db_engine = create_engine(f'sqlite:///{DB_PATH_NATURAL}')
 
-    # 2.Construct M-Schema
     schema_engine = SchemaEngine(engine=db_engine, db_name=DB_NAME)
     mschema = schema_engine.mschema
     return mschema.to_mschema()

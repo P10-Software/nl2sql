@@ -132,6 +132,3 @@ def translate_query_to_natural(query: str) -> str:
             query = query.replace(f" {table};", f" {table_name_mapping[table]};")  # Ensure space for full matches
 
     return query
-
-if __name__ == "__main__":
-    _generate_mschema()

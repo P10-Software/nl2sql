@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import pyreadstat
 import pandas as pd
 from dotenv import load_dotenv
@@ -9,7 +10,7 @@ from src.database.database import get_conn
 load_dotenv()
 logger = get_logger(__name__)
 
-DB_PATH = os.getenv('DB_PATH')
+DB_PATH_ABBREVIATED = os.getenv('DB_PATH_ABBREVIATED')
 DB_PATH_NATURAL = os.getenv('DB_PATH_NATURAL')
 
 
@@ -22,7 +23,7 @@ def init_db(data_directory: str):
     - data_directory (str): Root directory to search for SAS files.
     """
 
-    _delete_db(f'{DB_PATH}')
+    _delete_db(f'{DB_PATH_ABBREVIATED}')
 
     sas_files = _find_sas_files(data_directory)
 
@@ -91,7 +92,7 @@ def _read_sas_normalised(path_to_sas, new_table_names) -> None:
     if table_name == "sponsor_defined_value_in_list":
         df.columns.values[2] = "sponsor_defined_submission_value"
 
-    conn = get_conn(natural="natural")
+    conn = sqlite3.connect(f'{DB_PATH_NATURAL}')
 
     try:
         df.to_sql(table_name, conn, if_exists='replace', index=False)
@@ -122,7 +123,7 @@ def _read_sas(path_to_sas: str):
         'column_label': meta.column_labels
     })
 
-    conn = get_conn(natural="abbreviated")
+    conn = sqlite3.connect(f'{DB_PATH_ABBREVIATED}')
 
     try:
         df.to_sql(table_name, conn, if_exists='replace', index=False)

@@ -18,9 +18,9 @@ TASK = 'text-generation'
 MAX_NEW_TOKENS = 200
 
 DB_NAME = os.getenv('DB_NAME')
-DB_PATH = os.getenv('DB_PATH')
+DB_PATH_ABBREVIATED = os.getenv('DB_PATH_ABBREVIATED')
 DB_PATH_NATURAL = os.getenv('DB_PATH_NATURAL')
-DB_NATURAL = os.getenv('DB_NATURAL')
+DB_NATURAL = int(os.getenv('DB_NATURAL', 0))
 
 class PromptStrategy(ABC):
     @abstractmethod
@@ -81,12 +81,12 @@ def _generate_mschema():
     """
     Generate schema to M-schema DDL format with additional information
     """
+    if DB_NATURAL:
+        db_engine = create_engine(f'sqlite:///{DB_PATH_NATURAL}')
+    else:
+        db_engine = create_engine(f'sqlite:///{DB_PATH_ABBREVIATED}')
 
-    db_engine = create_engine(f'sqlite:///{DB_PATH_NATURAL}')
-
-    schema_engine = SchemaEngine(engine=db_engine, db_name=DB_NAME)
-    mschema = schema_engine.mschema
-    return mschema.to_mschema()
+    return SchemaEngine(engine=db_engine, db_name=DB_NAME).mschema.to_mschema()
 
 def translate_query_to_natural(query: str) -> str:
     """

@@ -182,4 +182,4 @@ __pycache__
 .local/
 
 # Mac .DS_store
-.DS_store/
+.DS_store

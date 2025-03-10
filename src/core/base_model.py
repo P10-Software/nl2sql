@@ -1,17 +1,26 @@
+import os
 from abc import abstractmethod, ABC
 import re
 from tqdm import tqdm
 import pandas as pd
 from sql_metadata import Parser
-from collections import Counter
+from sqlalchemy import create_engine
+from dotenv import load_dotenv
 from src.common.logger import get_logger
 from src.core.extract_instructions import get_query_build_instruct, SchemaKind, sanitise_query
 from src.core.evaluation_metrics import precision, recall, f1_score, execution_accuracy
+from mschema.schema_engine import SchemaEngine
+
+logger = get_logger(__name__)
+load_dotenv()
 
 TASK = 'text-generation'
 MAX_NEW_TOKENS = 200
-logger = get_logger(__name__)
 
+DB_NAME = os.getenv('DB_NAME')
+DB_PATH_ABBREVIATED = os.getenv('DB_PATH_ABBREVIATED')
+DB_PATH_NATURAL = os.getenv('DB_PATH_NATURAL')
+DB_NATURAL = int(os.getenv('DB_NATURAL', 0))
 
 class PromptStrategy(ABC):
     @abstractmethod
@@ -20,12 +29,12 @@ class PromptStrategy(ABC):
 
 
 class NL2SQLModel(ABC):
-    def __init__(self, connection, benchmark_set: list, prompt_strategy: PromptStrategy):
+    def __init__(self, connection, benchmark_set: list, prompt_strategy: PromptStrategy, mschema: bool=False):
         """
         Init for any NL2SQL model used for benchmarking, uses transformers for all models.
 
         args:
-        - connection: Postgres connection string.
+        - connection: Database connection.
         - benchmark_set: Dictionary containing the benchmark dataset, format outlined in README.
         - prompt_strategy: A specialised prompt strategy for the model, should include a method get_prompt(), that builds the desired prompt.
         """
@@ -37,13 +46,17 @@ class NL2SQLModel(ABC):
         self.prompt_strategy = prompt_strategy
         self.results = {}
         self.analysis = None
+        self.mschema = mschema
 
     def run(self, schema_size: SchemaKind, naturalness: bool):
         logger.info(f"Started benchmarking of {self.__class__.__name__}.")
         for idx, pair in enumerate(tqdm(self.benchmark)):
             question = pair['question']
             goal = pair['golden_query']
-            schema = get_query_build_instruct(schema_size, goal, naturalness)
+            if self.mschema:
+                schema = _generate_mschema()
+            else:
+                schema = get_query_build_instruct(schema_size, goal, naturalness)
             prompt = self.prompt_strategy.get_prompt(schema, question)
             answer = self._prune_generated_query(self._answer_single_question(prompt))
             self.results[idx] = {'question': question, 'golden_query': goal, 'golden_result': {}, 'generated_query': answer, 'generated_result': {}}
@@ -63,7 +76,18 @@ class NL2SQLModel(ABC):
         query = re.sub(r';.*', ';', query, flags=(re.IGNORECASE | re.DOTALL))
         # Remove \n
         return query.replace("\n", "")
-    
+
+def _generate_mschema():
+    """
+    Generate schema to M-schema DDL format with additional information
+    """
+    if DB_NATURAL:
+        db_engine = create_engine(f'sqlite:///{DB_PATH_NATURAL}')
+    else:
+        db_engine = create_engine(f'sqlite:///{DB_PATH_ABBREVIATED}')
+
+    return SchemaEngine(engine=db_engine, db_name=DB_NAME).mschema.to_mschema()
+
 def translate_query_to_natural(query: str) -> str:
     """
     Translates an SQL from using abbreviated column and tables names to use more natural_names

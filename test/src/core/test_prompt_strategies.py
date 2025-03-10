@@ -2,7 +2,7 @@ from src.core.prompt_strategies import XiYanSQLPromptStrategy, Llama3PromptStrat
 import pytest
 
 XIYAN_SQL_EXPECTED = """
-    You are now a Postgres data analyst, and you are given a database schema as follows:
+    You are now a SQLite data analyst, and you are given a database schema as follows:
     【Schema】
     CREATE TABLE People (
         PersonID INT PRIMARY KEY AUTO_INCREMENT,
@@ -20,7 +20,7 @@ XIYAN_SQL_EXPECTED = """
 
 LLAMA_EXPECTED = """
     <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-    You are a helpful AI assistant translating natural language to Postgres queries.
+    You are a helpful AI assistant translating natural language to SQLite queries.
     You have access to the following database:
     CREATE TABLE People (
         PersonID INT PRIMARY KEY AUTO_INCREMENT,
@@ -35,7 +35,7 @@ LLAMA_EXPECTED = """
 """
 
 DEEPSEEK_EXPECTED = """
-    You are tasked with translating a question to SQL that can be executed on a Postgres database.
+    You are tasked with translating a question to SQL that can be executed on a SQLite database.
 
     You have access to the following database: 
     CREATE TABLE People (
@@ -67,7 +67,7 @@ def test_prompt_strategies(prompt_class, expected_prompt):
         );
     """
     question = "What is the age of bob?"
-    sql_dialect = "Postgres"
+    sql_dialect = "SQLite"
 
     # act
     prompt_strategy = prompt_class(sql_dialect)

@@ -11,7 +11,7 @@ import os
 logger = get_logger(__name__)
 SQL_DIALECT = "sqlite"
 SCHEMA_SIZES = ["Full", "Tables", "Columns"]
-DATASET_PATH = ".local/EX.json"
+DATASET_PATH = ".local/EX_sqlite.json"
 RESULTS_DIR = "results"
 NATURALNESS = "Normalized"
 MODEL = "XiYan"

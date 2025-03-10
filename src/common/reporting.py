@@ -36,12 +36,13 @@ class Reporter:
                           for res in result.values()]
         generated_results = [res['generated_result']
                              for res in result.values()]
+        nl_questions = [res['question']for res in result.values()]
 
         golden_sql = [res['golden_query'] for res in result.values()]
         generated_sql = [res['generated_query']
                          for res in result.values()]
 
-        sql_errors = self._analyse_sql(golden_sql, generated_sql)
+        sql_errors = self._analyse_sql(golden_sql, generated_sql, nl_questions)
 
         precision_score = precision(golden_results, generated_results)
         recall_score = recall(golden_results, generated_results)
@@ -55,7 +56,7 @@ class Reporter:
             'total sql queries': len(generated_sql)
         }))
 
-    def _analyse_sql(self, golden_sql_list, generated_sql_list):
+    def _analyse_sql(self, golden_sql_list, generated_sql_list, nl_question_list):
         """
         Finds and aggregated the error clauses for all SQL, comparing two lists of generated and gold sql queries.
         """
@@ -68,7 +69,7 @@ class Reporter:
         })
         individual_errors = []
 
-        for golden_sql, generated_sql in zip(golden_sql_list, generated_sql_list):
+        for golden_sql, generated_sql, nl_question in zip(golden_sql_list, generated_sql_list, nl_question_list):
             mismatches = self._extract_sql_mismatches(golden_sql, generated_sql)
 
             # Count table mismatches
@@ -90,6 +91,7 @@ class Reporter:
                 error_counts['not_query_errors'] += 1
 
             individual_errors.append({
+                'nl_question': nl_question,
                 'generated_sql': generated_sql,
                 'golden_sql': golden_sql,
                 'errors': mismatches
@@ -323,6 +325,7 @@ class Reporter:
             # Generate SQL mismatches
             sql_mismatch_data = [
                 (
+                    entry.get('nl_question', 'N/A'),
                     entry.get('golden_sql', 'N/A'),
                     entry.get('generated_sql', 'N/A'),
                     ', '.join(entry.get('errors', {}).get(
@@ -346,7 +349,7 @@ class Reporter:
 
             html_content += generate_details_row(
                 f"{model_name}-sql_mismatches", "SQL Mismatch Breakdown",
-                ["golden Query", "Generated Query", "Missing Tables", "Extra Tables",
+                ["NL Question", "Golden Query", "Generated Query", "Missing Tables", "Extra Tables",
                     "Missing Columns", "Extra Columns", "Clause Errors", "Distinct Mismatch", "Generated Not Query"],
                 sql_mismatch_data
             )

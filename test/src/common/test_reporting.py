@@ -1,7 +1,6 @@
 from src.common.reporting import Reporter
 import os
 import pytest
-from sql_metadata import Parser
 
 
 @pytest.fixture
@@ -143,6 +142,12 @@ def test_analyse_sql():
         "SELECT age from names;",
         "SELECT age, address FROM names;"
     ]
+    test_nl_questions = [
+        "",
+        "",
+        "",
+        ""
+    ]
     expected_total_errors = {
         'table_errors': 1,
         'column_errors': 1,
@@ -152,7 +157,7 @@ def test_analyse_sql():
     }
 
     # Act
-    result = model._analyse_sql(test_gold_set, test_generated_set)
+    result = model._analyse_sql(test_gold_set, test_generated_set, test_nl_questions)
 
     # Assert
     assert result['total_errors'] == expected_total_errors
@@ -217,7 +222,7 @@ def test_analyse_sql():
         )
     ],
     ids=['generated extra distinct', 'generated missing distinct',
-         'missing column, where and group by', 'different table', 'generated is not a query' ,'no errors', 'different order by', 'alias for column']
+         'missing column, where and group by', 'different table', 'generated is not a query', 'no errors', 'different order by', 'alias for column']
 )
 def test_extract_sql_mismatch(gold, generated, expected):
     # Arrange

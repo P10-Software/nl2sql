@@ -9,12 +9,12 @@ from src.common.reporting import Reporter
 import os
 
 logger = get_logger(__name__)
-SQL_DIALECT = "SQLite"
+SQL_DIALECT = "sqlite"
 SCHEMA_SIZES = ["Full", "Tables", "Columns"]
 DATASET_PATH = ".local/EX.json"
 RESULTS_DIR = "results"
 NATURALNESS = "Normalized"
-MODEL = "Llama"
+MODEL = "XiYan"
 
 def load_dataset(dataset_path: str):
     with open(dataset_path, "r") as file:
@@ -46,15 +46,15 @@ if __name__ == "__main__":
 
     # Run models and save generated queries
     for schema_size in SCHEMA_SIZES:
-        model.run(schema_size, NATURALNESS == "Normalized")
-        save_results(f"{RESULTS_DIR}/{MODEL}/{NATURALNESS}/{MODEL}{schema_size}{NATURALNESS}.json", model)
+        model.run(schema_size, naturalness=True)
+        save_results(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{MODEL}{schema_size}{NATURALNESS}.json", model)
         model.results = {}
 
     # Load results, execute queries and add to reporter
     reporter = Reporter()
 
-    for result_file_name in os.listdir(f"{RESULTS_DIR}/{MODEL}/{NATURALNESS}/"):
-        path = f"{RESULTS_DIR}/{MODEL}/{NATURALNESS}/{result_file_name}"
+    for result_file_name in os.listdir(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/"):
+        path = f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{result_file_name}"
         with open(path, "r") as file_pointer:
             results = load(file_pointer)
 
@@ -70,4 +70,4 @@ if __name__ == "__main__":
     
         reporter.add_result(results, result_file_name.split('.')[0])
 
-    reporter.create_report(f"{RESULTS_DIR}/{MODEL}/{NATURALNESS}")
+    reporter.create_report(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}")

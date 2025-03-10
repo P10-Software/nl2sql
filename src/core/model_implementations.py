@@ -7,8 +7,8 @@ import re
 MODELS_DIRECTORY_PATH = "models/"
 
 class XiYanSQLModel(NL2SQLModel):
-    def __init__(self, connection, benchmark_set, prompt_strategy):
-        super().__init__(connection, benchmark_set, prompt_strategy)
+    def __init__(self, connection, benchmark_set, prompt_strategy, mschema: bool=False):
+        super().__init__(connection, benchmark_set, prompt_strategy, mschema)
         self.tokenizer = AutoTokenizer.from_pretrained(join(MODELS_DIRECTORY_PATH, "XiYanSQL"))
         self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "XiYanSQL"), torch_dtype=torch.bfloat16,
             device_map="auto")
@@ -27,8 +27,8 @@ class XiYanSQLModel(NL2SQLModel):
         )[0]['generated_text']
     
 class DeepSeekQwenModel(NL2SQLModel):
-    def __init__(self, connection, benchmark_set, prompt_strategy):
-        super().__init__(connection, benchmark_set, prompt_strategy)
+    def __init__(self, connection, benchmark_set, prompt_strategy, mschema: bool=False):
+        super().__init__(connection, benchmark_set, prompt_strategy, mschema)
         self.tokenizer = AutoTokenizer.from_pretrained(join(MODELS_DIRECTORY_PATH, "DeepSeekQwen"))
         self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "DeepSeekQwen"), torch_dtype=torch.bfloat16,
             device_map="auto")
@@ -50,8 +50,8 @@ class DeepSeekQwenModel(NL2SQLModel):
         return re.sub(r'([a-z])([A-Z])', r'\1 \2', query)
     
 class DeepSeekLlamaModel(NL2SQLModel):
-    def __init__(self, connection, benchmark_set, prompt_strategy):
-        super().__init__(connection, benchmark_set, prompt_strategy)
+    def __init__(self, connection, benchmark_set, prompt_strategy, mschema: bool=False):
+        super().__init__(connection, benchmark_set, prompt_strategy, mschema)
         self.tokenizer = AutoTokenizer.from_pretrained(join(MODELS_DIRECTORY_PATH, "DeepSeekLlama"))
         self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "DeepSeekLlama"), torch_dtype=torch.bfloat16,
             device_map="auto")

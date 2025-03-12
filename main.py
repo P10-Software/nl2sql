@@ -9,12 +9,14 @@ from src.common.reporting import Reporter
 import os
 
 logger = get_logger(__name__)
+
 SQL_DIALECT = "sqlite"
 SCHEMA_SIZES = ["Full", "Tables", "Columns"]
 DATASET_PATH = ".local/EX_sqlite.json"
 RESULTS_DIR = "results"
 NATURALNESS = "Normalized"
 MODEL = "XiYan"
+MSCHEMA = "mschema"
 
 def load_dataset(dataset_path: str):
     with open(dataset_path, "r") as file:
@@ -44,10 +46,15 @@ if __name__ == "__main__":
             prompt_strategy = DeepSeekPromptStrategy(SQL_DIALECT)
             model = DeepSeekLlamaModel(connection, dataset, prompt_strategy)
 
+    connection.close()
+
     # Run models and save generated queries
     for schema_size in SCHEMA_SIZES:
         model.run(schema_size, naturalness=True)
-        save_results(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{MODEL}{schema_size}{NATURALNESS}.json", model)
+        if model.mschema:
+            save_results(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{MODEL}{schema_size}{NATURALNESS}{MSCHEMA}.json", model)
+        else:
+            save_results(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{MODEL}{schema_size}{NATURALNESS}.json", model)
         model.results = {}
 
     # Load results, execute queries and add to reporter
@@ -55,6 +62,9 @@ if __name__ == "__main__":
 
     for result_file_name in os.listdir(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/"):
         path = f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{result_file_name}"
+
+        if result_file_name == "report.html": continue # breaks is report exists.
+        
         with open(path, "r") as file_pointer:
             results = load(file_pointer)
 

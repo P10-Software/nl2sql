@@ -4,6 +4,7 @@ import pandas as pd
 from sql_metadata import Parser
 from src.common.logger import get_logger
 from src.database.setup_database import get_conn
+from src.database.database import execute_query
 
 
 SchemaKind = Literal['Full', 'Tables', 'Columns']
@@ -116,22 +117,18 @@ def _create_build_instruction_tree(connection_string) -> dict:
     """
     Creates a dict structure for the SQL build instructions of a database.
     Parameters:
-    - conn: PSQL connection string.
+    - conn: Database connection string.
     Returns:
     - dict: Dict of tables and columns with their build instructions.
     """
-    conn = connection_string
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'")
-    tables = cursor.fetchall()
+    tables = execute_query("SELECT name FROM sqlite_master WHERE type='table'")
 
     schema_dict = {}
 
     for table in tables:
         table_name = table[0]
-        cursor.execute(f"SELECT column_name, data_type, character_maximum_length, is_nullable, column_default FROM information_schema.columns WHERE table_name = '{table_name}'")
-        columns = cursor.fetchall()
+
+        columns = execute_query(f"PRAGME table_info({table_name})")
 
         schema_dict[table_name] = {
             'create_table': f'CREATE TABLE {table_name} ({{columns}});',
@@ -151,8 +148,6 @@ def _create_build_instruction_tree(connection_string) -> dict:
                 col_def += " NOT NULL"
 
             schema_dict[table_name]['columns'][col_name] = col_def
-    cursor.close()
-    conn.close()
 
     return schema_dict
 

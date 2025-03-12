@@ -16,7 +16,7 @@ DATASET_PATH = ".local/EX_sqlite.json"
 RESULTS_DIR = "results"
 NATURALNESS = "Normalized"
 MODEL = "XiYan"
-MSCHEMA = "mschema"
+MSCHEMA = "Mschema"
 
 def load_dataset(dataset_path: str):
     with open(dataset_path, "r") as file:
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     for result_file_name in os.listdir(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/"):
         path = f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{result_file_name}"
 
-        if result_file_name == "report.html": continue # breaks is report exists.
+        if result_file_name == "report.html": continue # breaks if report exists.
         
         with open(path, "r") as file_pointer:
             results = load(file_pointer)

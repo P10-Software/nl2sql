@@ -70,7 +70,7 @@ def _transform_natural_query(selected_tables_columns: dict[str, list[str]]) -> d
     table_names = pd.read_csv(".local/table_names_normalised.csv", header=None, names=["old_name", "new_name"])
     column_names = pd.read_csv(".local/column_names_normalised.csv", header=None, names=["old_name", "new_name", "table_name"])
 
-    # Ensure that querye adhere to naming conventions.
+    # Ensure that query table and column names adhere to naming conventions.
     table_names = table_names.map(column_name_format)
     column_names = column_names.map(column_name_format)
     selected_tables_columns = {

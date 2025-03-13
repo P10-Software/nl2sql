@@ -3,7 +3,7 @@ import re
 import pandas as pd
 from sql_metadata import Parser
 from src.common.logger import get_logger
-from src.database.setup_database import get_conn
+from src.database.setup_database import get_conn, column_name_format
 from src.database.database import execute_query
 
 
@@ -69,6 +69,14 @@ def _transform_natural_query(selected_tables_columns: dict[str, list[str]]) -> d
     """ Transform tables and column names in query to be more natural. """
     table_names = pd.read_csv(".local/table_names_normalised.csv", header=None, names=["old_name", "new_name"])
     column_names = pd.read_csv(".local/column_names_normalised.csv", header=None, names=["old_name", "new_name", "table_name"])
+
+    # Ensure that querye adhere to naming conventions.
+    table_names = table_names.map(column_name_format)
+    column_names = column_names.map(column_name_format)
+    selected_tables_columns = {
+        table: [column_name_format(col) for col in columns ]
+        for table, columns in selected_tables_columns.items()
+    }
 
     table_mapping = dict(zip(table_names['old_name'], table_names['new_name']))
     column_name_mapping = {

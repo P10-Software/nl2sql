@@ -29,7 +29,9 @@ def get_query_build_instruct(kind: SchemaKind, query: str, natural_names: bool) 
     if natural_names:
         selected_tables_columns = _transform_natural_query(selected_tables_columns)
 
-    schema_tree = _create_build_instruction_tree(conn)
+    schema_tree = _create_build_instruction_tree()
+
+    conn.close()
 
     return _create_build_instruction(schema_tree, selected_tables_columns, kind)
 
@@ -69,10 +71,10 @@ def _transform_natural_query(selected_tables_columns: dict[str, list[str]]) -> d
     column_names = pd.read_csv(".local/column_names_normalised.csv", header=None, names=["old_name", "new_name", "table_name"])
 
     table_mapping = dict(zip(table_names['old_name'], table_names['new_name']))
-    column_name_mapping = { 
+    column_name_mapping = {
         (row['old_name'], row['table_name']): row['new_name']
         for _, row in column_names.iterrows()
-    }    
+    }
     updated_dict = {}
 
     for key, values in selected_tables_columns.items():
@@ -113,11 +115,10 @@ def _parse_column(parser: Parser):
     return columns
 
 
-def _create_build_instruction_tree(connection_string) -> dict:
+def _create_build_instruction_tree() -> dict:
     """
     Creates a dict structure for the SQL build instructions of a database.
-    Parameters:
-    - conn: Database connection string.
+
     Returns:
     - dict: Dict of tables and columns with their build instructions.
     """
@@ -128,23 +129,20 @@ def _create_build_instruction_tree(connection_string) -> dict:
     for table in tables:
         table_name = table[0]
 
-        columns = execute_query(f"PRAGME table_info({table_name})")
+        columns = execute_query(f"PRAGMA table_info({table_name})")
 
         schema_dict[table_name] = {
             'create_table': f'CREATE TABLE {table_name} ({{columns}});',
             'columns': {}
         }
 
-        for col_name, data_type, char_length, is_nullable, col_default in columns:
+        for _, col_name, data_type, is_nullable, col_default, _ in columns:
             col_def = f'{col_name} {data_type.upper()}'
-
-            if char_length and data_type in ('character varying', 'varchar'):
-                col_def += f"({char_length})"
 
             if col_default:
                 col_def += f" DEFAULT {col_default}"
 
-            if is_nullable == 'NO':
+            if is_nullable == 0:
                 col_def += " NOT NULL"
 
             schema_dict[table_name]['columns'][col_name] = col_def

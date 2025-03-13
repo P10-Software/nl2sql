@@ -63,7 +63,7 @@ if __name__ == "__main__":
     for result_file_name in os.listdir(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/"):
         path = f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{result_file_name}"
 
-        if result_file_name == "report.html": continue # breaks if report exists.
+        if result_file_name == "report.html": continue
         
         with open(path, "r") as file_pointer:
             results = load(file_pointer)

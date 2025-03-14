@@ -89,7 +89,7 @@ def _transform_natural_query(selected_tables_columns: dict[str, list[str]]) -> d
         # Replace key if found, otherwise keep the original
         new_table = table_mapping.get(key, key)
 
-        new_values = [column_name_mapping[(column, new_table)] for  column in values]
+        new_values = [column_name_mapping.get((column, new_table), column) for column in values]
 
         updated_dict[new_table] = new_values
 

@@ -27,6 +27,7 @@ def load_dataset(dataset_path: str):
     return [{"question": pair["question"], "golden_query": pair["goal_query"]} for pair in dataset]
 
 def save_results(results_path: str, model: NL2SQLModel):
+    os.makedirs(os.path.dirname(results_path), exist_ok=True)
     with open(results_path, "w") as file:
         dump(model.results, file, indent=4)
 

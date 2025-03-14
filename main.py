@@ -3,9 +3,10 @@ from src.core.prompt_strategies import Llama3PromptStrategy, DeepSeekPromptStrat
 from src.database.setup_database import get_conn
 from src.database.database import execute_query
 from src.core.base_model import NL2SQLModel, translate_query_to_natural
-from json import load, dump
 from src.common.logger import get_logger
 from src.common.reporting import Reporter
+from json import load, dump
+from datetime import date
 import os
 
 logger = get_logger(__name__)
@@ -17,6 +18,7 @@ RESULTS_DIR = "results"
 NATURALNESS = "Normalized"
 MODEL = "XiYan"
 MSCHEMA = "Mschema"
+DATE = date.today()
 
 def load_dataset(dataset_path: str):
     with open(dataset_path, "r") as file:
@@ -52,16 +54,16 @@ if __name__ == "__main__":
     for schema_size in SCHEMA_SIZES:
         model.run(schema_size, naturalness=True)
         if model.mschema:
-            save_results(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{MODEL}{schema_size}{NATURALNESS}{MSCHEMA}.json", model)
+            save_results(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}/{MODEL}{schema_size}{NATURALNESS}{MSCHEMA}.json", model)
         else:
-            save_results(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{MODEL}{schema_size}{NATURALNESS}.json", model)
+            save_results(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}/{MODEL}{schema_size}{NATURALNESS}.json", model)
         model.results = {}
 
     # Load results, execute queries and add to reporter
     reporter = Reporter()
 
-    for result_file_name in os.listdir(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/"):
-        path = f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{result_file_name}"
+    for result_file_name in os.listdir(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}/"):
+        path = f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}/{result_file_name}"
 
         if result_file_name == "report.html": continue
         
@@ -80,4 +82,4 @@ if __name__ == "__main__":
     
         reporter.add_result(results, result_file_name.split('.')[0])
 
-    reporter.create_report(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}")
+    reporter.create_report(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}")

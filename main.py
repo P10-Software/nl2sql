@@ -1,5 +1,5 @@
-from src.core.model_implementations import LlamaModel, DeepSeekLlamaModel, DeepSeekQwenModel, XiYanSQLModel, XiYanWithAbstentionModule
-from src.core.prompt_strategies import Llama3PromptStrategy, DeepSeekPromptStrategy, XiYanSQLPromptStrategy
+from src.core.model_implementations import LlamaModel, DeepSeekLlamaModel, DeepSeekQwenModel, XiYanSQLModel, ModelWithAbstentionModule
+from src.core.prompt_strategies import Llama3PromptStrategy, DeepSeekPromptStrategy, XiYanSQLPromptStrategy, SQLCoderAbstentionPromptStrategy
 from src.database.setup_database import get_conn
 from src.database.database import execute_query
 from src.core.base_model import NL2SQLModel, translate_query_to_natural
@@ -19,7 +19,7 @@ NATURALNESS = "Normalized"
 MODEL = "XiYan"
 PRE_ABSTENTION = False
 POST_ABSTENTION = False
-MSCHEMA = "Mschema"
+MSCHEMA = False
 DATE = date.today()
 
 def load_dataset(dataset_path: str):
@@ -40,29 +40,28 @@ if __name__ == "__main__":
     match MODEL:
         case "XiYan":
             prompt_strategy = XiYanSQLPromptStrategy(SQL_DIALECT)
-            if PRE_ABSTENTION or POST_ABSTENTION:
-                model = XiYanWithAbstentionModule(connection, dataset, prompt_strategy, PRE_ABSTENTION, POST_ABSTENTION)
-            else:
-                model = XiYanSQLModel(connection, dataset, prompt_strategy)
+            model = XiYanSQLModel(connection, dataset, prompt_strategy, MSCHEMA)
         case "DeepSeekQwen":
             prompt_strategy = DeepSeekPromptStrategy(SQL_DIALECT)
-            model = DeepSeekQwenModel(connection, dataset, prompt_strategy)
+            model = DeepSeekQwenModel(connection, dataset, prompt_strategy, MSCHEMA)
         case "Llama":
             prompt_strategy = Llama3PromptStrategy(SQL_DIALECT)
-            model = LlamaModel(connection, dataset, prompt_strategy)
+            model = LlamaModel(connection, dataset, prompt_strategy, MSCHEMA)
         case "DeepSeekLlama":
             prompt_strategy = DeepSeekPromptStrategy(SQL_DIALECT)
-            model = DeepSeekLlamaModel(connection, dataset, prompt_strategy)
+            model = DeepSeekLlamaModel(connection, dataset, prompt_strategy, MSCHEMA)
+
+    if PRE_ABSTENTION or POST_ABSTENTION:
+        abstention_prompt_strategy =  SQLCoderAbstentionPromptStrategy(SQL_DIALECT)
+        model = ModelWithAbstentionModule(connection, dataset, abstention_prompt_strategy, model, PRE_ABSTENTION, POST_ABSTENTION, MSCHEMA)
 
     connection.close()
 
     # Run models and save generated queries
     for schema_size in SCHEMA_SIZES:
         model.run(schema_size, naturalness=True)
-        if model.mschema:
-            save_results(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}/{MODEL}{schema_size}{NATURALNESS}{MSCHEMA}.json", model)
-        else:
-            save_results(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}/{MODEL}{schema_size}{NATURALNESS}.json", model)
+        file_name = f"{MODEL}{schema_size}{NATURALNESS}{"MSchema" if MSCHEMA else ""}{"PreAbstention" if PRE_ABSTENTION else ""}{"PostAbstention" if POST_ABSTENTION else ""}.json"
+        save_results(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}/{file_name}", model)
         model.results = {}
 
     # Load results, execute queries and add to reporter

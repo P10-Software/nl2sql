@@ -91,20 +91,20 @@ class LlamaModel(NL2SQLModel):
         else:
             return super()._prune_generated_query(query) + ";"
 
-class XiYanWithAbstentionModule(XiYanSQLModel):
-    def __init__(self, connection, benchmark_set, prompt_strategy,  pre_sql_abstention: bool, post_sql_abstention: bool, mschema: bool = False):
+class ModelWithAbstentionModule(NL2SQLModel):
+    def __init__(self, connection, benchmark_set, prompt_strategy,  sql_generation_model: NL2SQLModel, pre_sql_abstention: bool, post_sql_abstention: bool, mschema: bool = False):
         super().__init__(connection, benchmark_set, prompt_strategy, mschema)
-        self.abstention_tokenizer = AutoTokenizer.from_pretrained(join(MODELS_DIRECTORY_PATH, "SQLCoder"))
-        self.abstention_model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "SQLCoder"), device_map="auto")
-        self.abstention_pipe = pipeline("text-generation", model=self.abstention_model, tokenizer=self.abstention_tokenizer)
-        self.abstention_prompt_strategy = SQLCoderAbstentionPromptStrategy(prompt_strategy.sql_dialect)
+        self.tokenizer = AutoTokenizer.from_pretrained(join(MODELS_DIRECTORY_PATH, "SQLCoder"))
+        self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "SQLCoder"), device_map="auto")
+        self.pipe = pipeline("text-generation", model=self.abstention_model, tokenizer=self.abstention_tokenizer)
         self.pre_sql_abstention = pre_sql_abstention
         self.post_sql_abstention = post_sql_abstention
+        self.sql_generation_model = sql_generation_model
 
     def _answer_single_question(self, question, schema):
         if self.pre_sql_abstention:
-            pre_abstention_prompt = self.abstention_prompt_strategy.get_prompt(schema, question)
-            pre_abstention_answer = self.abstention_pipe(
+            pre_abstention_prompt = self.prompt_strategy.get_prompt(schema, question)
+            pre_abstention_answer = self.pipe(
                 pre_abstention_prompt,
                 return_full_text=False,
                 pad_token_id=self.tokenizer.pad_token_id,
@@ -117,17 +117,18 @@ class XiYanWithAbstentionModule(XiYanSQLModel):
             if "I do not know" in pre_abstention_answer:
                 return None
 
-        sql_answer = super()._answer_single_question(question, schema)
+        sql_answer = self.sql_generation_model._answer_single_question(question, schema)
 
         if self.post_sql_abstention:
-            post_abstention_prompt = self.abstention_prompt_strategy.get_prompt(schema, question, sql_answer)
-            post_abstention_answer = self.abstention_pipe(
+            post_abstention_prompt = self.prompt_strategy.get_prompt(schema, question, sql_answer)
+            post_abstention_answer = self.pipe(
                 post_abstention_prompt,
                 return_full_text=False,
                 pad_token_id=self.tokenizer.pad_token_id,
                 eos_token_id=self.tokenizer.eos_token_id,
                 max_new_tokens=1024,
-                temperature=0             
+                do_sample=False,
+                num_beams=4         
             )
 
             if "incorrect" in post_abstention_answer:

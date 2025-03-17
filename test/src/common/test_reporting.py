@@ -6,12 +6,12 @@ import pytest
 @pytest.fixture
 def mock_analysis():
     yield {
-        'execution accuracy': {'total_execution_accuracy': 0.8, 'individual_execution_accuracy': {0: True, 1: True, 2: True, 3: False, 4: True}},
-        'precision': {'total_precision': 0.8, 'individual_precisions': {0: 1.0, 1: 1.0, 2: 1.0, 3: 0.0, 4: 1.0}},
-        'recall': {'total_recall': 0.8, 'individual_recalls': {0: 1.0, 1: 1.0, 2: 1.0, 3: 0.0, 4: 1.0}},
-        'f1 score': {'total_f1': 0.8, 'individual_f1s': {0: 1.0, 1: 1.0, 2: 1.0, 3: 0, 4: 1.0}},
+        'execution accuracy': {'total_execution_accuracy': 0.67, 'individual_execution_accuracy': {0: True, 1: True, 2: True, 3: False, 4: True, 5: False}},
+        'precision': {'total_precision': 0.67, 'individual_precisions': {0: 1.0, 1: 1.0, 2: 1.0, 3: 0.0, 4: 1.0, 5: 0}},
+        'recall': {'total_recall': 0.67, 'individual_recalls': {0: 1.0, 1: 1.0, 2: 1.0, 3: 0.0, 4: 1.0, 5: 0}},
+        'f1 score': {'total_f1': 0.67, 'individual_f1s': {0: 1.0, 1: 1.0, 2: 1.0, 3: 0, 4: 1.0, 5: 0}},
         'SQL mismatches': {
-            'total_errors': {'table_errors': 0, 'column_errors': 1, 'clause_errors': 1, 'distinct_errors': 0, 'not_query': 0},
+            'total_errors': {'table_errors': 0, 'column_errors': 1, 'clause_errors': 1, 'distinct_errors': 0, 'not_query': 0, 'abstention_errors': 1},
             'individual_errors': [
                 {'generated_sql': 'SELECT capital FROM countries WHERE name="France"',
                  'golden_sql': 'SELECT capital FROM countries WHERE name="France"',
@@ -20,7 +20,8 @@ def mock_analysis():
                      'columns': {'golden': [], 'generated': []},
                      'clauses': {},
                      'distinct': {'golden': False, 'generated': False},
-                     'not_query': False}},
+                     'not_query': False,
+                     'abstention': False}},
                 {'generated_sql': 'SELECT population FROM countries WHERE name="Germany"',
                  'golden_sql': 'SELECT population FROM countries WHERE name="Germany"',
                  'errors': {
@@ -28,7 +29,8 @@ def mock_analysis():
                      'columns': {'golden': [], 'generated': []},
                      'clauses': {},
                      'distinct': {'golden': False, 'generated': False},
-                     'not_query': False}},
+                     'not_query': False,
+                     'abstention': False}},
                 {'generated_sql': 'SELECT name FROM countries WHERE continent="Europe"',
                  'golden_sql': 'SELECT name FROM countries WHERE continent="Europe"',
                  'errors': {
@@ -36,7 +38,8 @@ def mock_analysis():
                      'columns': {'golden': [], 'generated': []},
                      'clauses': {},
                      'distinct': {'golden': False, 'generated': False},
-                     'not_query': False}},
+                     'not_query': False,
+                     'abstention': False}},
                 {'generated_sql': 'SELECT gdp, population FROM countries WHERE namee="Japon"',
                  'golden_sql': 'SELECT gdp FROM countries WHERE name="Japan"',
                  'errors': {
@@ -44,7 +47,8 @@ def mock_analysis():
                      'columns': {'golden': ['gdp'], 'generated': ['gdp', 'population']},
                      'clauses': {'WHERE': {'golden': ['NAME = JAPAN '], 'generated': ['NAMEE = JAPON ']}},
                      'distinct': {'golden': False, 'generated': False},
-                     'not_query': False}},
+                     'not_query': False,
+                     'abstention': False}},
                 {'generated_sql': 'SELECT area FROM countries WHERE name="Canada"',
                  'golden_sql': 'SELECT area FROM countries WHERE name="Canada"',
                  'errors': {
@@ -52,8 +56,18 @@ def mock_analysis():
                      'columns': {'golden': [], 'generated': []},
                      'clauses': {},
                      'distinct': {'golden': False, 'generated': False},
-                     'not_query': False}}]},
-        'total sql queries': 5}
+                     'not_query': False,
+                     'abstention': False}},
+                {'generated_sql': 'SELECT area FROM countries WHERE name="Canada"',
+                 'golden_sql': None,
+                 'errors': {
+                     'tables': {'golden': [], 'generated': []},
+                     'columns': {'golden': [], 'generated': []},
+                     'clauses': {},
+                     'distinct': {'golden': False, 'generated': False},
+                     'not_query': False,
+                     'abstention': True}}]},
+        'total sql queries': 6}
 
 
 @pytest.fixture
@@ -153,7 +167,8 @@ def test_analyse_sql():
         'column_errors': 1,
         'clause_errors': 3,
         'distinct_errors': 0,
-        'not_query_errors': 0
+        'not_query_errors': 0,
+        'abstention_errors': 0
     }
 
     # Act
@@ -171,58 +186,65 @@ def test_analyse_sql():
             "SELECT name FROM names;",
             "SELECT DISTINCT name FROM names;",
             {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': [], 'generated': [
-            ]}, 'clauses': {}, 'distinct': {'golden': False, 'generated': True}, 'not_query': 0}
+            ]}, 'clauses': {}, 'distinct': {'golden': False, 'generated': True}, 'not_query': False, 'abstention': False}
         ),
         # Gold has distinct
         (
             "SELECT DISTINCT name FROM names;",
             "SELECT name FROM names;",
             {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': [], 'generated': [
-            ]}, 'clauses': {}, 'distinct': {'golden': True, 'generated': False}, 'not_query': 0}
+            ]}, 'clauses': {}, 'distinct': {'golden': True, 'generated': False}, 'not_query': False, 'abstention': False}
         ),
         # Missing column, WHERE clause, and GROUP BY
         (
             "SELECT name, age FROM users WHERE age > 18 GROUP BY age ORDER BY name",
             "SELECT name FROM users ORDER BY name",
             {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': ['name', 'age'], 'generated': ['name']}, 'clauses': {'WHERE': {
-                'golden': ['AGE > 18'], 'generated': []}, 'GROUPBY': {'golden': ['AGE'], 'generated': []}}, 'distinct': {'golden': False, 'generated': False}, 'not_query': 0}
+                'golden': ['AGE > 18'], 'generated': []}, 'GROUPBY': {'golden': ['AGE'], 'generated': []}}, 'distinct': {'golden': False, 'generated': False}, 'not_query': False, 'abstention': False}
         ),
         # Different table
         (
             "SELECT id FROM orders",
             "SELECT id FROM transactions",
             {'tables': {'golden': ['orders'], 'generated': ['transactions']}, 'columns': {'golden': [
-            ], 'generated': []}, 'clauses': {}, 'distinct': {'golden': False, 'generated': False}, 'not_query': 0}
+            ], 'generated': []}, 'clauses': {}, 'distinct': {'golden': False, 'generated': False}, 'not_query': False, 'abstention': False}
         ),
         # Generated is not a query
         (
             "SELECT id FROM orders",
             "What are the ids of orders?",
             {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': [
-            ], 'generated': []}, 'clauses': {}, 'distinct': {'golden': False, 'generated': False}, 'not_query': 1}
+            ], 'generated': []}, 'clauses': {}, 'distinct': {'golden': False, 'generated': False}, 'not_query': True, 'abstention': False}
+        ),
+        # Abstention Mismatch
+        (
+            "SELECT id FROM orders",
+            None,
+            {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': [
+            ], 'generated': []}, 'clauses': {}, 'distinct': {'golden': False, 'generated': False}, 'not_query': False, 'abstention': True}
         ),
         # Identical SQL (no errors)
         (
             "SELECT id, amount FROM transactions WHERE amount > 100",
             "SELECT id, amount FROM transactions WHERE amount > 100",
             {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': [], 'generated': [
-            ]}, 'clauses': {}, 'distinct': {'golden': False, 'generated': False}, 'not_query': 0}
+            ]}, 'clauses': {}, 'distinct': {'golden': False, 'generated': False}, 'not_query': False, 'abstention': False}
         ),
         (
             "SELECT name, age FROM users WHERE age > 18 GROUP BY age ORDER BY name",
             "SELECT name, age FROM users WHERE age > 18 GROUP BY age ORDER BY age",
             {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': [], 'generated': []}, 'clauses': {
-                'ORDERBY': {'golden': ['NAME '], 'generated': ['AGE ']}}, 'distinct': {'golden': False, 'generated': False}, 'not_query': 0}
+                'ORDERBY': {'golden': ['NAME '], 'generated': ['AGE ']}}, 'distinct': {'golden': False, 'generated': False}, 'not_query': False, 'abstention': False}
         ),
         (
             "SELECT T1.cdw_partition_key, T1.profile_id FROM planned_profile AS T1",
             "SELECT profile_id AS unique_identifier, cdw_partition_key AS partition_key FROM planned_profile",
             {'tables': {'golden': [], 'generated': []}, 'columns': {'golden': [], 'generated': []}, 'clauses': {
-                'ORDERBY': {'golden': [], 'generated': []}}, 'distinct': {'golden': False, 'generated': False}, 'not_query': 0}
+                'ORDERBY': {'golden': [], 'generated': []}}, 'distinct': {'golden': False, 'generated': False}, 'not_query': False, 'abstention': False}
         )
     ],
     ids=['generated extra distinct', 'generated missing distinct',
-         'missing column, where and group by', 'different table', 'generated is not a query', 'no errors', 'different order by', 'alias for column']
+         'missing column, where and group by', 'different table', 'generated is not a query', 'abstention mismatch', 'no errors', 'different order by', 'alias for column']
 )
 def test_extract_sql_mismatch(gold, generated, expected):
     # Arrange
@@ -248,3 +270,6 @@ def test_extract_sql_mismatch(gold, generated, expected):
 
     assert result['distinct']['golden'] == expected['distinct']['golden']
     assert result['distinct']['generated'] == expected['distinct']['generated']
+    
+    assert result['not_query'] == expected['not_query']
+    assert result['abstention'] == expected['abstention']

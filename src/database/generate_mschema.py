@@ -29,7 +29,6 @@ def save_mschema_file():
     """
     with open(".local/mschema.txt", "w") as file:
         file.write(generate_mschema())
-        file.close()
 
 
 if __name__ == "__main__":

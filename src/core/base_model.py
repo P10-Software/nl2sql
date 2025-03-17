@@ -9,7 +9,6 @@ from dotenv import load_dotenv
 from src.common.logger import get_logger
 from src.core.extract_instructions import get_query_build_instruct, SchemaKind, sanitise_query
 from src.core.evaluation_metrics import precision, recall, f1_score, execution_accuracy
-from mschema.schema_engine import SchemaEngine
 
 logger = get_logger(__name__)
 load_dotenv()
@@ -77,16 +76,12 @@ class NL2SQLModel(ABC):
         # Remove \n
         return query.replace("\n", "")
 
-def _generate_mschema():
+def get_mschema():
     """
-    Generate schema to M-schema DDL format with additional information
+    Read database m-schema from file.
     """
-    if DB_NATURAL:
-        db_engine = create_engine(f'sqlite:///{DB_PATH_NATURAL}')
-    else:
-        db_engine = create_engine(f'sqlite:///{DB_PATH_ABBREVIATED}')
-
-    return SchemaEngine(engine=db_engine, db_name=DB_NAME).mschema.to_mschema()
+    with open(".local/mschema.txt", "r") as file:
+        return file.read()
 
 def translate_query_to_natural(query: str) -> str:
     """

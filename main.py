@@ -3,18 +3,22 @@ from src.core.prompt_strategies import Llama3PromptStrategy, DeepSeekPromptStrat
 from src.database.setup_database import get_conn
 from src.database.database import execute_query
 from src.core.base_model import NL2SQLModel, translate_query_to_natural
-from json import load, dump
 from src.common.logger import get_logger
 from src.common.reporting import Reporter
+from json import load, dump
+from datetime import date
 import os
 
 logger = get_logger(__name__)
+
 SQL_DIALECT = "sqlite"
 SCHEMA_SIZES = ["Full", "Tables", "Columns"]
 DATASET_PATH = ".local/EX_sqlite.json"
 RESULTS_DIR = "results"
 NATURALNESS = "Normalized"
 MODEL = "XiYan"
+MSCHEMA = "Mschema"
+DATE = date.today()
 
 def load_dataset(dataset_path: str):
     with open(dataset_path, "r") as file:
@@ -23,6 +27,7 @@ def load_dataset(dataset_path: str):
     return [{"question": pair["question"], "golden_query": pair["goal_query"]} for pair in dataset]
 
 def save_results(results_path: str, model: NL2SQLModel):
+    os.makedirs(os.path.dirname(results_path), exist_ok=True)
     with open(results_path, "w") as file:
         dump(model.results, file, indent=4)
 
@@ -44,17 +49,25 @@ if __name__ == "__main__":
             prompt_strategy = DeepSeekPromptStrategy(SQL_DIALECT)
             model = DeepSeekLlamaModel(connection, dataset, prompt_strategy)
 
+    connection.close()
+
     # Run models and save generated queries
     for schema_size in SCHEMA_SIZES:
         model.run(schema_size, naturalness=True)
-        save_results(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{MODEL}{schema_size}{NATURALNESS}.json", model)
+        if model.mschema:
+            save_results(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}/{MODEL}{schema_size}{NATURALNESS}{MSCHEMA}.json", model)
+        else:
+            save_results(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}/{MODEL}{schema_size}{NATURALNESS}.json", model)
         model.results = {}
 
     # Load results, execute queries and add to reporter
     reporter = Reporter()
 
-    for result_file_name in os.listdir(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/"):
-        path = f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{result_file_name}"
+    for result_file_name in os.listdir(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}/"):
+        path = f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}/{result_file_name}"
+
+        if result_file_name == "report.html": continue
+        
         with open(path, "r") as file_pointer:
             results = load(file_pointer)
 
@@ -70,4 +83,4 @@ if __name__ == "__main__":
     
         reporter.add_result(results, result_file_name.split('.')[0])
 
-    reporter.create_report(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}")
+    reporter.create_report(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}")

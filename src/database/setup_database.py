@@ -86,7 +86,7 @@ def _read_sas_normalised(path_to_sas, new_table_names) -> None:
     column_mappings = dict(zip(column_names_df['old_names'], column_names_df['new_names']))
 
     df.rename(columns=column_mappings, inplace=True)
-    df.columns = df.columns.map(_column_name_format)
+    df.columns = df.columns.map(column_name_format)
 
     # Handle duplicate column labels in sponsor_def_value table.
     if table_name == "sponsor_defined_value_in_list":
@@ -102,7 +102,7 @@ def _read_sas_normalised(path_to_sas, new_table_names) -> None:
     conn.close()
 
 
-def _column_name_format(column_name: str) -> str:
+def column_name_format(column_name: str) -> str:
     """ Ensure that the columns comply with database naming rules."""
     return column_name.replace(' ', '_').lower()
 
@@ -113,7 +113,7 @@ def _read_sas(path_to_sas: str):
     # meta is all the 'non' visible data, so in our case labels.
     df, meta = pyreadstat.read_sas7bdat(path_to_sas)
 
-    df.columns = df.columns.map(_column_name_format)
+    df.columns = df.columns.map(column_name_format)
     
     column_names = df.columns
 

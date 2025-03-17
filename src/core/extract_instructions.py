@@ -3,7 +3,8 @@ import re
 import pandas as pd
 from sql_metadata import Parser
 from src.common.logger import get_logger
-from src.database.setup_database import get_conn
+from src.database.setup_database import get_conn, column_name_format
+from src.database.database import execute_query
 
 
 SchemaKind = Literal['Full', 'Tables', 'Columns']
@@ -28,7 +29,9 @@ def get_query_build_instruct(kind: SchemaKind, query: str, natural_names: bool) 
     if natural_names:
         selected_tables_columns = _transform_natural_query(selected_tables_columns)
 
-    schema_tree = _create_build_instruction_tree(conn)
+    schema_tree = _create_build_instruction_tree()
+
+    conn.close()
 
     return _create_build_instruction(schema_tree, selected_tables_columns, kind)
 
@@ -67,18 +70,26 @@ def _transform_natural_query(selected_tables_columns: dict[str, list[str]]) -> d
     table_names = pd.read_csv(".local/table_names_normalised.csv", header=None, names=["old_name", "new_name"])
     column_names = pd.read_csv(".local/column_names_normalised.csv", header=None, names=["old_name", "new_name", "table_name"])
 
+    # Ensure that query table and column names adhere to naming conventions.
+    table_names = table_names.map(column_name_format)
+    column_names = column_names.map(column_name_format)
+    selected_tables_columns = {
+        table: [column_name_format(col) for col in columns ]
+        for table, columns in selected_tables_columns.items()
+    }
+
     table_mapping = dict(zip(table_names['old_name'], table_names['new_name']))
-    column_name_mapping = { 
+    column_name_mapping = {
         (row['old_name'], row['table_name']): row['new_name']
         for _, row in column_names.iterrows()
-    }    
+    }
     updated_dict = {}
 
     for key, values in selected_tables_columns.items():
         # Replace key if found, otherwise keep the original
         new_table = table_mapping.get(key, key)
 
-        new_values = [column_name_mapping[(column, new_table)] for  column in values]
+        new_values = [column_name_mapping.get((column, new_table), column) for column in values]
 
         updated_dict[new_table] = new_values
 
@@ -112,47 +123,37 @@ def _parse_column(parser: Parser):
     return columns
 
 
-def _create_build_instruction_tree(connection_string) -> dict:
+def _create_build_instruction_tree() -> dict:
     """
     Creates a dict structure for the SQL build instructions of a database.
-    Parameters:
-    - conn: PSQL connection string.
+
     Returns:
     - dict: Dict of tables and columns with their build instructions.
     """
-    conn = connection_string
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'")
-    tables = cursor.fetchall()
+    tables = execute_query("SELECT name FROM sqlite_master WHERE type='table'")
 
     schema_dict = {}
 
     for table in tables:
         table_name = table[0]
-        cursor.execute(f"SELECT column_name, data_type, character_maximum_length, is_nullable, column_default FROM information_schema.columns WHERE table_name = '{table_name}'")
-        columns = cursor.fetchall()
+
+        columns = execute_query(f"PRAGMA table_info({table_name})")
 
         schema_dict[table_name] = {
             'create_table': f'CREATE TABLE {table_name} ({{columns}});',
             'columns': {}
         }
 
-        for col_name, data_type, char_length, is_nullable, col_default in columns:
+        for _, col_name, data_type, is_nullable, col_default, _ in columns:
             col_def = f'{col_name} {data_type.upper()}'
-
-            if char_length and data_type in ('character varying', 'varchar'):
-                col_def += f"({char_length})"
 
             if col_default:
                 col_def += f" DEFAULT {col_default}"
 
-            if is_nullable == 'NO':
+            if is_nullable == 0:
                 col_def += " NOT NULL"
 
             schema_dict[table_name]['columns'][col_name] = col_def
-    cursor.close()
-    conn.close()
 
     return schema_dict
 

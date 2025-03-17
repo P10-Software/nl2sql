@@ -68,8 +68,8 @@ class DeepSeekLlamaModel(NL2SQLModel):
         )[0]['generated_text']
     
 class LlamaModel(NL2SQLModel):
-    def __init__(self, connection, benchmark_set, prompt_strategy):
-        super().__init__(connection, benchmark_set, prompt_strategy)
+    def __init__(self, connection, benchmark_set, prompt_strategy, mschema: bool=False):
+        super().__init__(connection, benchmark_set, prompt_strategy, mschema)
         self.tokenizer = AutoTokenizer.from_pretrained(join(MODELS_DIRECTORY_PATH, "Llama"))
         self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "Llama"), torch_dtype=torch.bfloat16,
             device_map="auto")

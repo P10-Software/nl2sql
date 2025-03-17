@@ -17,7 +17,7 @@ class MockPromptStrategy(PromptStrategy):
 
 class MockNL2SQLModel(NL2SQLModel):
     def __init__(self, connection, benchmark_set):
-        super().__init__(connection, benchmark_set, MockPromptStrategy(), mschema=False)
+        super().__init__(connection, benchmark_set, MockPromptStrategy(), False)
         self.tokenizer = MagicMock()
         self.model = MagicMock()
         self.pipe = MagicMock(

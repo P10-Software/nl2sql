@@ -52,3 +52,40 @@ class Llama3PromptStrategy(PromptStrategy):
 
     def get_prompt(self, schema, question):
         return self.prompt_template.format(SQL_DIALECT=self.sql_dialect, DDL_INSTRUCTIONS=schema, NL_QUESTION=question)
+    
+class SQLCoderAbstentionPromptStrategy(PromptStrategy):
+    def __init__(self, sql_dialect):
+        self.sql_dialect = sql_dialect
+        self.pre_sql_prompt_template = """
+            ### Task
+            Generate a {SQL_DIALECT} SQL query to answer [QUESTION]{NL_QUESTION}[/QUESTION]
+
+            ### Instructions 
+            - If you cannot answer the question with the available database schema, return 'I do not know'
+
+            ### Database Schema
+            The query will run on a database with the following schema:
+            {DDL_INSTRUCTIONS}
+
+            ### Answer
+            Given the database schema, here is the SQL query that [QUESTION]{NL_QUESTION}[/QUESTION]
+            [SQL]
+        """
+        self.post_sql_prompt_template = """
+            #### Based on the question and predicted {SQL_DIALECT} SQL, are you sure the SQL below is correct? If you consider the SQL is correct, answer me with 'correct'. 
+            If not, answer me with 'incorrect'. Only output your response without explanation.
+
+            ### Database Schema
+            The query will run on a database with the following schema:
+            {DDL_INSTRUCTIONS}
+
+            Question: {NL_QUESTION}
+            Predicted SQL: {SQL}
+            Answer:        
+        """
+
+    def get_prompt(self, schema, question, generated_sql= None):
+        if not generated_sql:
+            return self.pre_sql_prompt_template.format(SQL_DIALECT=self.sql_dialect, DDL_INSTRUCTIONS=schema, NL_QUESTION=question)
+        else:
+            return self.post_sql_prompt_template.format(SQL_DIALECT=self.sql_dialect, DDL_INSTRUCTIONS=schema, NL_QUESTION=question, SQL=generated_sql)

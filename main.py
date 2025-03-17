@@ -1,4 +1,4 @@
-from src.core.model_implementations import LlamaModel, DeepSeekLlamaModel, DeepSeekQwenModel, XiYanSQLModel
+from src.core.model_implementations import LlamaModel, DeepSeekLlamaModel, DeepSeekQwenModel, XiYanSQLModel, XiYanWithAbstentionModule
 from src.core.prompt_strategies import Llama3PromptStrategy, DeepSeekPromptStrategy, XiYanSQLPromptStrategy
 from src.database.setup_database import get_conn
 from src.database.database import execute_query
@@ -15,6 +15,8 @@ DATASET_PATH = ".local/EX_sqlite.json"
 RESULTS_DIR = "results"
 NATURALNESS = "Normalized"
 MODEL = "XiYan"
+PRE_ABSTENTION = False
+POST_ABSTENTION = False
 
 def load_dataset(dataset_path: str):
     with open(dataset_path, "r") as file:
@@ -33,7 +35,10 @@ if __name__ == "__main__":
     match MODEL:
         case "XiYan":
             prompt_strategy = XiYanSQLPromptStrategy(SQL_DIALECT)
-            model = XiYanSQLModel(connection, dataset, prompt_strategy)
+            if PRE_ABSTENTION or POST_ABSTENTION:
+                model = XiYanWithAbstentionModule(connection, dataset, prompt_strategy, PRE_ABSTENTION, POST_ABSTENTION)
+            else:
+                model = XiYanSQLModel(connection, dataset, prompt_strategy)
         case "DeepSeekQwen":
             prompt_strategy = DeepSeekPromptStrategy(SQL_DIALECT)
             model = DeepSeekQwenModel(connection, dataset, prompt_strategy)

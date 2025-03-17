@@ -8,7 +8,6 @@ from sqlalchemy import create_engine
 from dotenv import load_dotenv
 from src.common.logger import get_logger
 from src.core.extract_instructions import get_query_build_instruct, SchemaKind, sanitise_query
-from src.core.evaluation_metrics import precision, recall, f1_score, execution_accuracy
 from mschema.schema_engine import SchemaEngine
 
 logger = get_logger(__name__)
@@ -57,8 +56,7 @@ class NL2SQLModel(ABC):
                 schema = _generate_mschema()
             else:
                 schema = get_query_build_instruct(schema_size, goal, naturalness)
-            prompt = self.prompt_strategy.get_prompt(schema, question)
-            answer = self._prune_generated_query(self._answer_single_question(prompt))
+            answer = self._answer_single_question(question, schema)
             self.results[idx] = {'question': question, 'golden_query': goal, 'golden_result': {}, 'generated_query': answer, 'generated_result': {}}
         logger.info(f"Benchmarking finished for {self.__class__.__name__}.")
 

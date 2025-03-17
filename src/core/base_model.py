@@ -8,7 +8,6 @@ from sqlalchemy import create_engine
 from dotenv import load_dotenv
 from src.common.logger import get_logger
 from src.core.extract_instructions import get_query_build_instruct, SchemaKind, sanitise_query
-from mschema.schema_engine import SchemaEngine
 
 logger = get_logger(__name__)
 load_dotenv()
@@ -53,7 +52,7 @@ class NL2SQLModel(ABC):
             question = pair['question']
             goal = pair['golden_query']
             if self.mschema:
-                schema = _generate_mschema()
+                schema = self.get_mschema()
             else:
                 schema = get_query_build_instruct(schema_size, goal, naturalness)
             answer = self._answer_single_question(question, schema)
@@ -75,16 +74,12 @@ class NL2SQLModel(ABC):
         # Remove \n
         return query.replace("\n", "")
 
-def _generate_mschema():
-    """
-    Generate schema to M-schema DDL format with additional information
-    """
-    if DB_NATURAL:
-        db_engine = create_engine(f'sqlite:///{DB_PATH_NATURAL}')
-    else:
-        db_engine = create_engine(f'sqlite:///{DB_PATH_ABBREVIATED}')
-
-    return SchemaEngine(engine=db_engine, db_name=DB_NAME).mschema.to_mschema()
+    def get_mschema(self):
+        """
+        Read database m-schema from file.
+        """
+        with open(".local/mschema.txt", "r") as file:
+            return file.read()
 
 def translate_query_to_natural(query: str) -> str:
     """

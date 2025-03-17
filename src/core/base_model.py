@@ -53,7 +53,7 @@ class NL2SQLModel(ABC):
             question = pair['question']
             goal = pair['golden_query']
             if self.mschema:
-                schema = _generate_mschema()
+                schema = self.get_mschema()
             else:
                 schema = get_query_build_instruct(schema_size, goal, naturalness)
             prompt = self.prompt_strategy.get_prompt(schema, question)
@@ -76,12 +76,12 @@ class NL2SQLModel(ABC):
         # Remove \n
         return query.replace("\n", "")
 
-def get_mschema():
-    """
-    Read database m-schema from file.
-    """
-    with open(".local/mschema.txt", "r") as file:
-        return file.read()
+    def get_mschema(self):
+        """
+        Read database m-schema from file.
+        """
+        with open(".local/mschema.txt", "r") as file:
+            return file.read()
 
 def translate_query_to_natural(query: str) -> str:
     """

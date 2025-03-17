@@ -3,7 +3,7 @@ import re
 import pandas as pd
 from sql_metadata import Parser
 from src.common.logger import get_logger
-from src.database.setup_database import get_conn, column_name_format
+from src.database.setup_database import column_name_format
 from src.database.database import execute_query
 
 
@@ -23,15 +23,12 @@ def get_query_build_instruct(kind: SchemaKind, query: str, natural_names: bool) 
     Returns:
     - SQL build instructions (sql): SQL instructions specifying how to build the DB.
     """
-    conn = get_conn()
     selected_tables_columns = _extract_column_table(query)
 
     if natural_names:
         selected_tables_columns = _transform_natural_query(selected_tables_columns)
 
     schema_tree = _create_build_instruction_tree()
-
-    conn.close()
 
     return _create_build_instruction(schema_tree, selected_tables_columns, kind)
 

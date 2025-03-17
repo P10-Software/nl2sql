@@ -65,11 +65,18 @@ if __name__ == "__main__":
 
         logger.info(f"Running results of database for {path}.")
         for res in results.values():
-            if NATURALNESS == "Normalized":
-                res['golden_query'] = translate_query_to_natural(res['golden_query'])
+            if res['golden_query']:
+                if NATURALNESS == "Normalized":
+                    res['golden_query'] = translate_query_to_natural(res['golden_query'])
 
-            res['golden_result'] = execute_query(res['golden_query'])
-            res['generated_result'] = execute_query(res['generated_query'])
+                res['golden_result'] = execute_query(res['golden_query'])
+            else:
+                res['golden_result'] = None
+            
+            if res['generated_query']:
+                res['generated_result'] = execute_query(res['generated_query'])
+            else:
+                res['generated_result'] = None
 
         logger.info(f"Executed all queries on the database for {path}.")
     

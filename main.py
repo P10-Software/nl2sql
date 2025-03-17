@@ -60,7 +60,7 @@ if __name__ == "__main__":
     # Run models and save generated queries
     for schema_size in SCHEMA_SIZES:
         model.run(schema_size, naturalness=True)
-        file_name = f"{MODEL}{schema_size}{NATURALNESS}{"MSchema" if MSCHEMA else ""}{"PreAbstention" if PRE_ABSTENTION else ""}{"PostAbstention" if POST_ABSTENTION else ""}.json"
+        file_name = f"{MODEL}{schema_size}{NATURALNESS}{'MSchema' if MSCHEMA else ''}{'PreAbstention' if PRE_ABSTENTION else ''}{'PostAbstention' if POST_ABSTENTION else ''}.json"
         save_results(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}/{file_name}", model)
         model.results = {}
 

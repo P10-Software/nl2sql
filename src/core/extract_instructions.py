@@ -130,6 +130,7 @@ def _create_build_instruction_tree() -> dict:
     tables = execute_query("SELECT name FROM sqlite_master WHERE type='table'")
 
     schema_dict = {}
+    column_df = _get_nullable_columns()
 
     for table in tables:
         table_name = table[0]
@@ -141,18 +142,29 @@ def _create_build_instruction_tree() -> dict:
             'columns': {}
         }
 
-        for _, col_name, data_type, is_nullable, col_default, _ in columns:
+        for _, col_name, data_type, _, col_default, _ in columns:
             col_def = f'{col_name} {data_type.upper()}'
 
             if col_default:
                 col_def += f" DEFAULT {col_default}"
 
-            if is_nullable == 0:
+            if f"{table_name}.{col_name}" not in column_df['columns'].values:
                 col_def += " NOT NULL"
 
             schema_dict[table_name]['columns'][col_name] = col_def
 
     return schema_dict
+
+
+def _get_nullable_columns():
+    df = pd.DataFrame()
+
+    try:
+        df = pd.read_csv('.local/nullable_columns.csv')
+    except Exception as e:
+        logger.error("Error reading nullable columns from .local/nullable_columns.csv %s", e)
+    
+    return df
 
 
 def _create_build_instruction(build_instruct_dict: dict, tables_columns: dict, level: str) -> str:
@@ -188,4 +200,5 @@ def _create_build_instruction(build_instruct_dict: dict, tables_columns: dict, l
                     columns=",\n    ".join(columns_def)
                 )
                 sql_statements.append(create_table_sql)
+    
     return "\n\n".join(sql_statements)

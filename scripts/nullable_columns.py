@@ -49,6 +49,7 @@ def save_nullable_columns(nullable_columns):
     It contains columns for both normalized and abbreviated database.
     """
     df = pd.DataFrame(nullable_columns)
+    df.columns = ['columns']
 
     csv_file = ".local/nullable_columns.csv"
     df.to_csv(csv_file, index=False)

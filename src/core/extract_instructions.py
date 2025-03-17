@@ -157,13 +157,17 @@ def _create_build_instruction_tree() -> dict:
 
 
 def _get_nullable_columns():
+    """
+    Return dataframe containing all column names from the DB containing NULL values.
+    It contains values from both databases.
+    """
     df = pd.DataFrame()
 
     try:
         df = pd.read_csv('.local/nullable_columns.csv')
     except Exception as e:
         logger.error("Error reading nullable columns from .local/nullable_columns.csv %s", e)
-    
+
     return df
 
 
@@ -200,5 +204,5 @@ def _create_build_instruction(build_instruct_dict: dict, tables_columns: dict, l
                     columns=",\n    ".join(columns_def)
                 )
                 sql_statements.append(create_table_sql)
-    
+
     return "\n\n".join(sql_statements)

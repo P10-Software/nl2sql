@@ -1,6 +1,5 @@
 from src.core.model_implementations import LlamaModel, DeepSeekLlamaModel, DeepSeekQwenModel, XiYanSQLModel
 from src.core.prompt_strategies import Llama3PromptStrategy, DeepSeekPromptStrategy, XiYanSQLPromptStrategy
-# from src.database.database import 
 from src.database.database import execute_query, get_conn
 from src.core.base_model import NL2SQLModel, translate_query_to_natural
 from src.common.logger import get_logger

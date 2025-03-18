@@ -144,7 +144,7 @@ def _delete_db(db_path: str):
 
 if __name__ == '__main__':
     try:
-        # init_db(".local/NOVO_SAS_DATA")
+        init_db(".local/NOVO_SAS_DATA")
         init_normalised_db(".local/NOVO_SAS_DATA", ".local/table_names_normalised.csv")
     except Exception as e:
         logger.error("Failed to setup SQLite databases: %s", e)

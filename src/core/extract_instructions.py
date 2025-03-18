@@ -130,7 +130,7 @@ def _create_build_instruction_tree() -> dict:
     tables = execute_query("SELECT name FROM sqlite_master WHERE type='table'")
 
     schema_dict = {}
-    column_df = _get_nullable_columns()
+    null_column_df = _get_nullable_columns()
 
     for table in tables:
         table_name = table[0]
@@ -148,7 +148,7 @@ def _create_build_instruction_tree() -> dict:
             if col_default:
                 col_def += f" DEFAULT {col_default}"
 
-            if f"{table_name}.{col_name}" not in column_df['columns'].values:
+            if f"{table_name}.{col_name}" not in null_column_df['columns'].values:
                 col_def += " NOT NULL"
 
             schema_dict[table_name]['columns'][col_name] = col_def

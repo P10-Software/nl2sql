@@ -13,7 +13,7 @@ DB_NATURAL = int(os.getenv('DB_NATURAL', 0))
 
 def find_nullable_columns(db_path, nullable_columns):
     """
-    Identify columns that are nullable if they contain any rows containing nulle values.
+    Identify columns that are nullable if they contain any rows containing NULL values.
     """
 
     conn = sqlite3.connect(db_path)
@@ -32,8 +32,7 @@ def find_nullable_columns(db_path, nullable_columns):
             column_name = column[1]
 
             # Query returns 1 if where exist a row with null else 0
-            query = f"SELECT EXISTS(SELECT 1 FROM {table_name} WHERE {column_name} IS NULL LIMIT 1);"
-            cursor.execute(query)
+            cursor.execute(f"SELECT EXISTS(SELECT 1 FROM {table_name} WHERE {column_name} IS NULL LIMIT 1);")
             nullable = cursor.fetchall()[0][0]
 
             if nullable:

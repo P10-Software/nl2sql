@@ -78,8 +78,12 @@ class NL2SQLModel(ABC):
         """
         Read database m-schema from file.
         """
-        with open(".local/mschema.txt", "r") as file:
-            return file.read()
+        if DB_NATURAL:
+            with open(".local/mschema_natural.txt", "r") as file:
+                return file.read()
+        else:
+            with open(".local/mschema_abbreviated.txt", "r") as file:
+                return file.read()
 
 def translate_query_to_natural(query: str) -> str:
     """

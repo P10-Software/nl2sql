@@ -1,7 +1,6 @@
 from src.core.model_implementations import LlamaModel, DeepSeekLlamaModel, DeepSeekQwenModel, XiYanSQLModel, ModelWithAbstentionModule
 from src.core.prompt_strategies import Llama3PromptStrategy, DeepSeekPromptStrategy, XiYanSQLPromptStrategy, SQLCoderAbstentionPromptStrategy
-from src.database.setup_database import get_conn
-from src.database.database import execute_query
+from src.database.database import execute_query, get_conn
 from src.core.base_model import NL2SQLModel, translate_query_to_natural
 from src.common.logger import get_logger
 from src.common.reporting import Reporter
@@ -70,7 +69,7 @@ def execute_and_analyze_results():
     reporter = Reporter()
 
     for result_file_name in os.listdir(f"{RESULTS_DIR}/{MODEL}/{'Natural' if NATURALNESS else 'Abbreviated'}/{DATE}/"):
-        path = f"{RESULTS_DIR/{MODEL}/{'Natural' if NATURALNESS else 'Abbreviated'}/{DATE}/{result_file_name}"
+        path = f"{RESULTS_DIR}/{MODEL}/{'Natural' if NATURALNESS else 'Abbreviated'}/{DATE}/{result_file_name}"
 
         if result_file_name == "report.html": continue
         

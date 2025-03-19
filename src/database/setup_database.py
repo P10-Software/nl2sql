@@ -5,7 +5,6 @@ import pandas as pd
 from dotenv import load_dotenv
 from tqdm import tqdm
 from src.common.logger import get_logger
-from src.database.database import get_conn
 
 load_dotenv()
 logger = get_logger(__name__)
@@ -104,7 +103,7 @@ def _read_sas_normalised(path_to_sas, new_table_names) -> None:
 
 def column_name_format(column_name: str) -> str:
     """ Ensure that the columns comply with database naming rules."""
-    return column_name.replace(' ', '_').lower()
+    return column_name.strip().replace(' ', '_').replace('-', '_').replace('.', '').lower()
 
 
 def _read_sas(path_to_sas: str):
@@ -114,7 +113,7 @@ def _read_sas(path_to_sas: str):
     df, meta = pyreadstat.read_sas7bdat(path_to_sas)
 
     df.columns = df.columns.map(column_name_format)
-    
+
     column_names = df.columns
 
     label_df = pd.DataFrame({

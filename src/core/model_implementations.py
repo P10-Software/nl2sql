@@ -1,9 +1,8 @@
 from src.core.base_model import NL2SQLModel
 from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
-from src.core.prompt_strategies import SQLCoderAbstentionPromptStrategy
 from os.path import join
-import torch
 import re
+import torch
 
 MODELS_DIRECTORY_PATH = "models/"
 
@@ -11,7 +10,7 @@ class XiYanSQLModel(NL2SQLModel):
     def __init__(self, connection, benchmark_set, prompt_strategy, mschema: bool=False):
         super().__init__(connection, benchmark_set, prompt_strategy, mschema)
         self.tokenizer = AutoTokenizer.from_pretrained(join(MODELS_DIRECTORY_PATH, "XiYanSQL"))
-        self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "XiYanSQL"), device_map="auto")
+        self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "XiYanSQL"), torch_dtype=torch.bfloat16, device_map="auto")
         self.pipe = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer)
 
     def _answer_single_question(self, question, schema):
@@ -31,7 +30,7 @@ class DeepSeekQwenModel(NL2SQLModel):
     def __init__(self, connection, benchmark_set, prompt_strategy, mschema: bool=False):
         super().__init__(connection, benchmark_set, prompt_strategy, mschema)
         self.tokenizer = AutoTokenizer.from_pretrained(join(MODELS_DIRECTORY_PATH, "DeepSeekQwen"))
-        self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "DeepSeekQwen"), device_map="auto")
+        self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "DeepSeekQwen"), device_map="auto", torch_dtype=torch.bfloat16)
         self.pipe = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer)
 
     def _answer_single_question(self, question, schema):
@@ -54,7 +53,7 @@ class DeepSeekLlamaModel(NL2SQLModel):
     def __init__(self, connection, benchmark_set, prompt_strategy, mschema: bool=False):
         super().__init__(connection, benchmark_set, prompt_strategy, mschema)
         self.tokenizer = AutoTokenizer.from_pretrained(join(MODELS_DIRECTORY_PATH, "DeepSeekLlama"))
-        self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "DeepSeekLlama"), device_map="auto")
+        self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "DeepSeekLlama"), device_map="auto", torch_dtype=torch.bfloat16)
         self.pipe = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer)
 
     def _answer_single_question(self, question, schema):
@@ -72,7 +71,7 @@ class LlamaModel(NL2SQLModel):
     def __init__(self, connection, benchmark_set, prompt_strategy, mschema: bool=False):
         super().__init__(connection, benchmark_set, prompt_strategy, mschema)
         self.tokenizer = AutoTokenizer.from_pretrained(join(MODELS_DIRECTORY_PATH, "Llama"))
-        self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "Llama"), device_map="auto")
+        self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "Llama"), device_map="auto", torch_dtype=torch.bfloat16)
         self.pipe = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer)
 
     def _answer_single_question(self, question, schema):
@@ -95,8 +94,8 @@ class ModelWithAbstentionModule(NL2SQLModel):
     def __init__(self, connection, benchmark_set, prompt_strategy,  sql_generation_model: NL2SQLModel, pre_sql_abstention: bool, post_sql_abstention: bool, mschema: bool = False):
         super().__init__(connection, benchmark_set, prompt_strategy, mschema)
         self.tokenizer = AutoTokenizer.from_pretrained(join(MODELS_DIRECTORY_PATH, "SQLCoder"))
-        self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "SQLCoder"), device_map="auto")
-        self.pipe = pipeline("text-generation", model=self.abstention_model, tokenizer=self.abstention_tokenizer)
+        self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "SQLCoder"), device_map="auto", torch_dtype=torch.float16)
+        self.pipe = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer)
         self.pre_sql_abstention = pre_sql_abstention
         self.post_sql_abstention = post_sql_abstention
         self.sql_generation_model = sql_generation_model

@@ -7,9 +7,7 @@ load_dotenv()
 logger = get_logger(__name__)
 
 DB_NAME = os.getenv('DB_NAME')
-DB_PATH_ABBREVIATED = os.getenv('DB_PATH_ABBREVIATED')
-DB_PATH_NATURAL = os.getenv('DB_PATH_NATURAL')
-DB_NATURAL = int(os.getenv('DB_NATURAL', 0))
+DB_PATH = os.getenv('DB_PATH')
 
 
 def execute_query(query: str):
@@ -43,10 +41,7 @@ def get_conn() -> sqlite3.Connection:
     """
     Creates and returns the connection to the database
     """
-    db_path = DB_PATH_NATURAL if DB_NATURAL else DB_PATH_ABBREVIATED
-
-    conn = sqlite3.connect(f'{db_path}')
-
+    conn = sqlite3.connect(f'{DB_PATH}')
     _check_connection(conn)
 
     return conn

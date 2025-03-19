@@ -8,18 +8,20 @@ from src.common.reporting import Reporter
 from json import load, dump
 from datetime import date
 import os
+from dotenv import load_dotenv
 
 logger = get_logger(__name__)
+load_dotenv()
 
-SQL_DIALECT = "sqlite"
+SQL_DIALECT = os.getenv('SQL_DIALECT')
 SCHEMA_SIZES = ["Full", "Tables", "Columns"]
-DATASET_PATH = ".local/EX_sqlite.json"
-RESULTS_DIR = "results"
-NATURALNESS = "Normalized"
-MODEL = "XiYan"
-PRE_ABSTENTION = False
-POST_ABSTENTION = False
-MSCHEMA = False
+DATASET_PATH = os.getenv('DATASET_PATH')
+RESULTS_DIR = os.getenv('RESULTS_DIR')
+NATURALNESS = int(os.getenv('DB_NATURAL'))
+MODEL = os.getenv('MODEL')
+PRE_ABSTENTION = int(os.getenv('PRE_ABSTENTION'))
+POST_ABSTENTION = int(os.getenv('POST_ABSTENTION'))
+MSCHEMA = int(os.getenv('MSCHEMA'))
 DATE = date.today()
 
 def load_dataset(dataset_path: str):
@@ -33,7 +35,7 @@ def save_results(results_path: str, model: NL2SQLModel):
     with open(results_path, "w") as file:
         dump(model.results, file, indent=4)
 
-if __name__ == "__main__":
+def get_model():
     connection = get_conn()
     dataset = load_dataset(DATASET_PATH)
 
@@ -55,20 +57,20 @@ if __name__ == "__main__":
         abstention_prompt_strategy =  SQLCoderAbstentionPromptStrategy(SQL_DIALECT)
         model = ModelWithAbstentionModule(connection, dataset, abstention_prompt_strategy, model, PRE_ABSTENTION, POST_ABSTENTION, MSCHEMA)
 
-    connection.close()
+    return model    
 
-    # Run models and save generated queries
+def run_experiments(model: NL2SQLModel):
     for schema_size in SCHEMA_SIZES:
-        model.run(schema_size, naturalness=True)
-        file_name = f"{MODEL}{schema_size}{NATURALNESS}{'MSchema' if MSCHEMA else ''}{'PreAbstention' if PRE_ABSTENTION else ''}{'PostAbstention' if POST_ABSTENTION else ''}.json"
-        save_results(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}/{file_name}", model)
+        model.run(schema_size, naturalness=NATURALNESS)
+        file_name = f"{MODEL}{schema_size}{'Natural' if NATURALNESS else 'Abbreviated'}{'MSchema' if MSCHEMA else ''}{'PreAbstention' if PRE_ABSTENTION else ''}{'PostAbstention' if POST_ABSTENTION else ''}.json"
+        save_results(f"{RESULTS_DIR}/{MODEL}/{'Natural' if NATURALNESS else 'Abbreviated'}/{DATE}/{file_name}", model)
         model.results = {}
 
-    # Load results, execute queries and add to reporter
+def execute_and_analyze_results():
     reporter = Reporter()
 
-    for result_file_name in os.listdir(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}/"):
-        path = f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}/{result_file_name}"
+    for result_file_name in os.listdir(f"{RESULTS_DIR}/{MODEL}/{'Natural' if NATURALNESS else 'Abbreviated'}/{DATE}/"):
+        path = f"{RESULTS_DIR/{MODEL}/{'Natural' if NATURALNESS else 'Abbreviated'}/{DATE}/{result_file_name}"
 
         if result_file_name == "report.html": continue
         
@@ -93,5 +95,11 @@ if __name__ == "__main__":
         logger.info(f"Executed all queries on the database for {path}.")
     
         reporter.add_result(results, result_file_name.split('.')[0])
+    
+    return reporter
 
-    reporter.create_report(f"{RESULTS_DIR}/{SQL_DIALECT}/{MODEL}/{NATURALNESS}/{DATE}")
+if __name__ == "__main__":
+    model = get_model()
+    run_experiments(model)
+    reporter = execute_and_analyze_results()
+    reporter.create_report(f"{RESULTS_DIR}/{MODEL}/{'Natural' if NATURALNESS else 'Abbreviated'}/{DATE}")

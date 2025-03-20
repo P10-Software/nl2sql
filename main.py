@@ -1,4 +1,4 @@
-from src.core.model_implementations import LlamaModel, DeepSeekLlamaModel, DeepSeekQwenModel, XiYanSQLModel, ModelWithAbstentionModule
+from src.core.model_implementations import LlamaModel, DeepSeekLlamaModel, DeepSeekQwenModel, XiYanSQLModel, ModelWithSQLCoderAbstentionModule
 from src.core.prompt_strategies import Llama3PromptStrategy, DeepSeekPromptStrategy, XiYanSQLPromptStrategy, SQLCoderAbstentionPromptStrategy
 from src.database.database import execute_query
 from src.core.base_model import NL2SQLModel, translate_query_to_natural
@@ -53,7 +53,7 @@ def get_model():
 
     if PRE_ABSTENTION or POST_ABSTENTION:
         abstention_prompt_strategy =  SQLCoderAbstentionPromptStrategy(SQL_DIALECT)
-        model = ModelWithAbstentionModule(dataset, abstention_prompt_strategy, model, PRE_ABSTENTION, POST_ABSTENTION, MSCHEMA)
+        model = ModelWithSQLCoderAbstentionModule(dataset, abstention_prompt_strategy, model, PRE_ABSTENTION, POST_ABSTENTION, MSCHEMA)
 
     return model    
 

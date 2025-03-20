@@ -19,6 +19,9 @@ def precision(golden: list[list[tuple]], generated: list[list[tuple]]):
     precision_scores = {}
 
     for idx, (gen_res, gold_res) in enumerate(zip(generated, golden)):
+        if gen_res is None or gold_res is None:
+            precision_scores[idx] = 1 if gen_res is gold_res else 0
+            continue
 
         gen_counts = Counter([elem for row in gen_res for elem in row])
         gold_counts = Counter([elem for row in gold_res for elem in row])
@@ -57,6 +60,10 @@ def recall(golden: list[list[tuple]], generated: list[list[tuple]]):
     per_query_recall = {}
 
     for idx, (gen_res, gold_res) in enumerate(zip(generated, golden)):
+        if gen_res is None or gold_res is None:
+            per_query_recall[idx] = 1 if gen_res is gold_res else 0
+            continue
+
         gen_counts = Counter([elem for row in gen_res for elem in row])
         gold_counts = Counter([elem for row in gold_res for elem in row])
 

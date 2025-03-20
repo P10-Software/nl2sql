@@ -50,10 +50,16 @@ from src.core.evaluation_metrics import precision, recall, f1_score, execution_a
         [[(1, 'Alice'), (2, 'Bob')]],
         [[(1, 'Alice', 'Alice'), (2, 'Bob', 'Bob')]],
         {'total_precision': 0.67, 'individual_precisions': {0: 0.67}}
+    ),
+    # 9. Abstention
+    (
+        [None, [(1, 'Alice')], None],
+        [None, None, [(1, 'Alice')]],
+        {'total_precision': 0.33, 'individual_precisions': {0: 1, 1: 0, 2: 0}}
     )
 ], ids=[
     'full match', 'generated one diff', 'generated full diff', 'empty generated', 'empty gold',
-    'some missing some extra', 'duplicate predictions', 'duplicate columns'
+    'some missing some extra', 'duplicate predictions', 'duplicate columns', 'abstention'
 ])
 def test_precision(golden, generated, result):
     # Arrange + Act
@@ -105,10 +111,16 @@ def test_precision(golden, generated, result):
         [[(1, 'Alice'), (2, 'Bob')]],
         [[(1, 'Alice', 'Alice'), (2, 'Bob', 'Bob')]],
         {'total_recall': 1.0, 'individual_recalls': {0: 1.0}}
+    ),
+    # 9. Abstention
+    (
+        [None, [(1, 'Alice')], None],
+        [None, None, [(1, 'Alice')]],
+        {'total_recall': 0.33, 'individual_recalls': {0: 1, 1: 0, 2: 0}}
     )
 ], ids=[
     'full match', 'generated one diff', 'generated full diff', 'empty generated',
-    'some missing some extra', 'duplicate predictions', 'duplicate columns'
+    'some missing some extra', 'duplicate predictions', 'duplicate columns', 'abstention'
 ])
 def test_recall(golden, generated, result):
     # Arrange + Act

@@ -1,6 +1,6 @@
 from src.core.model_implementations import LlamaModel, DeepSeekLlamaModel, DeepSeekQwenModel, XiYanSQLModel, ModelWithAbstentionModule
 from src.core.prompt_strategies import Llama3PromptStrategy, DeepSeekPromptStrategy, XiYanSQLPromptStrategy, SQLCoderAbstentionPromptStrategy
-from src.database.database import execute_query, get_conn
+from src.database.database import execute_query
 from src.core.base_model import NL2SQLModel, translate_query_to_natural
 from src.common.logger import get_logger
 from src.common.reporting import Reporter
@@ -16,7 +16,7 @@ SQL_DIALECT = os.getenv('SQL_DIALECT')
 SCHEMA_SIZES = ["Full", "Tables", "Columns"]
 DATASET_PATH = os.getenv('DATASET_PATH')
 RESULTS_DIR = os.getenv('RESULTS_DIR')
-NATURALNESS = int(os.getenv('DB_NATURAL'))
+DB_NATURAL = int(os.getenv('DB_NATURAL'))
 MODEL = os.getenv('MODEL')
 PRE_ABSTENTION = int(os.getenv('PRE_ABSTENTION'))
 POST_ABSTENTION = int(os.getenv('POST_ABSTENTION'))
@@ -35,7 +35,6 @@ def save_results(results_path: str, model: NL2SQLModel):
         dump(model.results, file, indent=4)
 
 def get_model():
-    connection = get_conn()
     dataset = load_dataset(DATASET_PATH)
 
     match MODEL:
@@ -60,16 +59,16 @@ def get_model():
 
 def run_experiments(model: NL2SQLModel):
     for schema_size in SCHEMA_SIZES:
-        model.run(schema_size, naturalness=NATURALNESS)
-        file_name = f"{MODEL}{schema_size}{'Natural' if NATURALNESS else 'Abbreviated'}{'MSchema' if MSCHEMA else ''}{'PreAbstention' if PRE_ABSTENTION else ''}{'PostAbstention' if POST_ABSTENTION else ''}.json"
-        save_results(f"{RESULTS_DIR}/{MODEL}/{'Natural' if NATURALNESS else 'Abbreviated'}/{DATE}/{file_name}", model)
+        model.run(schema_size, naturalness=DB_NATURAL)
+        file_name = f"{MODEL}{schema_size}{'Natural' if DB_NATURAL else 'Abbreviated'}{'MSchema' if MSCHEMA else ''}{'PreAbstention' if PRE_ABSTENTION else ''}{'PostAbstention' if POST_ABSTENTION else ''}.json"
+        save_results(f"{RESULTS_DIR}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/{file_name}", model)
         model.results = {}
 
 def execute_and_analyze_results():
     reporter = Reporter()
 
-    for result_file_name in os.listdir(f"{RESULTS_DIR}/{MODEL}/{'Natural' if NATURALNESS else 'Abbreviated'}/{DATE}/"):
-        path = f"{RESULTS_DIR}/{MODEL}/{'Natural' if NATURALNESS else 'Abbreviated'}/{DATE}/{result_file_name}"
+    for result_file_name in os.listdir(f"{RESULTS_DIR}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/"):
+        path = f"{RESULTS_DIR}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/{result_file_name}"
 
         if result_file_name == "report.html": continue
         
@@ -79,7 +78,7 @@ def execute_and_analyze_results():
         logger.info(f"Running results of database for {path}.")
         for res in results.values():
             if res['golden_query']:
-                if NATURALNESS == "Normalized":
+                if DB_NATURAL == "Normalized":
                     res['golden_query'] = translate_query_to_natural(res['golden_query'])
 
                 res['golden_result'] = execute_query(res['golden_query'])
@@ -101,4 +100,4 @@ if __name__ == "__main__":
     model = get_model()
     run_experiments(model)
     reporter = execute_and_analyze_results()
-    reporter.create_report(f"{RESULTS_DIR}/{MODEL}/{'Natural' if NATURALNESS else 'Abbreviated'}/{DATE}")
+    reporter.create_report(f"{RESULTS_DIR}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}")

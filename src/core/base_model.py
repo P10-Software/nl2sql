@@ -27,7 +27,7 @@ class PromptStrategy(ABC):
 
 
 class NL2SQLModel(ABC):
-    def __init__(self, connection, benchmark_set: list, prompt_strategy: PromptStrategy, mschema: bool):
+    def __init__(self, benchmark_set: list, prompt_strategy: PromptStrategy, mschema: bool):
         """
         Init for any NL2SQL model used for benchmarking, uses transformers for all models.
 
@@ -40,7 +40,6 @@ class NL2SQLModel(ABC):
         self.tokenizer = None
         self.model = None
         self.pipe = None
-        self.conn = connection
         self.prompt_strategy = prompt_strategy
         self.results = {}
         self.analysis = None

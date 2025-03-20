@@ -7,8 +7,8 @@ import torch
 MODELS_DIRECTORY_PATH = "models/"
 
 class XiYanSQLModel(NL2SQLModel):
-    def __init__(self, connection, benchmark_set, prompt_strategy, mschema: bool=False):
-        super().__init__(connection, benchmark_set, prompt_strategy, mschema)
+    def __init__(self, benchmark_set, prompt_strategy, mschema: bool=False):
+        super().__init__(benchmark_set, prompt_strategy, mschema)
         self.tokenizer = AutoTokenizer.from_pretrained(join(MODELS_DIRECTORY_PATH, "XiYanSQL"))
         self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "XiYanSQL"), torch_dtype=torch.bfloat16, device_map="auto")
         self.pipe = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer)
@@ -27,8 +27,8 @@ class XiYanSQLModel(NL2SQLModel):
         )[0]['generated_text'])
     
 class DeepSeekQwenModel(NL2SQLModel):
-    def __init__(self, connection, benchmark_set, prompt_strategy, mschema: bool=False):
-        super().__init__(connection, benchmark_set, prompt_strategy, mschema)
+    def __init__(self, benchmark_set, prompt_strategy, mschema: bool=False):
+        super().__init__(benchmark_set, prompt_strategy, mschema)
         self.tokenizer = AutoTokenizer.from_pretrained(join(MODELS_DIRECTORY_PATH, "DeepSeekQwen"))
         self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "DeepSeekQwen"), device_map="auto", torch_dtype=torch.bfloat16)
         self.pipe = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer)
@@ -50,8 +50,8 @@ class DeepSeekQwenModel(NL2SQLModel):
         return re.sub(r'([a-z])([A-Z])', r'\1 \2', query)
     
 class DeepSeekLlamaModel(NL2SQLModel):
-    def __init__(self, connection, benchmark_set, prompt_strategy, mschema: bool=False):
-        super().__init__(connection, benchmark_set, prompt_strategy, mschema)
+    def __init__(self, benchmark_set, prompt_strategy, mschema: bool=False):
+        super().__init__(benchmark_set, prompt_strategy, mschema)
         self.tokenizer = AutoTokenizer.from_pretrained(join(MODELS_DIRECTORY_PATH, "DeepSeekLlama"))
         self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "DeepSeekLlama"), device_map="auto", torch_dtype=torch.bfloat16)
         self.pipe = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer)
@@ -68,8 +68,8 @@ class DeepSeekLlamaModel(NL2SQLModel):
         )[0]['generated_text'])
     
 class LlamaModel(NL2SQLModel):
-    def __init__(self, connection, benchmark_set, prompt_strategy, mschema: bool=False):
-        super().__init__(connection, benchmark_set, prompt_strategy, mschema)
+    def __init__(self, benchmark_set, prompt_strategy, mschema: bool=False):
+        super().__init__(benchmark_set, prompt_strategy, mschema)
         self.tokenizer = AutoTokenizer.from_pretrained(join(MODELS_DIRECTORY_PATH, "Llama"))
         self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "Llama"), device_map="auto", torch_dtype=torch.bfloat16)
         self.pipe = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer)
@@ -90,12 +90,12 @@ class LlamaModel(NL2SQLModel):
         else:
             return super()._prune_generated_query(query) + ";"
 
-class ModelWithAbstentionModule(NL2SQLModel):
-    def __init__(self, connection, benchmark_set, prompt_strategy,  sql_generation_model: NL2SQLModel, pre_sql_abstention: bool, post_sql_abstention: bool, mschema: bool = False):
-        super().__init__(connection, benchmark_set, prompt_strategy, mschema)
-        self.tokenizer = AutoTokenizer.from_pretrained(join(MODELS_DIRECTORY_PATH, "SQLCoder"))
-        self.model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "SQLCoder"), device_map="auto", torch_dtype=torch.float16)
-        self.pipe = pipeline("text-generation", model=self.model, tokenizer=self.tokenizer)
+class ModelWithSQLCoderAbstentionModule(NL2SQLModel):
+    def __init__(self, benchmark_set, prompt_strategy,  sql_generation_model: NL2SQLModel, pre_sql_abstention: bool, post_sql_abstention: bool, mschema: bool = False):
+        super().__init__(benchmark_set, prompt_strategy, mschema)
+        self.abstention_tokenizer = AutoTokenizer.from_pretrained(join(MODELS_DIRECTORY_PATH, "SQLCoder"))
+        self.abstention_model = AutoModelForCausalLM.from_pretrained(join(MODELS_DIRECTORY_PATH, "SQLCoder"), device_map="auto", torch_dtype=torch.float16)
+        self.abstention_pipe = pipeline("text-generation", model=self.abstention_model, tokenizer=self.abstention_tokenizer)
         self.pre_sql_abstention = pre_sql_abstention
         self.post_sql_abstention = post_sql_abstention
         self.sql_generation_model = sql_generation_model
@@ -103,7 +103,7 @@ class ModelWithAbstentionModule(NL2SQLModel):
     def _answer_single_question(self, question, schema):
         if self.pre_sql_abstention:
             pre_abstention_prompt = self.prompt_strategy.get_prompt(schema, question)
-            pre_abstention_answer = self.pipe(
+            pre_abstention_answer = self.abstention_pipe(
                 pre_abstention_prompt,
                 return_full_text=False,
                 pad_token_id=self.tokenizer.pad_token_id,
@@ -120,7 +120,7 @@ class ModelWithAbstentionModule(NL2SQLModel):
 
         if self.post_sql_abstention:
             post_abstention_prompt = self.prompt_strategy.get_prompt(schema, question, sql_answer)
-            post_abstention_answer = self.pipe(
+            post_abstention_answer = self.abstention_pipe(
                 post_abstention_prompt,
                 return_full_text=False,
                 pad_token_id=self.tokenizer.pad_token_id,

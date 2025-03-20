@@ -40,20 +40,20 @@ def get_model():
     match MODEL:
         case "XiYan":
             prompt_strategy = XiYanSQLPromptStrategy(SQL_DIALECT)
-            model = XiYanSQLModel(connection, dataset, prompt_strategy, MSCHEMA)
+            model = XiYanSQLModel(dataset, prompt_strategy, MSCHEMA)
         case "DeepSeekQwen":
             prompt_strategy = DeepSeekPromptStrategy(SQL_DIALECT)
-            model = DeepSeekQwenModel(connection, dataset, prompt_strategy, MSCHEMA)
+            model = DeepSeekQwenModel(dataset, prompt_strategy, MSCHEMA)
         case "Llama":
             prompt_strategy = Llama3PromptStrategy(SQL_DIALECT)
-            model = LlamaModel(connection, dataset, prompt_strategy, MSCHEMA)
+            model = LlamaModel(dataset, prompt_strategy, MSCHEMA)
         case "DeepSeekLlama":
             prompt_strategy = DeepSeekPromptStrategy(SQL_DIALECT)
-            model = DeepSeekLlamaModel(connection, dataset, prompt_strategy, MSCHEMA)
+            model = DeepSeekLlamaModel(dataset, prompt_strategy, MSCHEMA)
 
     if PRE_ABSTENTION or POST_ABSTENTION:
         abstention_prompt_strategy =  SQLCoderAbstentionPromptStrategy(SQL_DIALECT)
-        model = ModelWithAbstentionModule(connection, dataset, abstention_prompt_strategy, model, PRE_ABSTENTION, POST_ABSTENTION, MSCHEMA)
+        model = ModelWithAbstentionModule(dataset, abstention_prompt_strategy, model, PRE_ABSTENTION, POST_ABSTENTION, MSCHEMA)
 
     return model    
 

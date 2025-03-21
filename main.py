@@ -16,6 +16,7 @@ SQL_DIALECT = os.getenv('SQL_DIALECT')
 SCHEMA_SIZES = ["Full", "Tables", "Columns"]
 DATASET_PATH = os.getenv('DATASET_PATH')
 RESULTS_DIR = os.getenv('RESULTS_DIR')
+DB_NAME = os.getenv('DB_NAME')
 DB_NATURAL = int(os.getenv('DB_NATURAL'))
 MODEL = os.getenv('MODEL')
 PRE_ABSTENTION = int(os.getenv('PRE_ABSTENTION'))
@@ -61,14 +62,14 @@ def run_experiments(model: NL2SQLModel):
     for schema_size in SCHEMA_SIZES:
         model.run(schema_size, naturalness=DB_NATURAL)
         file_name = f"{MODEL}{schema_size}{'Natural' if DB_NATURAL else 'Abbreviated'}{'MSchema' if MSCHEMA else ''}{'PreAbstention' if PRE_ABSTENTION else ''}{'PostAbstention' if POST_ABSTENTION else ''}.json"
-        save_results(f"{RESULTS_DIR}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/{file_name}", model)
+        save_results(f"{RESULTS_DIR}/{DB_NAME}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/{file_name}", model)
         model.results = {}
 
 def execute_and_analyze_results():
     reporter = Reporter()
 
-    for result_file_name in os.listdir(f"{RESULTS_DIR}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/"):
-        path = f"{RESULTS_DIR}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/{result_file_name}"
+    for result_file_name in os.listdir(f"{RESULTS_DIR}/{DB_NAME}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/"):
+        path = f"{RESULTS_DIR}/{DB_NAME}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/{result_file_name}"
 
         if result_file_name == "report.html": continue
         
@@ -100,4 +101,4 @@ if __name__ == "__main__":
     model = get_model()
     run_experiments(model)
     reporter = execute_and_analyze_results()
-    reporter.create_report(f"{RESULTS_DIR}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}")
+    reporter.create_report(f"{RESULTS_DIR}/{DB_NAME}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}")

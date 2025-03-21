@@ -79,7 +79,7 @@ def execute_and_analyze_results():
         logger.info(f"Running results of database for {path}.")
         for res in results.values():
             if res['golden_query']:
-                if DB_NATURAL == "Normalized":
+                if DB_NATURAL == "Natural":
                     res['golden_query'] = translate_query_to_natural(res['golden_query'])
 
                 res['golden_result'] = execute_query(res['golden_query'])

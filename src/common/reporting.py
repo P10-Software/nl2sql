@@ -367,7 +367,7 @@ class Reporter:
             html_content += generate_details_row(
                 f"{model_name}-sql_mismatches", "SQL Mismatch Breakdown",
                 ["NL Question", "Golden Query", "Generated Query", "Missing Tables", "Extra Tables",
-                    "Missing Columns", "Extra Columns", "Clause Errors", "Distinct Mismatch", "Generated Not Query", "Abstention Mismatch"],
+                    "Missing Columns", "Extra Columns", "Clause Errors", "Distinct Mismatch", "Execution Failed", "Abstention Mismatch"],
                 sql_mismatch_data
             )
 

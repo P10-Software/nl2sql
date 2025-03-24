@@ -16,9 +16,7 @@ TASK = 'text-generation'
 MAX_NEW_TOKENS = 200
 
 DB_NAME = os.getenv('DB_NAME')
-DB_PATH_ABBREVIATED = os.getenv('DB_PATH_ABBREVIATED')
-DB_PATH_NATURAL = os.getenv('DB_PATH_NATURAL')
-DB_NATURAL = int(os.getenv('DB_NATURAL', 0))
+DB_NATURAL = bool(os.getenv('DB_NATURAL', 0))
 
 class PromptStrategy(ABC):
     @abstractmethod

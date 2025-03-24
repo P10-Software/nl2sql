@@ -7,7 +7,7 @@ load_dotenv()
 
 DB_NAME = os.getenv('DB_NAME')
 DB_PATH = os.getenv('DB_PATH')
-DB_NATURAL = int(os.getenv('DB_NATURAL', 0))
+DB_NATURAL = bool(os.getenv('DB_NATURAL', 0))
 
 def generate_mschema():
     """

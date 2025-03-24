@@ -2,15 +2,13 @@ import os
 import sqlite3
 import pyreadstat
 import pandas as pd
-from dotenv import load_dotenv
 from tqdm import tqdm
 from src.common.logger import get_logger
 
-load_dotenv()
 logger = get_logger(__name__)
 
-DB_PATH_ABBREVIATED = os.getenv('DB_PATH_ABBREVIATED')
-DB_PATH_NATURAL = os.getenv('DB_PATH_NATURAL')
+DB_PATH_ABBREVIATED = ".local/trial_metadata.sqlite"
+DB_PATH_NATURAL = ".local/trial_metadata_natural.sqlite"
 
 
 def init_db(data_directory: str):

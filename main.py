@@ -13,16 +13,17 @@ logger = get_logger(__name__)
 load_dotenv()
 
 SQL_DIALECT = os.getenv('SQL_DIALECT')
-SCHEMA_SIZES = ["Full", "Tables", "Columns"]
 DATASET_PATH = os.getenv('DATASET_PATH')
 RESULTS_DIR = os.getenv('RESULTS_DIR')
-DB_NATURAL = int(os.getenv('DB_NATURAL'))
+DB_NAME = os.getenv('DB_NAME')
 MODEL = os.getenv('MODEL')
-PRE_ABSTENTION = int(os.getenv('PRE_ABSTENTION'))
-POST_ABSTENTION = int(os.getenv('POST_ABSTENTION'))
-MSCHEMA = int(os.getenv('MSCHEMA'))
+DB_NATURAL = bool(os.getenv('DB_NATURAL', 0))
+PRE_ABSTENTION = bool(os.getenv('PRE_ABSTENTION', 0))
+POST_ABSTENTION = bool(os.getenv('POST_ABSTENTION', 0))
+MSCHEMA = bool(os.getenv('MSCHEMA', 1))
 DATE = date.today()
 
+SCHEMA_SIZES = ["Full", "Tables", "Columns"]
 
 def load_dataset(dataset_path: str):
     with open(dataset_path, "r") as file:
@@ -65,15 +66,15 @@ def run_experiments(model: NL2SQLModel):
     for schema_size in SCHEMA_SIZES:
         model.run(schema_size, naturalness=DB_NATURAL)
         file_name = f"{MODEL}{schema_size}{'Natural' if DB_NATURAL else 'Abbreviated'}{'MSchema' if MSCHEMA else ''}{'PreAbstention' if PRE_ABSTENTION else ''}{'PostAbstention' if POST_ABSTENTION else ''}.json"
-        save_results(f"{RESULTS_DIR}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/{file_name}", model)
+        save_results(f"{RESULTS_DIR}/{DB_NAME}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/{file_name}", model)
         model.results = {}
 
 
 def execute_and_analyze_results():
     reporter = Reporter()
 
-    for result_file_name in os.listdir(f"{RESULTS_DIR}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/"):
-        path = f"{RESULTS_DIR}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/{result_file_name}"
+    for result_file_name in os.listdir(f"{RESULTS_DIR}/{DB_NAME}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/"):
+        path = f"{RESULTS_DIR}/{DB_NAME}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/{result_file_name}"
 
         if result_file_name == "report.html":
             continue
@@ -84,7 +85,7 @@ def execute_and_analyze_results():
         logger.info(f"Running results of database for {path}.")
         for res in results.values():
             if res['golden_query']:
-                if DB_NATURAL == "Normalized":
+                if DB_NATURAL == "Natural":
                     res['golden_query'] = translate_query_to_natural(res['golden_query'])
 
                 res['golden_result'] = execute_query(res['golden_query'])
@@ -109,4 +110,4 @@ if __name__ == "__main__":
     model = get_model()
     run_experiments(model)
     reporter = execute_and_analyze_results()
-    reporter.create_report(f"{RESULTS_DIR}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}")
+    reporter.create_report(f"{RESULTS_DIR}/{DB_NAME}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}")

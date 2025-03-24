@@ -47,6 +47,38 @@ def get_conn() -> sqlite3.Connection:
     return conn
 
 
+def verify_database(conn: sqlite3.Connection) -> bool:
+    """
+    Verifies that the database has content.
+    """
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
+        tables = cursor.fetchall()
+
+        if not tables:
+            logger.error("No tables found in the database. Please check database name and setup. Quitting...")
+            return False
+
+        non_empty_tables = 0
+
+        for table in tables:
+            cursor.execute(f"SELECT 1 FROM {table[0]} LIMIT 1;")
+            if cursor.fetchone():
+                non_empty_tables += 1
+
+        if non_empty_tables != 0:
+            logger.info(f"Found data in {non_empty_tables} out of {len(tables)}.")
+            return True
+
+        logger.error(f"{len(tables)} tables found, but all were empty.")
+        return False
+    except sqlite3.Error as e:
+        logger.error(f"SQLite error {e}")
+        return False
+
+
 def _check_connection(conn: sqlite3.Connection) -> None:
     try:
         conn.execute("PRAGMA database_list")

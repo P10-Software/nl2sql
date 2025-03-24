@@ -1,16 +1,13 @@
 import os
-import psycopg2
+import sqlite3
 from dotenv import load_dotenv
 from src.common.logger import get_logger
 
 load_dotenv()
 logger = get_logger(__name__)
 
-USER = os.getenv('PG_USER')
-PASSWORD = os.getenv('PG_PASSWORD')
-HOST = os.getenv('PG_HOST')
-PORT = os.getenv('PG_PORT')
 DB_NAME = os.getenv('DB_NAME')
+DB_PATH = os.getenv('DB_PATH')
 
 
 def execute_query(query: str):
@@ -26,11 +23,10 @@ def execute_query(query: str):
 
     result = []
     conn = get_conn()
+    cur = conn.cursor()
+
     if conn:
         try:
-            # conn.autocommit = True
-            cur = conn.cursor()
-
             cur.execute(query)
             result = cur.fetchall()
         except Exception as e:
@@ -38,18 +34,21 @@ def execute_query(query: str):
         finally:
             cur.close()
             conn.close()
-
     return result
 
-def get_conn():
+
+def get_conn() -> sqlite3.Connection:
     """
     Creates and returns the connection to the database
     """
-    conn = None
-
-    try:
-        conn = psycopg2.connect(dbname=DB_NAME, user=USER, password=PASSWORD, host=HOST, port=PORT)
-    except Exception as e:
-        logger.error(f"Error connecting to database {DB_NAME}: {e}")
+    conn = sqlite3.connect(f'{DB_PATH}')
+    _check_connection(conn)
 
     return conn
+
+
+def _check_connection(conn: sqlite3.Connection) -> None:
+    try:
+        conn.execute("PRAGMA database_list")
+    except Exception as e:
+        logger.error(f"Error connecting to database {DB_NAME}: {e}")

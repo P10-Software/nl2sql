@@ -34,11 +34,9 @@ def in_memory_db():
     ('Tables', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL,\n    pln_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);"),
     ('Full', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL,\n    pln_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);\n\nCREATE TABLE nu_pln (nu_id TEXT NOT NULL);")
 ])
-@patch('src.core.extract_instructions.get_conn')
 @patch('src.core.extract_instructions._create_build_instruction_tree')
-def test_get_query_build_instructions(mock_build_tree, mock_get_conn, in_memory_db, kind, expected):
+def test_get_query_build_instructions(mock_build_tree, kind, expected):
     # Arrange
-    mock_get_conn.return_value = in_memory_db
     mock_build_tree.return_value = {
         'tab_pln': {
             'create_table': 'CREATE TABLE tab_pln ({columns});',
@@ -70,11 +68,9 @@ def test_get_query_build_instructions(mock_build_tree, mock_get_conn, in_memory_
     ('Full', {'table_plan': ['plan_id', 'plan_name', 'created_at'], 'nu_plan': ['nu_id']}, "CREATE TABLE table_plan (plan_id TEXT NOT NULL,\n    plan_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);\n\nCREATE TABLE nu_plan (nu_id TEXT NOT NULL);")
 ])
 @patch("src.core.extract_instructions._transform_natural_query")
-@patch('src.core.extract_instructions.get_conn')
 @patch('src.core.extract_instructions._create_build_instruction_tree')
-def test_get_query_build_instructions_naturalised(mock_build_tree, mock_get_conn, mock_transform_natural_query, in_memory_db, kind, translated_column_table, expected):
+def test_get_query_build_instructions_naturalised(mock_build_tree, mock_transform_natural_query, kind, translated_column_table, expected):
     # Arrange
-    mock_get_conn.return_value = in_memory_db
     mock_build_tree.return_value = {
         'table_plan': {
             'create_table': 'CREATE TABLE table_plan ({columns});',
@@ -98,8 +94,6 @@ def test_get_query_build_instructions_naturalised(mock_build_tree, mock_get_conn
 
     # Act
     result = get_query_build_instruct(kind, query, True)
-
-    print("TEST: ", result)
 
     # Assert
     assert result.strip() == expected.strip()

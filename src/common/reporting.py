@@ -36,32 +36,27 @@ class Reporter:
                           for res in result.values()]
         generated_results = [res['generated_result']
                              for res in result.values()]
+        nl_questions = [res['question']for res in result.values()]
 
         golden_sql = [res['golden_query'] for res in result.values()]
         generated_sql = [res['generated_query']
                          for res in result.values()]
 
-        golden_columns = [self._extract_columns(
-            sql_metadata.Parser(sql), True) for sql in golden_sql]
-        try:
-            generated_columns = [self._extract_columns(
-                sql_metadata.Parser(sql), True) for sql in generated_sql]
-        except:
-            generated_columns = []
-            logger.error("Generated is not a query")
+        sql_errors = self._analyse_sql(golden_sql, generated_sql, nl_questions)
 
-        sql_errors = self._analyse_sql(golden_sql, generated_sql)
+        precision_score = precision(golden_results, generated_results)
+        recall_score = recall(golden_results, generated_results)
 
         self.analysis.append((name, {
             'execution accuracy': execution_accuracy(golden_results, generated_results),
-            'precision': precision(list(zip(golden_results, golden_columns)), list(zip(generated_results, generated_columns))),
-            'recall': recall(list(zip(golden_results, golden_columns)), list(zip(generated_results, generated_columns))),
-            'f1 score': f1_score(list(zip(golden_results, golden_columns)), list(zip(generated_results, generated_columns))),
+            'precision': precision_score,
+            'recall': recall_score,
+            'f1 score': f1_score(precision_score, recall_score),
             'SQL mismatches': sql_errors,
             'total sql queries': len(generated_sql)
         }))
 
-    def _analyse_sql(self, golden_sql_list, generated_sql_list):
+    def _analyse_sql(self, golden_sql_list, generated_sql_list, nl_question_list):
         """
         Finds and aggregated the error clauses for all SQL, comparing two lists of generated and gold sql queries.
         """
@@ -70,11 +65,12 @@ class Reporter:
             "column_errors": 0,
             "clause_errors": 0,
             "distinct_errors": 0,
-            "not_query_errors": 0
+            "not_query_errors": 0,
+            "abstention_errors": 0
         })
         individual_errors = []
 
-        for golden_sql, generated_sql in zip(golden_sql_list, generated_sql_list):
+        for golden_sql, generated_sql, nl_question in zip(golden_sql_list, generated_sql_list, nl_question_list):
             mismatches = self._extract_sql_mismatches(golden_sql, generated_sql)
 
             # Count table mismatches
@@ -95,7 +91,11 @@ class Reporter:
             if mismatches['not_query']:
                 error_counts['not_query_errors'] += 1
 
+            if mismatches['abstention']:
+                error_counts['abstention_errors'] += 1
+
             individual_errors.append({
+                'nl_question': nl_question,
                 'generated_sql': generated_sql,
                 'golden_sql': golden_sql,
                 'errors': mismatches
@@ -107,6 +107,16 @@ class Reporter:
         }
 
     def _extract_sql_mismatches(self, golden_sql, generated_sql):
+        if golden_sql is None or generated_sql is None:
+            return {
+                'tables': {'golden': [], 'generated': []},
+                'columns': {'golden': [], 'generated': []},
+                'clauses': {},
+                'distinct': {'golden': False, 'generated': False},
+                'not_query': False,
+                'abstention': False if golden_sql is generated_sql else True
+            }
+
         golden_parser = sql_metadata.Parser(golden_sql)
         generated_parser = sql_metadata.Parser(generated_sql)
         try:
@@ -115,7 +125,8 @@ class Reporter:
                 'columns': {'golden': [], 'generated': []},
                 'clauses': {},
                 'distinct': {'golden': self._has_dictinct(golden_parser), 'generated': self._has_dictinct(generated_parser)},
-                "not_query": False
+                'not_query': False,
+                'abstention': False
             }
 
             golden_tables = set(golden_parser.tables) if golden_parser.tables else set()
@@ -150,16 +161,15 @@ class Reporter:
 
             return mismatches
 
-        except:
+        except Exception:
             return {
                 'tables': {'golden': [], 'generated': []},
                 'columns': {'golden': [], 'generated': []},
                 'clauses': {},
                 'distinct': {'golden': False, 'generated': False},
-                'not_query': True
+                'not_query': True,
+                'abstention': False
             }
-    
-
 
     def _extract_clauses(self, parser):
         clauses = {'WHERE': [], 'JOIN': [], 'GROUPBY': [], 'ORDERBY': []}
@@ -211,7 +221,8 @@ class Reporter:
                                 column_names.append(next_token.value)
                             next_token = next_token.next_token
                             if next_token is not None and next_token.normalized == 'FROM':
-                                columns.extend([(next_token.next_token.value + '.' + s if '.' not in s else s) for s in column_names])
+                                columns.extend(
+                                    [(next_token.next_token.value + '.' + s if '.' not in s else s) for s in column_names])
                                 break
                 return columns
         else:
@@ -330,6 +341,7 @@ class Reporter:
             # Generate SQL mismatches
             sql_mismatch_data = [
                 (
+                    entry.get('nl_question', 'N/A'),
                     entry.get('golden_sql', 'N/A'),
                     entry.get('generated_sql', 'N/A'),
                     ', '.join(entry.get('errors', {}).get(
@@ -344,17 +356,18 @@ class Reporter:
                         f"{clause}:{errors.get('generated', 'N/A')}"
                         for clause, errors in entry.get('errors', {}).get('clauses', {}).items()
                     ) or '✅',
-                    'Mismatch' if entry.get('errors', {}).get('distinct', {}).get('golden', False) != entry.get(
+                    '❌' if entry.get('errors', {}).get('distinct', {}).get('golden', False) != entry.get(
                         'errors', {}).get('distinct', {}).get('generated', False) else '✅',
-                    'Generated is not a query' if entry.get('errors', {}).get('not_query') else '✅'
+                    '❌' if entry.get('errors', {}).get('not_query') else '✅',
+                    '❌' if entry.get('errors', {}).get('abstention') else '✅'
                 )
                 for entry in a['SQL mismatches'].get('individual_errors', [])
             ]
 
             html_content += generate_details_row(
                 f"{model_name}-sql_mismatches", "SQL Mismatch Breakdown",
-                ["golden Query", "Generated Query", "Missing Tables", "Extra Tables",
-                    "Missing Columns", "Extra Columns", "Clause Errors", "Distinct Mismatch", "Generated Not Query"],
+                ["NL Question", "Golden Query", "Generated Query", "Missing Tables", "Extra Tables",
+                    "Missing Columns", "Extra Columns", "Clause Errors", "Distinct Mismatch", "Generated Not Query", "Abstention Mismatch"],
                 sql_mismatch_data
             )
 

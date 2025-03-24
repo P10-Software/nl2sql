@@ -26,6 +26,7 @@ def get_query_build_instruct(kind: SchemaKind, query: str, natural_names: bool) 
 
     if query is None or '':
         kind = 'Full'
+        query = ''
 
     selected_tables_columns = _extract_column_table(query)
 

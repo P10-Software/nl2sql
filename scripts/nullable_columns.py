@@ -1,8 +1,8 @@
 import sqlite3
 import pandas as pd
 
-DB_PATH_ABBREVIATED = ".local/trial_metadata.db"
-DB_PATH_NATURAL = ".local/trial_metadata_natural.db"
+DB_PATH_ABBREVIATED = ".local/trial_metadata.sqlite"
+DB_PATH_NATURAL = ".local/trial_metadata_natural.sqlite"
 
 def find_nullable_columns(db_path, nullable_columns):
     """

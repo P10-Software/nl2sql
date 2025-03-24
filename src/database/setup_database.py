@@ -7,8 +7,8 @@ from src.common.logger import get_logger
 
 logger = get_logger(__name__)
 
-DB_PATH_ABBREVIATED = ".local/trial_metadata.db"
-DB_PATH_NATURAL = ".local/trial_metadata_natural.db"
+DB_PATH_ABBREVIATED = ".local/trial_metadata.sqlite"
+DB_PATH_NATURAL = ".local/trial_metadata_natural.sqlite"
 
 
 def init_db(data_directory: str):

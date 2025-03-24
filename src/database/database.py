@@ -64,7 +64,7 @@ def verify_database(conn: sqlite3.Connection) -> bool:
         non_empty_tables = 0
 
         for table in tables:
-            cursor.execute(f"SELECT 1 FROM {table} LIMIT 1;")
+            cursor.execute(f"SELECT 1 FROM {table[0]} LIMIT 1;")
             if cursor.fetchone():
                 non_empty_tables += 1
 

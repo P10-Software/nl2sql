@@ -13,16 +13,17 @@ logger = get_logger(__name__)
 load_dotenv()
 
 SQL_DIALECT = os.getenv('SQL_DIALECT')
-SCHEMA_SIZES = ["Full", "Tables", "Columns"]
 DATASET_PATH = os.getenv('DATASET_PATH')
 RESULTS_DIR = os.getenv('RESULTS_DIR')
 DB_NAME = os.getenv('DB_NAME')
-DB_NATURAL = int(os.getenv('DB_NATURAL'))
 MODEL = os.getenv('MODEL')
-PRE_ABSTENTION = int(os.getenv('PRE_ABSTENTION'))
-POST_ABSTENTION = int(os.getenv('POST_ABSTENTION'))
-MSCHEMA = int(os.getenv('MSCHEMA'))
+DB_NATURAL = bool(os.getenv('DB_NATURAL', 0))
+PRE_ABSTENTION = bool(os.getenv('PRE_ABSTENTION', 0))
+POST_ABSTENTION = bool(os.getenv('POST_ABSTENTION', 0))
+MSCHEMA = bool(os.getenv('MSCHEMA', 1))
 DATE = date.today()
+
+SCHEMA_SIZES = ["Full", "Tables", "Columns"]
 
 def load_dataset(dataset_path: str):
     with open(dataset_path, "r") as file:

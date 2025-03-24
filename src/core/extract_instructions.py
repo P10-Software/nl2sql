@@ -23,6 +23,10 @@ def get_query_build_instruct(kind: SchemaKind, query: str, natural_names: bool) 
     Returns:
     - SQL build instructions (sql): SQL instructions specifying how to build the DB.
     """
+
+    if query is None or '':
+        kind = 'Full'
+
     selected_tables_columns = _extract_column_table(query)
 
     if natural_names:
@@ -71,7 +75,7 @@ def _transform_natural_query(selected_tables_columns: dict[str, list[str]]) -> d
     table_names = table_names.map(column_name_format)
     column_names = column_names.map(column_name_format)
     selected_tables_columns = {
-        table: [column_name_format(col) for col in columns ]
+        table: [column_name_format(col) for col in columns]
         for table, columns in selected_tables_columns.items()
     }
 

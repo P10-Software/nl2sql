@@ -30,7 +30,7 @@ def init_db(data_directory: str):
             _read_sas(sas_file)
 
 
-def init_normalised_db(data_directory: str, table_name_file: str) -> None:
+def init_natural_db(data_directory: str, table_name_file: str) -> None:
     """
     Inits the database with non abbreviated table and column names, based on the raw SAS DB, 
     recursively adds all sas7bdat files as tables.
@@ -50,7 +50,7 @@ def init_normalised_db(data_directory: str, table_name_file: str) -> None:
     logger.info("Inserting data from all_trial_metadata and GCMD with natural language.")
     for _, files in sas_files.items():
         for sas_file in tqdm(files):
-            _read_sas_normalised(sas_file, table_names)
+            _read_sas_natural(sas_file, table_names)
 
 
 def _find_sas_files(directory_path: str):
@@ -66,7 +66,7 @@ def _find_sas_files(directory_path: str):
     return sas_files
 
 
-def _read_sas_normalised(path_to_sas, new_table_names) -> None:
+def _read_sas_natural(path_to_sas, new_table_names) -> None:
     table_name = os.path.splitext(os.path.basename(path_to_sas))[0]
 
     # Substitute abbreviated table name with normaised table name
@@ -143,6 +143,6 @@ def _delete_db(db_path: str):
 if __name__ == '__main__':
     try:
         init_db(".local/NOVO_SAS_DATA")
-        init_normalised_db(".local/NOVO_SAS_DATA", ".local/table_names_normalised.csv")
+        init_natural_db(".local/NOVO_SAS_DATA", ".local/table_names_natural.csv")
     except Exception as e:
         logger.error("Failed to setup SQLite databases: %s", e)

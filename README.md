@@ -15,11 +15,11 @@ Here is the manual steps to create database files, this can be used instead of
 downloading from teams or to update if changes are needed
 
 ### Setup the databases
-Run the following script to set up the normal and abbreviated databases.
+Run the following script to set up the natural and abbreviated databases.
 Make sure to have the the following data in your .local before running:
 - Folder with SAS database files.
-- column_names_normalised.csv
-- tables_names_normalised.csv
+- column_names_natural.csv
+- tables_names_natural.csv
 ```
 python -m src.database.setup_database
 ```

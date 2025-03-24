@@ -64,8 +64,8 @@ def _extract_column_table(query: str) -> dict[str, list[str]]:
 
 def _transform_natural_query(selected_tables_columns: dict[str, list[str]]) -> dict[str, list[str]]:
     """ Transform tables and column names in query to be more natural. """
-    table_names = pd.read_csv(".local/table_names_normalised.csv", header=None, names=["old_name", "new_name"])
-    column_names = pd.read_csv(".local/column_names_normalised.csv", header=None, names=["old_name", "new_name", "table_name"])
+    table_names = pd.read_csv(".local/table_names_natural.csv", header=None, names=["old_name", "new_name"])
+    column_names = pd.read_csv(".local/column_names_natural.csv", header=None, names=["old_name", "new_name", "table_name"])
 
     # Ensure that query table and column names adhere to naming conventions.
     table_names = table_names.map(column_name_format)

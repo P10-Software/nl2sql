@@ -172,10 +172,16 @@ def test_recall(golden, generated, result):
         [[(1, 'Alice'), (2, 'Bob')]],
         [[(1, 'Alice', 'Alice'), (2, 'Bob', 'Bob')]],
         {'total_f1': 0.8, 'individual_f1s': {0: 0.8}}
+    ),
+    # 9. Abstention
+    (
+        [None, [(1, 'Alice')], None],
+        [None, None, [(1, 'Alice')]],
+        {'total_f1': 0.33, 'individual_f1s': {0: 1, 1: 0, 2: 0}}
     )
 ], ids=[
     'full match', 'generated one diff', 'generated full diff', 'empty generated',
-    'some missing some extra', 'duplicate predictions', 'duplicate columns'
+    'some missing some extra', 'duplicate predictions', 'duplicate columns', 'abstention'
 ])
 def test_f1_score(golden, generated, result):
     # Arrange
@@ -249,10 +255,16 @@ def test_f1_score(golden, generated, result):
         [[], [(1, 'Bob'), (2, 'Alice'), (3, 'Alice')]],
         {'total_execution_accuracy': 0.0, 'individual_execution_accuracy': {0: 0.0, 1: 0.0}}
     ),
+    # 11. A question with results, a question with abstention mismatch
+    (
+        [[(1, 'Alice'), (2, 'Bob')], [(1, 'Bob'), (2, 'Alice')]],
+        [[(1, 'Alice'), (2, 'Bob')], None],
+        {'total_execution_accuracy': 0.5, 'individual_execution_accuracy': {0: 1, 1: 0.0}}
+    ),
 ], ids=[
     'full match', 'generated one diff', 'generated full diff', 'empty generated', 'empty gold',
     'some missing some extra', 'duplicate predictions', 'multiple', 'match and no match', 
-    'multiple no match'
+    'multiple no match', 'abstention and sql match'
 ])
 def test_execution_accuracy_score(golden, generated, expected_result):
     # Arrange + Act

@@ -1,15 +1,8 @@
-import os
 import sqlite3
 import pandas as pd
-from dotenv import load_dotenv
 
-load_dotenv()
-
-DB_NAME = os.getenv('DB_NAME')
-DB_PATH_ABBREVIATED = os.getenv('DB_PATH_ABBREVIATED')
-DB_PATH_NATURAL = os.getenv('DB_PATH_NATURAL')
-DB_NATURAL = int(os.getenv('DB_NATURAL', 0))
-
+DB_PATH_ABBREVIATED = ".local/trial_metadata.sqlite"
+DB_PATH_NATURAL = ".local/trial_metadata_natural.sqlite"
 
 def find_nullable_columns(db_path, nullable_columns):
     """
@@ -45,7 +38,7 @@ def find_nullable_columns(db_path, nullable_columns):
 def save_nullable_columns(nullable_columns):
     """
     Save all nullable columns in in a CSV format.
-    It contains columns for both normalized and abbreviated database.
+    It contains columns for both natural and abbreviated database.
     """
     df = pd.DataFrame(nullable_columns)
     df.columns = ['columns']

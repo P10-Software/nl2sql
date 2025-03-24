@@ -1,8 +1,8 @@
-from src.core.base_model import NL2SQLModel
-from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 from os.path import join
 import re
 import torch
+from src.core.base_model import NL2SQLModel
+from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 
 MODELS_DIRECTORY_PATH = "models/"
 
@@ -16,7 +16,7 @@ class XiYanSQLModel(NL2SQLModel):
     def _answer_single_question(self, question, schema):
         prompt = self.prompt_strategy.get_prompt(schema, question)
         return self._prune_generated_query(self.pipe(
-            prompt, 
+            prompt,
             return_full_text=False,
             pad_token_id=self.tokenizer.pad_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
@@ -25,7 +25,7 @@ class XiYanSQLModel(NL2SQLModel):
             top_p=0.8,
             do_sample=True
         )[0]['generated_text'])
-    
+
 class DeepSeekQwenModel(NL2SQLModel):
     def __init__(self, benchmark_set, prompt_strategy, mschema: bool=False):
         super().__init__(benchmark_set, prompt_strategy, mschema)
@@ -36,19 +36,19 @@ class DeepSeekQwenModel(NL2SQLModel):
     def _answer_single_question(self, question, schema):
         prompt = self.prompt_strategy.get_prompt(schema, question)
         return self._prune_generated_query(self.pipe(
-            prompt, 
+            prompt,
             return_full_text=False,
             max_new_tokens=1024,
             pad_token_id=self.tokenizer.pad_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
             temperature=0.6
         )[0]['generated_text'])
-    
+
     def _prune_generated_query(self, query):
         query = super()._prune_generated_query(query)
         query = re.sub(r".*SELECT", "SELECT", query, flags=re.IGNORECASE)
         return re.sub(r'([a-z])([A-Z])', r'\1 \2', query)
-    
+
 class DeepSeekLlamaModel(NL2SQLModel):
     def __init__(self, benchmark_set, prompt_strategy, mschema: bool=False):
         super().__init__(benchmark_set, prompt_strategy, mschema)
@@ -59,14 +59,14 @@ class DeepSeekLlamaModel(NL2SQLModel):
     def _answer_single_question(self, question, schema):
         prompt = self.prompt_strategy.get_prompt(schema, question)
         return self._prune_generated_query(self.pipe(
-            prompt, 
+            prompt,
             return_full_text=False,
             max_new_tokens=1024,
             pad_token_id=self.tokenizer.pad_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
             temperature=0.6
         )[0]['generated_text'])
-    
+
 class LlamaModel(NL2SQLModel):
     def __init__(self, benchmark_set, prompt_strategy, mschema: bool=False):
         super().__init__(benchmark_set, prompt_strategy, mschema)
@@ -77,13 +77,13 @@ class LlamaModel(NL2SQLModel):
     def _answer_single_question(self, question, schema):
         prompt = self.prompt_strategy.get_prompt(schema, question)
         return self._prune_generated_query(self.pipe(
-            prompt, 
+            prompt,
             return_full_text=False,
             pad_token_id=self.tokenizer.pad_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
             max_new_tokens=1024,
         )[0]['generated_text'])
-    
+
     def _prune_generated_query(self, query: str):
         if ';' in query:
             return super()._prune_generated_query(query)
@@ -110,7 +110,7 @@ class ModelWithSQLCoderAbstentionModule(NL2SQLModel):
                 eos_token_id=self.tokenizer.eos_token_id,
                 max_new_tokens=1024,
                 do_sample=False,
-                num_beams=4     
+                num_beams=4
             )
 
             if "I do not know" in pre_abstention_answer:
@@ -127,10 +127,10 @@ class ModelWithSQLCoderAbstentionModule(NL2SQLModel):
                 eos_token_id=self.tokenizer.eos_token_id,
                 max_new_tokens=1024,
                 do_sample=False,
-                num_beams=4         
+                num_beams=4
             )
 
             if "incorrect" in post_abstention_answer:
                 return None
-            
+
         return sql_answer

@@ -16,9 +16,7 @@ TASK = 'text-generation'
 MAX_NEW_TOKENS = 200
 
 DB_NAME = os.getenv('DB_NAME')
-DB_PATH_ABBREVIATED = os.getenv('DB_PATH_ABBREVIATED')
-DB_PATH_NATURAL = os.getenv('DB_PATH_NATURAL')
-DB_NATURAL = int(os.getenv('DB_NATURAL', 0))
+DB_NATURAL = bool(int(os.getenv('DB_NATURAL', 0)))
 
 class PromptStrategy(ABC):
     @abstractmethod
@@ -93,11 +91,11 @@ def translate_query_to_natural(query: str) -> str:
     columns = parser.columns
 
     # Load natural column and table names:
-    table_names_natural = pd.read_csv(".local/table_names_normalised.csv", header=None, names=["old_name", "new_name"])
-    column_names_natural = pd.read_csv(".local/column_names_normalised.csv", header=None, names=["old_name", "new_name", "table_name"])
+    table_names_natural = pd.read_csv(".local/table_names_natural.csv", header=None, names=["old_name", "new_name"])
+    column_names_natural = pd.read_csv(".local/column_names_natural.csv", header=None, names=["old_name", "new_name", "table_name"])
 
     table_name_mapping = dict(zip(table_names_natural['old_name'], table_names_natural['new_name']))
-    column_name_mapping = { 
+    column_name_mapping = {
         (row['old_name'], row['table_name']): row['new_name']
         for _, row in column_names_natural.iterrows()
     }

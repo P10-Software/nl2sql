@@ -1,6 +1,7 @@
 from transformers import AutoTokenizer, AutoModel
 from os.path import join
 import torch
+import torch.nn.functional as F
 
 MODELS_DIRECTORY_PATH = "models/"
 PATH = join(MODELS_DIRECTORY_PATH, "XiYanSQL")
@@ -43,7 +44,7 @@ columns = [
 formatted_input = schema + "\n\n" + query + "\n\n" + " ".join(columns)
 
 # Tokenize input
-inputs = tokenizer(formatted_input, return_tensors="pt", truncation=True, padding=True)
+inputs = tokenizer(formatted_input, return_tensors="pt", truncation=True, padding=True).to("cuda")
 
 with torch.no_grad():
     outputs = model(**inputs)
@@ -52,8 +53,8 @@ hidden_states = outputs.last_hidden_state  # Shape: (batch_size, seq_len, hidden
 
 # Identify positions of `«` and `»`
 input_tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
-alpha_positions = [i for i, token in enumerate(input_tokens) if token == "«"]
-omega_positions = [i for i, token in enumerate(input_tokens) if token == "»"]
+alpha_positions = [i for i, token in enumerate(input_tokens) if token == "ĠÂ«" or token == "Â«"]
+omega_positions = [i for i, token in enumerate(input_tokens) if token == "ĠÂ»"]
 
 # Extract corresponding embeddings
 alpha_embeddings = hidden_states[0, alpha_positions, :]  # (num_columns, hidden_dim)
@@ -61,12 +62,14 @@ omega_embeddings = hidden_states[0, omega_positions, :]  # (num_columns, hidden_
 
 # Concatenate the embeddings
 column_embeddings = torch.cat([alpha_embeddings, omega_embeddings], dim=-1)  # (num_columns, 2*hidden_dim)
+print(column_embeddings)
 
-relevance_layer = torch.nn.Linear(column_embeddings.shape[1], 1)  # Output 1 score per column
-relevance_scores = relevance_layer(column_embeddings.to(torch.float32)).squeeze(-1)  # Shape: (num_columns,)
+#relevance_layer = torch.nn.Linear(column_embeddings.shape[1], 1).to("cuda")  # Output 1 score per column
+#relevance_scores = relevance_layer(column_embeddings.to(torch.float32)).squeeze(-1)  # Shape: (num_columns,)
+cosine_similarities = F.cosine_similarity(alpha_embeddings, omega_embeddings, dim=-1)  # (num_columns,)
 
 # Apply sigmoid to get probabilities
-relevance_probs = torch.sigmoid(relevance_scores)
+relevance_probs = torch.sigmoid(cosine_similarities)
 
 # Print relevance scores for each column
 for col, score in zip(columns, relevance_probs.tolist()):

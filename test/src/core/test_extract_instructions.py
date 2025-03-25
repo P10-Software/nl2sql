@@ -154,3 +154,36 @@ def test_extract_column_table(sql, expected):
 
     # Assert
     assert result == expected
+
+
+@pytest.mark.parametrize("kind, expected", [
+    ('Full', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL,\n    pln_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);\n\nCREATE TABLE nu_pln (nu_id TEXT NOT NULL);"),
+    ('Table', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL,\n    pln_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);\n\nCREATE TABLE nu_pln (nu_id TEXT NOT NULL);"),
+    ('column', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL,\n    pln_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);\n\nCREATE TABLE nu_pln (nu_id TEXT NOT NULL);")
+])
+@patch('src.core.extract_instructions._create_build_instruction_tree')
+def test_none_query(mock_build_tree, kind, expected):
+    # Arrange
+    mock_build_tree.return_value = {
+        'tab_pln': {
+            'create_table': 'CREATE TABLE tab_pln ({columns});',
+            'columns': {
+                'pln_id': 'pln_id TEXT NOT NULL',
+                'pln_name': 'pln_name TEXT',
+                'created_at': 'created_at DATE DEFAULT CURRENT_TIMESTAMP'
+            }
+        },
+        'nu_pln': {
+            'create_table': 'CREATE TABLE nu_pln ({columns});',
+            'columns': {
+                'nu_id': 'nu_id TEXT NOT NULL'
+            }
+        }
+    }
+    sql = None
+
+    # Act
+    res = get_query_build_instruct(kind, sql, False)
+
+    # Assert
+    assert res == expected

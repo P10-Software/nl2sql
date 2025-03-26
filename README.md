@@ -18,7 +18,6 @@ downloading from teams or to update if changes are needed
 Run the following script to set up the natural and abbreviated databases.
 Make sure to have the the following data in your .local before running:
 - Folder with SAS database files.
-- column_names_natural.csv
 - tables_names_natural.csv
 ```
 python -m src.database.setup_database

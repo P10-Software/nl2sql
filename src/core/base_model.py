@@ -43,7 +43,7 @@ class NL2SQLModel(ABC):
         self.analysis = None
         self.mschema = mschema
 
-    def run(self, schema_size: SchemaKind, naturalness: bool):
+    def run(self, schema_size: SchemaKind):
         logger.info(f"Started benchmarking of {self.__class__.__name__}.")
         for idx, pair in enumerate(tqdm(self.benchmark)):
             question = pair['question']
@@ -51,9 +51,17 @@ class NL2SQLModel(ABC):
             if self.mschema:
                 schema = self.get_mschema()
             else:
-                schema = get_query_build_instruct(schema_size, goal, naturalness)
+                schema = get_query_build_instruct(schema_size, goal)
+
             answer = self._answer_single_question(question, schema)
-            self.results[idx] = {'question': question, 'golden_query': goal, 'golden_result': {}, 'generated_query': answer, 'generated_result': {}}
+
+            self.results[idx] = {
+                'question': question, 
+                'golden_query': goal, 
+                'golden_result': {}, 
+                'generated_query': answer, 
+                'generated_result': {}
+            }
         logger.info(f"Benchmarking finished for {self.__class__.__name__}.")
 
     @abstractmethod
@@ -77,52 +85,3 @@ class NL2SQLModel(ABC):
         """
         with open(f".local/mschema_{DB_NAME}_{'natural' if DB_NATURAL else 'abbreviated'}.txt", "r") as file:
             return file.read()
-
-def translate_query_to_natural(query: str) -> str:
-    """
-    Translates an SQL from using abbreviated column and tables names to use more natural_names
-    Uses the column and table natural names CSV files.
-
-    Args:
-    - query (str): SQL query in a string format
-    """
-    parser = Parser(sanitise_query(query))
-    tables = parser.tables
-    columns = parser.columns
-
-    # Load natural column and table names:
-    table_names_natural = pd.read_csv(".local/table_names_natural.csv", header=None, names=["old_name", "new_name"])
-    column_names_natural = pd.read_csv(".local/column_names_natural.csv", header=None, names=["old_name", "new_name", "table_name"])
-
-    table_name_mapping = dict(zip(table_names_natural['old_name'], table_names_natural['new_name']))
-    column_name_mapping = {
-        (row['old_name'], row['table_name']): row['new_name']
-        for _, row in column_names_natural.iterrows()
-    }
-
-    # Replace column names based on their respective tables
-    for column in columns:
-        if '.' in column:  # Check if column includes the table alias
-            table, col_name = column.split('.')
-            if (col_name, table_name_mapping[table]) in column_name_mapping:  # Check if both the column and table exist in mapping
-                new_col_name = column_name_mapping[(col_name, table_name_mapping[table])]
-                query = query.replace(f'.{col_name} ', f'.{new_col_name} ')
-                query = query.replace(f'.{col_name},', f'.{new_col_name},')
-                query = query.replace(f'.{col_name})', f'.{new_col_name})')
-        else:
-            col_name = column
-            table = table_name_mapping[tables[0]]
-            if (col_name, table) in column_name_mapping:  # Check if both the column and table exist in mapping
-                new_col_name = column_name_mapping[(col_name, table)]
-                query = query.replace(f' {col_name} ', f' {new_col_name} ')
-                query = query.replace(f' {col_name},', f' {new_col_name},')
-                query = query.replace(f' {col_name})', f' {new_col_name})')
-
-    # Replace table names in the query
-    for table in tables:
-        if table in table_name_mapping:
-            query = query.replace(f" {table} ", f" {table_name_mapping[table]} ")  # Ensure space for full matches
-            query = query.replace(f" {table},", f" {table_name_mapping[table]},")  # Ensure space for full matches
-            query = query.replace(f" {table};", f" {table_name_mapping[table]};")  # Ensure space for full matches
-
-    return query

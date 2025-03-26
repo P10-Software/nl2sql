@@ -3,7 +3,6 @@ import re
 import pandas as pd
 from sql_metadata import Parser
 from src.common.logger import get_logger
-from src.database.setup_database import column_name_format
 from src.database.database import execute_query
 
 
@@ -11,14 +10,13 @@ SchemaKind = Literal['Full', 'Tables', 'Columns']
 logger = get_logger(__name__)
 
 
-def get_query_build_instruct(kind: SchemaKind, query: str, natural_names: bool) -> str:
+def get_query_build_instruct(kind: SchemaKind, query: str) -> str:
     """
     Find the build instructions of the database based on a query.
 
     Args:
     - kind (SchemaKind): One of 'Full', 'Tables', 'Columns' specifying how restricted the schema should be.
     - query: SQL query in string format
-    - natural_names: Boolean values, True for natural_names and False for abbreviated
 
     Returns:
     - SQL build instructions (sql): SQL instructions specifying how to build the DB.
@@ -29,9 +27,6 @@ def get_query_build_instruct(kind: SchemaKind, query: str, natural_names: bool) 
         query = ''
 
     selected_tables_columns = _extract_column_table(query)
-
-    if natural_names:
-        selected_tables_columns = _transform_natural_query(selected_tables_columns)
 
     schema_tree = _create_build_instruction_tree()
 
@@ -65,37 +60,6 @@ def _extract_column_table(query: str) -> dict[str, list[str]]:
                 raise RuntimeError(f"Ambiguity found in query {query}, quitting.")
 
     return column_table_mapping
-
-
-def _transform_natural_query(selected_tables_columns: dict[str, list[str]]) -> dict[str, list[str]]:
-    """ Transform tables and column names in query to be more natural. """
-    table_names = pd.read_csv(".local/table_names_natural.csv", header=None, names=["old_name", "new_name"])
-    column_names = pd.read_csv(".local/column_names_natural.csv", header=None, names=["old_name", "new_name", "table_name"])
-
-    # Ensure that query table and column names adhere to naming conventions.
-    table_names = table_names.map(column_name_format)
-    column_names = column_names.map(column_name_format)
-    selected_tables_columns = {
-        table: [column_name_format(col) for col in columns]
-        for table, columns in selected_tables_columns.items()
-    }
-
-    table_mapping = dict(zip(table_names['old_name'], table_names['new_name']))
-    column_name_mapping = {
-        (row['old_name'], row['table_name']): row['new_name']
-        for _, row in column_names.iterrows()
-    }
-    updated_dict = {}
-
-    for key, values in selected_tables_columns.items():
-        # Replace key if found, otherwise keep the original
-        new_table = table_mapping.get(key, key)
-
-        new_values = [column_name_mapping.get((column, new_table), column) for column in values]
-
-        updated_dict[new_table] = new_values
-
-    return updated_dict
 
 
 def sanitise_query(query: str):

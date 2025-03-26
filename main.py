@@ -1,7 +1,7 @@
 from src.core.model_implementations import LlamaModel, DeepSeekLlamaModel, DeepSeekQwenModel, XiYanSQLModel, ModelWithSQLCoderAbstentionModule
 from src.core.prompt_strategies import Llama3PromptStrategy, DeepSeekPromptStrategy, XiYanSQLPromptStrategy, SQLCoderAbstentionPromptStrategy
 from src.database.database import execute_query, verify_database, get_conn
-from src.core.base_model import NL2SQLModel, translate_query_to_natural
+from src.core.base_model import NL2SQLModel
 from src.common.logger import get_logger
 from src.common.reporting import Reporter
 from json import load, dump
@@ -64,7 +64,7 @@ def get_model():
 
 def run_experiments(model: NL2SQLModel):
     for schema_size in SCHEMA_SIZES:
-        model.run(schema_size, naturalness=DB_NATURAL)
+        model.run(schema_size)
         file_name = f"{MODEL}{schema_size}{'Natural' if DB_NATURAL else 'Abbreviated'}{'MSchema' if MSCHEMA else ''}{'PreAbstention' if PRE_ABSTENTION else ''}{'PostAbstention' if POST_ABSTENTION else ''}.json"
         save_results(f"{RESULTS_DIR}/{DB_NAME}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/{file_name}", model)
         model.results = {}
@@ -85,9 +85,6 @@ def execute_and_analyze_results():
         logger.info(f"Running results of database for {path}.")
         for res in results.values():
             if res['golden_query']:
-                if DB_NATURAL:
-                    res['golden_query'] = translate_query_to_natural(res['golden_query'])
-
                 res['golden_result'] = execute_query(res['golden_query'])
             else:
                 res['golden_result'] = None

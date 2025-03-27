@@ -16,6 +16,7 @@ SQL_DIALECT = os.getenv('SQL_DIALECT')
 DATASET_PATH = os.getenv('DATASET_PATH')
 RESULTS_DIR = os.getenv('RESULTS_DIR')
 DB_NAME = os.getenv('DB_NAME')
+DATASET_NAME = os.getenv('DATASET_NAME')
 MODEL = os.getenv('MODEL')
 DB_NATURAL = bool(int(os.getenv('DB_NATURAL', 0)))
 PRE_ABSTENTION = bool(int(os.getenv('PRE_ABSTENTION', 0)))
@@ -65,7 +66,7 @@ def get_model():
 def run_experiments(model: NL2SQLModel):
     for schema_size in SCHEMA_SIZES:
         model.run(schema_size)
-        file_name = f"{MODEL}{schema_size}{'Natural' if DB_NATURAL else 'Abbreviated'}{'MSchema' if MSCHEMA else ''}{'PreAbstention' if PRE_ABSTENTION else ''}{'PostAbstention' if POST_ABSTENTION else ''}.json"
+        file_name = f"{MODEL}{DATASET_NAME}{schema_size}{'Natural' if DB_NATURAL else 'Abbreviated'}{'MSchema' if MSCHEMA else ''}{'PreAbstention' if PRE_ABSTENTION else ''}{'PostAbstention' if POST_ABSTENTION else ''}.json"
         save_results(f"{RESULTS_DIR}/{DB_NAME}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/{file_name}", model)
         model.results = {}
 

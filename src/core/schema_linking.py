@@ -13,22 +13,21 @@ class SchemaExtractor():
         self.model = AutoModelForCausalLM.from_pretrained(PATH,  torch_dtype=torch.bfloat16, device_map="auto")
         self.schema = schema
         self.prompt_strategy = """
-            You are now a {SQL_DIALECT} data analyst, and you are given a database schema as follows:
+/* Database schema */
+{SCHEMA}
 
-            【Schema】
-            {SCHEMA}
-
-            【Question】
-            {NL_QUESTION}
-
-            【Evidence】
-            {EVIDENCE}
-
-            Please read and understand the database schema carefully, and generate the relevant schema elements based on the user's question and evidence. Do not generate SQL. The generated schema is protected by ```schema and ```
+Attention:
+1. if the question have when\where\which, pay attention to pick table.column related to time, location and name in #columns
+2. Please answer the question in the following format without any other content:
+```
+#columns: The top 10 columns relevant to the question( format: table.column_1, table.column_2 ...)
+#values: Potential filter values that the question might query(format: "value1", "value2" ...)
+```
+/* Answer the following: {NL_QUESTION} */
         """
 
     def generate_relevant_schema_elements(self, question) -> dict:
-        prompt = self.prompt_strategy.format(SQL_DIALECT="sqlite", SCHEMA=self.schema, NL_QUESTION=question, EVIDENCE="")
+        prompt = self.prompt_strategy.format(SCHEMA=self.schema, NL_QUESTION=question)
         message = [{'role': 'user', 'content': prompt}]
         text = self.tokenizer.apply_chat_template(
             message,
@@ -54,14 +53,34 @@ class SchemaExtractor():
             outputs.sequences,
             outputs.scores,
             normalize_logits = True
-        )
+        ).cpu()
+
         generated_ids = [
             output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, outputs.sequences)
         ]
 
-        relevant_schema_with_probs = []
+        is_columns = False
+        new_candidate = []
+        relevant_schema_with_probs = {"columns": [], "values": []}
+
         for tok, score in zip(generated_ids[0], transition_scores[0]):
-            relevant_schema_with_probs.append({"token": f"{tok:5d}", "token_string": f"{self.tokenizer.decode(tok):8s}", "log_probability": f"{score.numpy():.3f}", "probability": f"{np.exp(score.numpy()):.2%}"})
+            tok_string = self.tokenizer.decode(tok).strip()
+            match tok_string:
+                case "#":
+                    if new_candidate:
+                        relevant_schema_with_probs["columns" if is_columns else "values"].append(new_candidate)
+                        new_candidate = []
+                case "columns":
+                    is_columns = True
+                case "values":
+                    is_columns = False
+                case ",":
+                    relevant_schema_with_probs["columns" if is_columns else "values"].append(new_candidate)
+                    new_candidate = []
+                case "\n" | ":" | "":
+                    continue
+                case _:
+                    new_candidate.append({tok_string: f"{np.exp(score.numpy()):.2%}"})
 
         return relevant_schema_with_probs
     

@@ -106,8 +106,8 @@ class ModelWithSQLCoderAbstentionModule(NL2SQLModel):
             pre_abstention_answer = self.abstention_pipe(
                 pre_abstention_prompt,
                 return_full_text=False,
-                pad_token_id=self.tokenizer.pad_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
+                pad_token_id=self.abstention_tokenizer.pad_token_id,
+                eos_token_id=self.abstention_tokenizer.eos_token_id,
                 max_new_tokens=1024,
                 do_sample=False,
                 num_beams=4
@@ -123,8 +123,8 @@ class ModelWithSQLCoderAbstentionModule(NL2SQLModel):
             post_abstention_answer = self.abstention_pipe(
                 post_abstention_prompt,
                 return_full_text=False,
-                pad_token_id=self.tokenizer.pad_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
+                pad_token_id=self.abstention_tokenizer.pad_token_id,
+                eos_token_id=self.abstention_tokenizer.eos_token_id,
                 max_new_tokens=1024,
                 do_sample=False,
                 num_beams=4

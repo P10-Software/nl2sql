@@ -11,6 +11,9 @@ logger = get_logger(__name__)
 RESULT_DIR = "results"
 
 def generate_report() -> None:
+    """
+    Generate report over results for files in specified directory
+    """
     reporter = Reporter()
 
     for result_file in tqdm(os.listdir(RESULT_DIR)):
@@ -28,6 +31,9 @@ def generate_report() -> None:
 
 
 def evaluate_experiment(file: str, db_path: str):
+    """
+    run each gold and generated query to get the results
+    """
     with open(f"{RESULT_DIR}/{file}", "r") as file_pointer:
         results = load(file_pointer)
 
@@ -46,6 +52,9 @@ def evaluate_experiment(file: str, db_path: str):
 
 
 def decide_db(file_name: str):
+    """
+    Decides which database to use based on strin matching of the file name.
+    """
     if "ehrsql" in file_name.lower():
         logger.info(f"{file_name} uses mimic_iv DB")
         return ".local/mimic_iv.sqlite"

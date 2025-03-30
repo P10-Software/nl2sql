@@ -1,39 +1,82 @@
 import os
-from json import load, dump
-# from dotenv import load_dotenv
-import dotenv
-from src.database.database import execute_query
+import sqlite3
+from json import load
+from tqdm import tqdm
+from src.common.reporting import Reporter
+from src.common.logger import get_logger
 
-dotenv_file = dotenv.find_dotenv()
-dotenv.load_dotenv(dotenv_file)
+logger = get_logger(__name__)
 
-ORIGINAL_DB_PATH = os.environ["DB_PATH"]
-
-# MODEL = os.getenv('MODEL')
-# DB_PATH = os.getenv('DB_PATH')
+# Directory containing json result files for resport
+RESULT_DIR = "results"
 
 def generate_report() -> None:
-    print(os.environ["DB_PATH"])
+    reporter = Reporter()
 
-    os.environ['DB_PATH'] = "NEW_PATH_naME"
-    dotenv.set_key(dotenv_file, "DB_PATH", os.environ['DB_PATH'])
+    for result_file in tqdm(os.listdir(RESULT_DIR)):
+        db_path = decide_db(result_file)
 
-    execute_query("test")
+        if db_path == "none":
+            continue
 
-    os.environ['DB_PATH'] = "NEW_PATH_WITH_NATURAL"
-    dotenv.set_key(dotenv_file, "DB_PATH", os.environ['DB_PATH'])
+        if result_file == "report.html":
+            continue
 
-    execute_query("test")
+        reporter.add_result(evaluate_experiment(result_file, db_path), result_file.split('.')[0])
 
-    set_env_variable("DB_PATH", ORIGINAL_DB_PATH)
-
-    execute_query("test")
+    reporter.create_report(RESULT_DIR)
 
 
-def set_env_variable(key: str, value: str) -> None:
-    os.environ[key] = value
-    dotenv.set_key(dotenv_file, key, os.environ[key])
-    print(f"Changed env variable {key} to {value}")
+def evaluate_experiment(file: str, db_path: str):
+    with open(f"{RESULT_DIR}/{file}", "r") as file_pointer:
+        results = load(file_pointer)
+
+    for res in results.values():
+        if res['golden_query']:
+            res['golden_result'] = execute_query(res['golden_query'], db_path)
+        else:
+            res['golden_result'] = None
+
+        if res['generated_query']:
+            res['generated_result'] = execute_query(res['generated_query'], db_path)
+        else:
+            res['generated_result'] = None
+
+    return results
+
+
+def decide_db(file_name: str):
+    if "ehrsql" in file_name.lower():
+        logger.info(f"{file_name} uses mimic_iv DB")
+        return ".local/mimic_iv.sqlite"
+    elif "abbreviated" in file_name.lower():
+        logger.info(f"{file_name} uses metadata abbreviated DB")
+        return ".local/trial_metadata.sqlite"
+    elif "natural" in file_name.lower():
+        logger.info(f"{file_name} uses metadata natural DB")
+        return ".local/trial_metadata_natural.sqlite"
+    else:
+        logger.info("Name does not indicate database")
+        return "none"
+
+
+def execute_query(query: str, db_path: str):
+    conn = sqlite3.connect(f"{db_path}")
+    cur = conn.cursor()
+
+    result = []
+
+    if conn:
+        try:
+            cur.execute(query)
+            result = cur.fetchall()
+        except Exception as e:
+            logger.error(f"Error executing query on database: {e}")
+        finally:
+            cur.close()
+            conn.close()
+
+    return result
 
 
 if __name__ == "__main__":

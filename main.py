@@ -18,10 +18,11 @@ RESULTS_DIR = os.getenv('RESULTS_DIR')
 DB_NAME = os.getenv('DB_NAME')
 DATASET_NAME = os.getenv('DATASET_NAME')
 MODEL = os.getenv('MODEL')
+NUMBER_OF_RUNS = int(os.getenv('NUMBER_OF_RUNS', 1))
 DB_NATURAL = bool(int(os.getenv('DB_NATURAL', 0)))
+MSCHEMA = bool(int(os.getenv('MSCHEMA', 1)))
 PRE_ABSTENTION = bool(int(os.getenv('PRE_ABSTENTION', 0)))
 POST_ABSTENTION = bool(int(os.getenv('POST_ABSTENTION', 0)))
-MSCHEMA = bool(int(os.getenv('MSCHEMA', 1)))
 DATE = date.today()
 
 SCHEMA_SIZES = ["Full", "Tables", "Columns"]

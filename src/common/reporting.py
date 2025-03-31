@@ -1,7 +1,7 @@
 import html
 from src.common.logger import get_logger
 from src.core.evaluation_metrics import execution_accuracy, precision, recall, f1_score
-from collections import Counter
+from collections import Counter, defaultdict
 import sql_metadata
 import os
 
@@ -14,7 +14,7 @@ class Reporter:
         self.analysis = []
         self.report = None
 
-    def add_result(self, result, name):
+    def add_result(self, result, name, run):
         """
         Adds a result set to the reporter.
 
@@ -22,9 +22,9 @@ class Reporter:
         - result: The result from NL2SQLModel.run()
         """
         self.results.append(result)
-        self._analyse(result, name)
+        self._analyse(result, name, run)
 
-    def _analyse(self, result, name) -> None:
+    def _analyse(self, result, name, run) -> None:
         """
         Generates an analysis of the results.
         Runs metrics of EX, recall, precision and F1. Also analysis SQL errors, categorising by table, column and clause.
@@ -47,7 +47,7 @@ class Reporter:
         precision_score = precision(golden_results, generated_results)
         recall_score = recall(golden_results, generated_results)
 
-        self.analysis.append((name, {
+        self.analysis.append((name, run, {
             'execution accuracy': execution_accuracy(golden_results, generated_results),
             'precision': precision_score,
             'recall': recall_score,
@@ -264,10 +264,17 @@ class Reporter:
         <body>
             <h1>NL2SQL Model Benchmark Report</h1>
         """
-        print(self.analysis)
-        print(type(self.analysis[0]))
 
-        for name, a in self.analysis:
+        # self.analysis.sort()
+        experiments_dict = defaultdict(list)
+        for name, run, results in self.analysis:
+            experiments_dict[name].append((name, run, results))
+
+        # Convert to list of lists
+        experiments = list(experiments_dict.values())
+        print(experiments)
+
+        for name, run, a in self.analysis:
             model_name = name
             total_errors = a.get(
                 'SQL mismatches', {}).get('total_errors', {})
@@ -276,7 +283,7 @@ class Reporter:
                 <table>
                 <caption><b>{model_name}</b></caption>
                 <tr>
-                    <th>Model</th>
+                    <th>Run</th>
                     <th>Execution Accuracy</th>
                     <th>Precision</th>
                     <th>Recall</th>
@@ -285,7 +292,7 @@ class Reporter:
                     <th>SQL Mismatches</th>
                 </tr>
                 <tr>
-                    <td>{model_name}</td>
+                    <td>{run}</td>
                     <td onclick="toggleDetails('{model_name}-execution_accuracy')">{a['execution accuracy']['total_execution_accuracy']:.2f}</td>
                     <td onclick="toggleDetails('{model_name}-precision')">{a['precision']['total_precision']:.2f}</td>
                     <td onclick="toggleDetails('{model_name}-recall')">{a['recall']['total_recall']:.2f}</td>

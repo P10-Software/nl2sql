@@ -25,7 +25,8 @@ def generate_report() -> None:
         if result_file == "report.html":
             continue
 
-        reporter.add_result(evaluate_experiment(result_file, db_path), result_file.split('.')[0])
+        file_name = result_file.split('.')[0]
+        reporter.add_result(evaluate_experiment(result_file, db_path), file_name.split('_')[0], file_name.split('_')[1])
 
     reporter.create_report(RESULT_DIR)
 

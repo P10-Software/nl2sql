@@ -65,11 +65,12 @@ def get_model():
 
 
 def run_experiments(model: NL2SQLModel):
-    for schema_size in SCHEMA_SIZES:
-        model.run(schema_size)
-        file_name = f"{MODEL}{DATASET_NAME}{schema_size}{'Natural' if DB_NATURAL else 'Abbreviated'}{'MSchema' if MSCHEMA else ''}{'PreAbstention' if PRE_ABSTENTION else ''}{'PostAbstention' if POST_ABSTENTION else ''}.json"
-        save_results(f"{RESULTS_DIR}/{DB_NAME}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/{file_name}", model)
-        model.results = {}
+    for i, _ in enumerate(NUMBER_OF_RUNS):
+        for schema_size in SCHEMA_SIZES:
+            model.run(schema_size)
+            file_name = f"{MODEL}{DATASET_NAME}{schema_size}{'Natural' if DB_NATURAL else 'Abbreviated'}{'MSchema' if MSCHEMA else ''}{'PreAbstention' if PRE_ABSTENTION else ''}{'PostAbstention' if POST_ABSTENTION else ''}_{i + 1}.json"
+            save_results(f"{RESULTS_DIR}/{DB_NAME}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/{file_name}", model)
+            model.results = {}
 
 
 def execute_and_analyze_results():
@@ -98,7 +99,8 @@ def execute_and_analyze_results():
 
         logger.info(f"Executed all queries on the database for {path}.")
 
-        reporter.add_result(results, result_file_name.split('.')[0])
+        
+        reporter.add_result(results, result_file_name.split('_')[0], result_file_name.split('.')[1])
 
     return reporter
 

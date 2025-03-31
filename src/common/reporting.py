@@ -248,8 +248,8 @@ class Reporter:
                 body { font-family: Arial, sans-serif; margin: 20px; }
                 h1 { color: #333; }
                 table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: center; cursor: pointer; }
-                th { background-color: #f2f2f2; }
+                th, td, caption { border: 1px solid #ddd; padding: 8px; text-align: center; cursor: pointer; }
+                th, caption { background-color: #f2f2f2; }
                 tr:nth-child(even) { background-color: #f9f9f9; }
                 .hidden { display: none; }
                 .details-table { width: 80%; margin: 10px auto; border: 1px solid #ddd; }
@@ -263,7 +263,18 @@ class Reporter:
         </head>
         <body>
             <h1>NL2SQL Model Benchmark Report</h1>
-            <table>
+        """
+        print(self.analysis)
+        print(type(self.analysis[0]))
+
+        for name, a in self.analysis:
+            model_name = name
+            total_errors = a.get(
+                'SQL mismatches', {}).get('total_errors', {})
+
+            html_content += f"""
+                <table>
+                <caption><b>{model_name}</b></caption>
                 <tr>
                     <th>Model</th>
                     <th>Execution Accuracy</th>
@@ -273,14 +284,6 @@ class Reporter:
                     <th>Total SQL Queries</th>
                     <th>SQL Mismatches</th>
                 </tr>
-        """
-
-        for name, a in self.analysis:
-            model_name = name
-            total_errors = a.get(
-                'SQL mismatches', {}).get('total_errors', {})
-
-            html_content += f"""
                 <tr>
                     <td>{model_name}</td>
                     <td onclick="toggleDetails('{model_name}-execution_accuracy')">{a['execution accuracy']['total_execution_accuracy']:.2f}</td>
@@ -371,8 +374,9 @@ class Reporter:
                 sql_mismatch_data
             )
 
+            html_content += "</table>"
+
         html_content += """
-            </table>
         </body>
         </html>
         """

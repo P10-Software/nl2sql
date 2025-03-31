@@ -80,7 +80,7 @@ def execute_query(query: str, db_path: str):
             cur.execute(query)
             result = cur.fetchall()
         except Exception as e:
-            logger.error(f"Error executing query on database: {e}")
+            logger.debug(f"Error executing query on database: {e}")
         finally:
             cur.close()
             conn.close()

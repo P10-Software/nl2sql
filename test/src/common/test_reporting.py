@@ -115,7 +115,7 @@ def test_create_report(mock_analysis):
     # Arrange
     model = Reporter()
     model.analysis = []
-    model.analysis.append(("model1", mock_analysis))
+    model.analysis.append(("model1", "1", mock_analysis))
     file_path = ".temp"
 
     # Act
@@ -132,13 +132,15 @@ def test_analysis(mock_results):
     # Arrange
     model = Reporter()
     model_name = 'model1'
+    run = "1"
 
     # Act
-    model.add_result(mock_results, model_name)
+    model.add_result(mock_results, model_name, run)
 
     # Assert
     assert model.analysis is not None
     assert model.analysis[0][0] == model_name
+    assert model.analysis[0][1] == run
 
 
 def test_analyse_sql():

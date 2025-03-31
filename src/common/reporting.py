@@ -265,7 +265,6 @@ class Reporter:
             <h1>NL2SQL Model Benchmark Report</h1>
         """
 
-        # self.analysis.sort()
         experiments_dict = defaultdict(list)
         for name, run, results in self.analysis:
             experiments_dict[name].append((name, run, results))
@@ -274,11 +273,8 @@ class Reporter:
         experiments = list(experiments_dict.values())
         print(experiments)
 
-        for name, run, a in self.analysis:
-            model_name = name
-            total_errors = a.get(
-                'SQL mismatches', {}).get('total_errors', {})
-
+        for experiment in experiments:
+            model_name = experiment[0][0]
             html_content += f"""
                 <table>
                 <caption><b>{model_name}</b></caption>
@@ -291,95 +287,101 @@ class Reporter:
                     <th>Total SQL Queries</th>
                     <th>SQL Mismatches</th>
                 </tr>
-                <tr>
-                    <td>{run}</td>
-                    <td onclick="toggleDetails('{model_name}-execution_accuracy')">{a['execution accuracy']['total_execution_accuracy']:.2f}</td>
-                    <td onclick="toggleDetails('{model_name}-precision')">{a['precision']['total_precision']:.2f}</td>
-                    <td onclick="toggleDetails('{model_name}-recall')">{a['recall']['total_recall']:.2f}</td>
-                    <td onclick="toggleDetails('{model_name}-f1_score')">{a['f1 score']['total_f1']:.2f}</td>
-                    <td>{a.get('total sql queries', 'N/A')}</td>
-                    <td onclick="toggleDetails('{model_name}-sql_mismatches')">⚠️ {sum(total_errors.values()) if total_errors else 0} Errors</td>
-                </tr>
             """
+            for _, run, a in experiment:
+                total_errors = a.get(
+                    'SQL mismatches', {}).get('total_errors', {})
 
-            # Generate detailed breakdown tables
-            def generate_details_row(row_id, title, headers, data):
-                return f"""
-                <tr id="{row_id}" class="hidden">
-                    <td colspan="7">
-                        <h3>{title}</h3>
-                        <table class="details-table">
-                            <tr>{''.join(f'<th>{h}</th>' for h in headers)}</tr>
-                            {''.join(f"<tr>{''.join(f'<td>{html.escape(str(cell))}</td>' for cell in row)}</tr>" for row in data)}
-                        </table>
-                    </td>
-                </tr>
-                """ if data else ""
+                html_content += f""" 
+                    <tr>
+                        <td>{run}</td>
+                        <td onclick="toggleDetails('{model_name}-execution_accuracy')">{a['execution accuracy']['total_execution_accuracy']:.2f}</td>
+                        <td onclick="toggleDetails('{model_name}-precision')">{a['precision']['total_precision']:.2f}</td>
+                        <td onclick="toggleDetails('{model_name}-recall')">{a['recall']['total_recall']:.2f}</td>
+                        <td onclick="toggleDetails('{model_name}-f1_score')">{a['f1 score']['total_f1']:.2f}</td>
+                        <td>{a.get('total sql queries', 'N/A')}</td>
+                        <td onclick="toggleDetails('{model_name}-sql_mismatches')">⚠️ {sum(total_errors.values()) if total_errors else 0} Errors</td>
+                    </tr>
+                """
 
-            # Generate execution accuracy breakdown
-            exec_acc_data = [
-                (idx, '✅' if val else '❌')
-                for idx, val in a['execution accuracy'].get('individual_execution_accuracy', {}).items()
-            ]
-            html_content += generate_details_row(f"{model_name}-execution_accuracy", "Execution Accuracy Details", [
-                                                "Query Index", "Correct Execution"], exec_acc_data)
+                # Generate detailed breakdown tables
+                def generate_details_row(row_id, title, headers, data):
+                    return f"""
+                    <tr id="{row_id}" class="hidden">
+                        <td colspan="7">
+                            <h3>{title}</h3>
+                            <table class="details-table">
+                                <tr>{''.join(f'<th>{h}</th>' for h in headers)}</tr>
+                                {''.join(f"<tr>{''.join(f'<td>{html.escape(str(cell))}</td>' for cell in row)}</tr>" for row in data)}
+                            </table>
+                        </td>
+                    </tr>
+                    """ if data else ""
 
-            # Generate precision breakdown
-            precision_data = [
-                (idx, f"{val:.2f}")
-                for idx, val in a['precision'].get('individual_precisions', {}).items()
-            ]
-            html_content += generate_details_row(f"{model_name}-precision", "Precision Details", [
-                                                "Query Index", "Precision"], precision_data)
+                # Generate execution accuracy breakdown
+                exec_acc_data = [
+                    (idx, '✅' if val else '❌')
+                    for idx, val in a['execution accuracy'].get('individual_execution_accuracy', {}).items()
+                ]
+                html_content += generate_details_row(f"{model_name}-execution_accuracy", "Execution Accuracy Details", [
+                                                    "Query Index", "Correct Execution"], exec_acc_data)
 
-            # Generate recall breakdown
-            recall_data = [
-                (idx, f"{val:.2f}")
-                for idx, val in a['recall'].get('individual_recalls', {}).items()
-            ]
-            html_content += generate_details_row(f"{model_name}-recall", "Recall Details", [
-                                                "Query Index", "Recall"], recall_data)
+                # Generate precision breakdown
+                precision_data = [
+                    (idx, f"{val:.2f}")
+                    for idx, val in a['precision'].get('individual_precisions', {}).items()
+                ]
+                html_content += generate_details_row(f"{model_name}-precision", "Precision Details", [
+                                                    "Query Index", "Precision"], precision_data)
 
-            # Generate F1 score breakdown
-            f1_data = [
-                (idx, f"{val:.2f}")
-                for idx, val in a['f1 score'].get('individual_f1s', {}).items()
-            ]
-            html_content += generate_details_row(f"{model_name}-f1_score", "F1 Score Details", [
-                                                "Query Index", "F1 Score"], f1_data)
+                # Generate recall breakdown
+                recall_data = [
+                    (idx, f"{val:.2f}")
+                    for idx, val in a['recall'].get('individual_recalls', {}).items()
+                ]
+                html_content += generate_details_row(f"{model_name}-recall", "Recall Details", [
+                                                    "Query Index", "Recall"], recall_data)
 
-            # Generate SQL mismatches
-            sql_mismatch_data = [
-                (
-                    entry.get('nl_question', 'N/A'),
-                    entry.get('golden_sql', 'N/A'),
-                    entry.get('generated_sql', 'N/A'),
-                    ', '.join(entry.get('errors', {}).get(
-                        'tables', {}).get('golden', [])) or '✅',
-                    ', '.join(entry.get('errors', {}).get(
-                        'tables', {}).get('generated', [])) or '✅',
-                    ', '.join(set(entry.get('errors', {}).get('columns', {}).get('golden', [
-                    ])) - set(entry.get('errors', {}).get('columns', {}).get('generated', []))) or '✅',
-                    ', '.join(set(entry.get('errors', {}).get('columns', {}).get('generated', [])) - set(entry.get('errors', {}).get('columns', {}).get('golden', [
-                    ]))) or '✅',
-                    ' | '.join(
-                        f"{clause}:{errors.get('generated', 'N/A')}"
-                        for clause, errors in entry.get('errors', {}).get('clauses', {}).items()
-                    ) or '✅',
-                    '❌' if entry.get('errors', {}).get('distinct', {}).get('golden', False) != entry.get(
-                        'errors', {}).get('distinct', {}).get('generated', False) else '✅',
-                    '❌' if entry.get('errors', {}).get('not_query') else '✅',
-                    '❌' if entry.get('errors', {}).get('abstention') else '✅'
+                # Generate F1 score breakdown
+                f1_data = [
+                    (idx, f"{val:.2f}")
+                    for idx, val in a['f1 score'].get('individual_f1s', {}).items()
+                ]
+                html_content += generate_details_row(f"{model_name}-f1_score", "F1 Score Details", [
+                                                    "Query Index", "F1 Score"], f1_data)
+
+                # Generate SQL mismatches
+                sql_mismatch_data = [
+                    (
+                        entry.get('nl_question', 'N/A'),
+                        entry.get('golden_sql', 'N/A'),
+                        entry.get('generated_sql', 'N/A'),
+                        ', '.join(entry.get('errors', {}).get(
+                            'tables', {}).get('golden', [])) or '✅',
+                        ', '.join(entry.get('errors', {}).get(
+                            'tables', {}).get('generated', [])) or '✅',
+                        ', '.join(set(entry.get('errors', {}).get('columns', {}).get('golden', [
+                        ])) - set(entry.get('errors', {}).get('columns', {}).get('generated', []))) or '✅',
+                        ', '.join(set(entry.get('errors', {}).get('columns', {}).get('generated', [])) - set(entry.get('errors', {}).get('columns', {}).get('golden', [
+                        ]))) or '✅',
+                        ' | '.join(
+                            f"{clause}:{errors.get('generated', 'N/A')}"
+                            for clause, errors in entry.get('errors', {}).get('clauses', {}).items()
+                        ) or '✅',
+                        '❌' if entry.get('errors', {}).get('distinct', {}).get('golden', False) != entry.get(
+                            'errors', {}).get('distinct', {}).get('generated', False) else '✅',
+                        '❌' if entry.get('errors', {}).get('not_query') else '✅',
+                        '❌' if entry.get('errors', {}).get('abstention') else '✅'
+                    )
+                    for entry in a['SQL mismatches'].get('individual_errors', [])
+                ]
+
+                html_content += generate_details_row(
+                    f"{model_name}-sql_mismatches", "SQL Mismatch Breakdown",
+                    ["NL Question", "Golden Query", "Generated Query", "Missing Tables", "Extra Tables",
+                        "Missing Columns", "Extra Columns", "Clause Errors", "Distinct Mismatch", "Execution Failed", "Abstention Mismatch"],
+                    sql_mismatch_data
                 )
-                for entry in a['SQL mismatches'].get('individual_errors', [])
-            ]
-
-            html_content += generate_details_row(
-                f"{model_name}-sql_mismatches", "SQL Mismatch Breakdown",
-                ["NL Question", "Golden Query", "Generated Query", "Missing Tables", "Extra Tables",
-                    "Missing Columns", "Extra Columns", "Clause Errors", "Distinct Mismatch", "Execution Failed", "Abstention Mismatch"],
-                sql_mismatch_data
-            )
 
             html_content += "</table>"
 

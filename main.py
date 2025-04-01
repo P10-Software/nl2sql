@@ -65,7 +65,7 @@ def get_model():
 
 
 def run_experiments(model: NL2SQLModel):
-    for i, _ in enumerate(NUMBER_OF_RUNS):
+    for i in range(NUMBER_OF_RUNS):
         for schema_size in SCHEMA_SIZES:
             model.run(schema_size)
             file_name = f"{MODEL}{DATASET_NAME}{schema_size}{'Natural' if DB_NATURAL else 'Abbreviated'}{'MSchema' if MSCHEMA else ''}{'PreAbstention' if PRE_ABSTENTION else ''}{'PostAbstention' if POST_ABSTENTION else ''}_{i + 1}.json"

@@ -271,10 +271,15 @@ class Reporter:
 
         # Convert to list of lists
         experiments = list(experiments_dict.values())
-        print(experiments)
 
         for experiment in experiments:
             model_name = experiment[0][0]
+
+            agg_ex = 0
+            agg_recall = 0
+            agg_precision = 0
+            agg_f1 = 0
+
             html_content += f"""
                 <table>
                 <caption><b>{model_name}</b></caption>
@@ -289,10 +294,15 @@ class Reporter:
                 </tr>
             """
             for _, run, a in experiment:
+                agg_ex += (a['execution accuracy']['total_execution_accuracy'])
+                agg_precision += (a['precision']['total_precision'])
+                agg_recall += (a['recall']['total_recall'])
+                agg_f1 += (a['f1 score']['total_f1'])
+
                 total_errors = a.get(
                     'SQL mismatches', {}).get('total_errors', {})
 
-                html_content += f""" 
+                html_content += f"""
                     <tr>
                         <td>{run}</td>
                         <td onclick="toggleDetails('{model_name}-execution_accuracy')">{a['execution accuracy']['total_execution_accuracy']:.2f}</td>
@@ -382,6 +392,19 @@ class Reporter:
                         "Missing Columns", "Extra Columns", "Clause Errors", "Distinct Mismatch", "Execution Failed", "Abstention Mismatch"],
                     sql_mismatch_data
                 )
+
+
+            html_content += f"""
+                <tr>
+                    <th>Aggregated</th>
+                    <th>{round(agg_ex / len(experiment), 2)}</th>
+                    <th>{round(agg_precision / len(experiment), 2)}</th>
+                    <th>{round(agg_recall / len(experiment), 2)}</th>
+                    <th>{round(agg_f1 / len(experiment), 2)}</th>
+                    <th>Empty</th>
+                    <th>Empty</th>
+                </tr>
+            """
 
             html_content += "</table>"
 

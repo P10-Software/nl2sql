@@ -48,7 +48,8 @@ class Reporter:
 
             logger.info(f"Executed all queries on the database for {path}.")
 
-            self.add_result(results, result_file_name.split('_')[0], result_file_name.split('.')[1])
+            file_name = result_file_name.split('.')[0] #remove .json
+            self.add_result(results, file_name.split('_')[0], file_name.split('_')[1])
 
         self.create_report(result_directory)
 

@@ -4,6 +4,7 @@ from src.core.evaluation_metrics import execution_accuracy, precision, recall, f
 from collections import Counter, defaultdict
 import sql_metadata
 import os
+import statistics
 
 logger = get_logger(__name__)
 
@@ -275,10 +276,10 @@ class Reporter:
         for experiment in experiments:
             model_name = experiment[0][0]
 
-            agg_ex = 0
-            agg_recall = 0
-            agg_precision = 0
-            agg_f1 = 0
+            agg_ex = []
+            agg_recall = []
+            agg_precision = []
+            agg_f1 = []
 
             html_content += f"""
                 <table>
@@ -294,10 +295,10 @@ class Reporter:
                 </tr>
             """
             for _, run, a in experiment:
-                agg_ex += (a['execution accuracy']['total_execution_accuracy'])
-                agg_precision += (a['precision']['total_precision'])
-                agg_recall += (a['recall']['total_recall'])
-                agg_f1 += (a['f1 score']['total_f1'])
+                agg_ex.append((a['execution accuracy']['total_execution_accuracy']))
+                agg_precision.append((a['precision']['total_precision']))
+                agg_recall.append((a['recall']['total_recall']))
+                agg_f1.append((a['f1 score']['total_f1']))
 
                 total_errors = a.get(
                     'SQL mismatches', {}).get('total_errors', {})
@@ -393,18 +394,27 @@ class Reporter:
                     sql_mismatch_data
                 )
 
-
-            html_content += f"""
-                <tr>
-                    <th>Aggregated</th>
-                    <th>{round(agg_ex / len(experiment), 2)}</th>
-                    <th>{round(agg_precision / len(experiment), 2)}</th>
-                    <th>{round(agg_recall / len(experiment), 2)}</th>
-                    <th>{round(agg_f1 / len(experiment), 2)}</th>
-                    <th>Empty</th>
-                    <th>Empty</th>
-                </tr>
-            """
+            if len(experiment) > 1:
+                html_content += f"""
+                    <tr>
+                        <th>Average</th>
+                        <th>{round(statistics.mean(agg_ex), 2)}</th>
+                        <th>{round(statistics.mean(agg_precision), 2)}</th>
+                        <th>{round(statistics.mean(agg_recall), 2)}</th>
+                        <th>{round(statistics.mean(agg_f1), 2)}</th>
+                        <th>Not Applicable</th>
+                        <th>Not Applicable</th>
+                    <tr>
+                    <tr>
+                        <th>Std Dev</th>
+                        <th>{round(statistics.stdev(agg_ex), 2)}</th>
+                        <th>{round(statistics.stdev(agg_precision), 2)}</th>
+                        <th>{round(statistics.stdev(agg_recall), 2)}</th>
+                        <th>{round(statistics.stdev(agg_f1), 2)}</th>
+                        <th>Not Applicable</th>
+                        <th>Not Applicable</th>
+                    </tr>
+                """
 
             html_content += "</table>"
 

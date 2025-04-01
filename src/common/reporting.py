@@ -1,10 +1,12 @@
+import os
 import html
+import statistics
+from collections import Counter, defaultdict
+from json import load
+import sql_metadata
 from src.common.logger import get_logger
 from src.core.evaluation_metrics import execution_accuracy, precision, recall, f1_score
-from collections import Counter, defaultdict
-import sql_metadata
-import os
-import statistics
+from src.database.database import execute_query
 
 logger = get_logger(__name__)
 
@@ -14,6 +16,42 @@ class Reporter:
         self.results = []
         self.analysis = []
         self.report = None
+
+
+    def generate_report(self, result_directory: str):
+        """
+        Executes generated and goal queries and creates results to be used for creating the report.
+
+        Args:
+        - result_directory: The directory path to find the json result files.
+        """
+        for result_file_name in os.listdir(result_directory):
+            path = f"{result_directory}/{result_file_name}"
+
+            if result_file_name == "report.html":
+                continue
+
+            with open(path, "r") as file_pointer:
+                results = load(file_pointer)
+
+            logger.info(f"Running results of database for {path}.")
+            for res in results.values():
+                if res['golden_query']:
+                    res['golden_result'] = execute_query(res['golden_query'])
+                else:
+                    res['golden_result'] = None
+
+                if res['generated_query']:
+                    res['generated_result'] = execute_query(res['generated_query'])
+                else:
+                    res['generated_result'] = None
+
+            logger.info(f"Executed all queries on the database for {path}.")
+
+            self.add_result(results, result_file_name.split('_')[0], result_file_name.split('.')[1])
+
+        self.create_report(result_directory)
+
 
     def add_result(self, result, name, run):
         """

@@ -1,8 +1,7 @@
 import sqlite3
 from unittest.mock import patch
 import pytest
-import pandas as pd
-from src.core.extract_instructions import get_query_build_instruct, sanitise_query, _extract_column_table
+from src.core.extract_instructions import get_query_build_instruct, sanitise_query, extract_column_table
 
 
 @pytest.fixture(scope="function")
@@ -88,7 +87,7 @@ def test_sanitise_query(sql, expected):
 ])
 def test_extract_column_table(sql, expected):
     # Arrange + Act
-    result = _extract_column_table(sql)
+    result = extract_column_table(sql)
 
     # Assert
     assert result == expected

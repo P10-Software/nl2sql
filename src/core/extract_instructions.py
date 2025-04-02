@@ -26,14 +26,14 @@ def get_query_build_instruct(kind: SchemaKind, query: str) -> str:
         kind = 'Full'
         query = ''
 
-    selected_tables_columns = _extract_column_table(query)
+    selected_tables_columns = extract_column_table(query)
 
     schema_tree = _create_build_instruction_tree()
 
     return _create_build_instruction(schema_tree, selected_tables_columns, kind)
 
 
-def _extract_column_table(query: str) -> dict[str, list[str]]:
+def extract_column_table(query: str) -> dict[str, list[str]]:
     parser = Parser(sanitise_query(query))
     tables = parser.tables
     columns = _parse_column(parser)

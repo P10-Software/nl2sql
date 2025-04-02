@@ -8,7 +8,7 @@ from src.common.logger import get_logger
 logger = get_logger(__name__)
 
 # Directory containing json result files for resport
-RESULT_DIR = ".local/test_results"
+RESULT_DIR = ".local/results"
 
 def generate_report() -> None:
     """

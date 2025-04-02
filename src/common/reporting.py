@@ -314,6 +314,7 @@ class Reporter:
 
         for experiment in experiments:
             model_name = experiment[0][0]
+            experiment.sort(key=lambda x: x[1])
 
             agg_ex = []
             agg_recall = []

@@ -2,18 +2,12 @@ import os
 from abc import abstractmethod, ABC
 import re
 from tqdm import tqdm
-import pandas as pd
-from sql_metadata import Parser
-from sqlalchemy import create_engine
 from dotenv import load_dotenv
 from src.common.logger import get_logger
-from src.core.extract_instructions import get_query_build_instruct, SchemaKind, sanitise_query
+from src.core.extract_instructions import get_query_build_instruct, SchemaKind
 
 logger = get_logger(__name__)
 load_dotenv()
-
-TASK = 'text-generation'
-MAX_NEW_TOKENS = 200
 
 DB_NAME = os.getenv('DB_NAME')
 DB_NATURAL = bool(int(os.getenv('DB_NATURAL', 0)))

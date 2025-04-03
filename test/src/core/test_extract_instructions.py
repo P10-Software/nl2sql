@@ -66,7 +66,8 @@ def test_get_query_build_instructions(mock_build_tree, kind, expected):
      "SELECT name FROM names WHERE name LIKE '';"),
     ("SELECT name, age FROM people WHERE name like '%Johnny%' AND age > 18;",
      "SELECT name, age FROM people WHERE name like '' AND age > 18;"),
-    ("SELECT age FROM people;", "SELECT age FROM people;")
+    ("SELECT age FROM people;", "SELECT age FROM people;"),
+    ("SELECT COUNT(name) FROM people;", "SELECT name FROM people")
 ])
 def test_sanitise_query(sql, expected):
     # Arrange + Act

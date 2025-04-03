@@ -63,6 +63,7 @@ def extract_column_table(query: str) -> dict[str, list[str]]:
 
 
 def sanitise_query(query: str):
+    query = re.sub(r"(?:\w+\((\w+)\))", r"\1", query, flags=re.IGNORECASE)
     return re.sub(r"(LIKE\s*)'[^']*'", r"\1''", query, flags=re.IGNORECASE)
 
 

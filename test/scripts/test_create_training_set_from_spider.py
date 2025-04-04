@@ -1,7 +1,7 @@
 import scripts.create_training_set_from_spider
 scripts.create_training_set_from_spider.PATH_TO_SPIDER_DIR = "test/scripts/mock_dataset"
 
-from scripts.create_training_set_from_spider import _load_ddl_instructions_for_all_dbs, create_training_set
+from scripts.create_training_set_from_spider import _load_schema_for_all_dbs, create_training_set, _repeat_columns_in_schema
 import os
 import sqlite3
 import pytest
@@ -56,10 +56,72 @@ def mock_train_file():
     with open("test/scripts/mock_dataset/train_spider.json", "w") as file:
         json.dump(train_content, file)
 
-def test__load_ddl_instructions_for_all_dbs(create_mock_database_folder):
+def test__load_schema_for_all_dbs(create_mock_database_folder):
     # arrange
-    expected_ddl_dict = {
-        "mock_db": """
+    expected_schema_dict = {
+        "mock_db": {"schema": """
+【DB_ID】 mock_db
+【Schema】
+# Table: users
+[
+(user_id:INTEGER, Primary Key, Examples: [1, 2]),
+(name:TEXT, Examples: [Alice Johnson, Bob Smith]),
+(email:TEXT)
+]
+# Table: orders
+[
+(order_id:INTEGER, Primary Key, Examples: [1, 2, 3]),
+(user_id:INTEGER, Examples: [1, 2]),
+(amount:REAL, Examples: [99.99, 149.5, 200.0])
+]
+""", "db_path": "test/scripts/mock_dataset/database/mock_db/mock_db.sqlite"}
+    }
+
+    # act
+    actual_schema_dict = _load_schema_for_all_dbs()
+
+    # assert
+    assert expected_schema_dict.keys() == actual_schema_dict.keys()
+    assert set("".join(expected_schema_dict["mock_db"]["schema"].split()).split("#")) == set("".join(actual_schema_dict["mock_db"]["schema"].split()).split("#"))
+    assert expected_schema_dict["mock_db"]["db_path"] == actual_schema_dict["mock_db"]["db_path"]
+
+def test_create_training_set(create_mock_database_folder, mock_train_file):
+    # arrange
+    expected_db = "【DB_ID】 mock_db"
+    expected_table_orders = """# Table: orders
+[
+(order_id:INTEGER, Primary Key, Examples: [1, 2, 3]),
+(user_id:INTEGER, Examples: [1, 2]),
+(amount:REAL, Examples: [99.99, 149.5, 200.0])
+]
+"""
+    expected_table_users = """# Table: users
+[
+(user_id:INTEGER, Primary Key, Examples: [1, 2]),
+(name:TEXT, Examples: [Alice Johnson, Bob Smith]),
+(email:TEXT)
+]"""
+    expected_question = "To answer: How many users exist?\nWe need columns:"
+    expected_repeated_columns_users = "<< users user_id >>\n<< users name >>\n<< users email >>"
+    expected_repeated_columns_orders = "<< orders order_id >>\n<< orders user_id >>\n<< orders amount >>"
+    expected_training_set = [{"input": None, "goal answer": ["users.user_id", "users.name", "users.email"]}]
+
+    # act
+    actual_training_set = create_training_set()
+
+    # assert
+    assert len(expected_training_set) == len(actual_training_set)
+    assert actual_training_set[0]["goal answer"] == expected_training_set[0]["goal answer"]
+    assert expected_db in actual_training_set[0]["input"]
+    assert expected_table_orders in actual_training_set[0]["input"]
+    assert expected_table_users in actual_training_set[0]["input"]
+    assert expected_question in actual_training_set[0]["input"]
+    assert expected_repeated_columns_users in actual_training_set[0]["input"]
+    assert expected_repeated_columns_orders in actual_training_set[0]["input"]
+
+def test__extract_column_names_from_mschema():
+    # arrange
+    input = """
 【DB_ID】 mock_db
 【Schema】
 # Table: users
@@ -75,41 +137,11 @@ def test__load_ddl_instructions_for_all_dbs(create_mock_database_folder):
 (amount:REAL, Examples: [99.99, 149.5, 200.0])
 ]
 """
-    }
+
+    expected_columns = "<< users user_id >>\n<< users name >>\n<< users email >>\n<< orders order_id >>\n<< orders user_id >>\n<< orders amount >>\n"
 
     # act
-    actual_ddl_dict = _load_ddl_instructions_for_all_dbs()
+    actual_columns = _repeat_columns_in_schema(input)
 
     # assert
-    assert expected_ddl_dict.keys() == actual_ddl_dict.keys()
-    assert set("".join(expected_ddl_dict["mock_db"].split()).split("#")) == set("".join(actual_ddl_dict["mock_db"].split()).split("#"))
-
-def test_create_training_set(create_mock_database_folder, mock_train_file):
-    # arrange
-    expected_input = """
-【DB_ID】 mock_db
-【Schema】
-# Table: users
-[
-(user_id:INTEGER, Primary Key, Examples: [1, 2]),
-(name:TEXT, Examples: [Alice Johnson, Bob Smith]),
-(email:TEXT)
-]
-# Table: orders
-[
-(order_id:INTEGER, Primary Key, Examples: [1, 2, 3]),
-(user_id:INTEGER, Examples: [1, 2]),
-(amount:REAL, Examples: [99.99, 149.5, 200.0])
-]
-To answer: How many users exist?
-We need columns:
-    """
-    expected_training_set = [{"input": expected_input, "goal answer": ["users.user_id", "users.name", "users.email"]}]
-
-    # act
-    actual_training_set = create_training_set()
-
-    # assert
-    assert len(expected_training_set) == len(actual_training_set)
-    assert actual_training_set[0]["goal answer"] == expected_training_set[0]["goal answer"]
-    assert actual_training_set[0]["input"] == expected_input
+    assert expected_columns == actual_columns

@@ -180,8 +180,8 @@ __pycache__
 
 # ignore .local folder containing data
 .local/
-test/src/core/temp
-test/scripts/mock_dataset
+test/src/core/temp/
+test/scripts/mock_dataset/
 
 # Mac .DS_store
 .DS_store

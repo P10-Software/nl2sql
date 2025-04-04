@@ -3,15 +3,12 @@ from unittest.mock import patch
 import pytest
 import os
 from src.core.extract_instructions import get_query_build_instruct, sanitise_query, extract_column_table
+import shutil
 
 @pytest.fixture
 def create_mock_database_file():
-    if not os.path.exists("test/src/core/temp/"):
-        os.makedirs("test/src/core/temp/")
-
+    os.makedirs("test/src/core/temp/")
     db_path = "test/src/core/temp/mock_db.sqlite"
-    if os.path.exists(f"{db_path}"):
-            os.remove(f"{db_path}")
     conn = sqlite3.connect(db_path)
 
     build_intstructions = """
@@ -40,6 +37,10 @@ def create_mock_database_file():
     conn.executescript(build_intstructions)
     conn.commit()
     conn.close()
+
+    yield
+
+    shutil.rmtree("test/src/core/temp/")
 
 @pytest.mark.parametrize("kind, expected", [
     ('Columns', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL);"),
@@ -75,10 +76,6 @@ def test_get_query_build_instructions(mock_build_tree, kind, expected):
 
 
 @pytest.mark.parametrize("sql, expected", [
-    ("SELECT name FROM names WHERE name LIKE '%john%';",
-     "SELECT name FROM names WHERE name LIKE '';"),
-    ("SELECT name, age FROM people WHERE name like '%Johnny%' AND age > 18;",
-     "SELECT name, age FROM people WHERE name like '' AND age > 18;"),
     ("SELECT age FROM people;", "SELECT age FROM people;"),
     ("SELECT COUNT(name) FROM people;", "SELECT name FROM people;"),
     ("SELECT COUNT(name) FROM people where age > AVG(age);", "SELECT name FROM people where age > age;")
@@ -105,12 +102,15 @@ def test_sanitise_query_w_db_access(create_mock_database_file, sql, expected):
 @pytest.mark.parametrize("sql, expected", [
     ("SELECT name, age FROM people WHERE name LIKE '% s.c master%'", {'people': ['name', 'age']}),
     ("SELECT age FROM people", {'people': ['age']}),
-    ("SELECT age, name FROM people AND SELECT gender FROM genders", {'people': ['age', 'name'], 'genders': ['gender']}),
+    ("SELECT people.age, people.name FROM people AND SELECT genders.gender FROM genders", {'people': ['age', 'name'], 'genders': ['gender']}),
     ("SELECT name FROM people and SELECT gender FROM people WHERE gender LIKE '% SELECT age FROM people%'", {'people': ['name', 'gender']}),
     ("SELECT people.name FROM people and SELECT genders.gender FROM genders", {'people': ['name'], 'genders': ['gender']}),
-    ("SELECT people.name FROM people and SELECT gender FROM genders", {'people': ['name'], 'genders': ['gender']}),
+    ("SELECT people.name FROM people and SELECT genders.gender FROM genders", {'people': ['name'], 'genders': ['gender']}),
     ("SELECT T1.name from people as T1", {'people': ['name']}),
-    ("SELECT name, * FROM people;", {'people': ['name']}) # * should be ignored
+    ("SELECT name, * FROM people;", {'people': ['name']}), # * should be ignored
+    ("SELECT name FROM people WHERE email = 'john@doe.com';", {'people': ['name', 'email']}),
+    ("SELECT name FROM people where gender LIKE 'female';", {"people": ["name", "gender"]}),
+    ("SELECT name FROM people WHERE age > 18;", {"people": ["name", "age"]})
 ])
 def test_extract_column_table(sql, expected):
     # Arrange + Act

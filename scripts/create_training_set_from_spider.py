@@ -1,10 +1,11 @@
 from src.core.extract_instructions import extract_column_table
 from json import load, dump
-from os.path import join
+from os.path import join, basename
 from os import walk
 from sqlalchemy import create_engine
 from mschema.schema_engine import SchemaEngine
 import re
+import os
 
 PATH_TO_SPIDER_DIR = "../spider_data/spider_data/"
 
@@ -19,7 +20,7 @@ def create_training_set():
     for question_pair in spider_train_set:
         question = question_pair["question"]
         schema = schema_dict[question_pair["db_id"]]["schema"]
-        schema_repeated = _repeat_columns_in_schema(schema)
+        schema_repeated = _extract_columns_in_schema(schema)
         
         # Extract goal columns from query
         column_table = extract_column_table(question_pair["query"], schema_dict[question_pair["db_id"]]["db_path"])
@@ -36,12 +37,12 @@ def _load_schema_for_all_dbs():
     ddl_dict = {}
     database_paths = [join(dirpath,f) for (dirpath, _, filenames) in walk(join(PATH_TO_SPIDER_DIR, "database")) for f in filenames if f.endswith(".sqlite")]
     for database_path in database_paths:
-        db_id = database_path.split("/")[4]
+        db_id = basename(database_path).split(".")[0]
         db_engine = create_engine(f'sqlite:///{database_path}')
         ddl_dict[db_id] = {"schema": SchemaEngine(engine=db_engine, db_name=db_id).mschema.to_mschema(), "db_path": database_path}
     return ddl_dict
 
-def _repeat_columns_in_schema(mschema: str) -> str:
+def _extract_columns_in_schema(mschema: str) -> str:
     columns_in_schema = ""
     
     # Split schema by tables
@@ -56,3 +57,8 @@ def _repeat_columns_in_schema(mschema: str) -> str:
             columns_in_schema += f"<< {table_name} {column} >>\n"
 
     return columns_in_schema
+
+if __name__ == "__main__":
+    training_set = create_training_set()
+    with open(".local/spider_exsl_train.json", "w") as file:
+        dump(training_set, file, indent=4)

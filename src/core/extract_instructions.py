@@ -36,13 +36,15 @@ def get_query_build_instruct(kind: SchemaKind, query: str, db_path: str = "") ->
 def extract_column_table(query: str, db_path: str = "") -> dict[str, list[str]]:
     parser = Parser(sanitise_query(query, db_path))
     tables = parser.tables
-    columns = _parse_column(parser)
+    columns = parser.columns
 
     column_table_mapping = {}
 
     if len(tables) == 1:
         single_table = tables[0]
         for col in columns:
+            if '*' in col:
+                continue
             if '.' in col:
                 table_name, column_name = col.split('.')
                 column_table_mapping.setdefault(
@@ -51,8 +53,13 @@ def extract_column_table(query: str, db_path: str = "") -> dict[str, list[str]]:
                 column_table_mapping.setdefault(single_table, []).append(col)
     else:
         for col in columns:
+            if '*' in col:
+                continue
             if '.' in col:
-                table_name, column_name = col.split('.')
+                try:
+                    table_name, column_name = col.split('.')
+                except:
+                    raise Exception(col)
                 column_table_mapping.setdefault(
                     table_name, []).append(column_name)
             else:
@@ -64,7 +71,7 @@ def extract_column_table(query: str, db_path: str = "") -> dict[str, list[str]]:
 
 def sanitise_query(query: str, db_path: str = ""):
     query = re.sub(r"(?:\w+\(([\w\*]+)\))", r"\1", query, flags=re.IGNORECASE)
-    query = re.sub(r"(LIKE\s*)'[^']*'", r"\1''", query, flags=re.IGNORECASE)
+    #query = re.sub(r"(LIKE\s*)'[^']*'", r"\1''", query, flags=re.IGNORECASE)
 
     # Replace * with all columns in tables if no other columns are selected
     if db_path:
@@ -84,29 +91,6 @@ def sanitise_query(query: str, db_path: str = ""):
                 query = query.replace(select_part, updated_select_part)
 
     return query
-
-def _parse_column(parser: Parser):
-    columns = parser.columns
-    if all('.' in col for col in columns):
-        return columns
-
-    columns = []
-
-    for token in parser.tokens:
-        if token.is_keyword and token.normalized == 'SELECT':
-            next_token = token.next_token
-            column_names = []
-            while next_token is not None:
-                if next_token.value not in ['.', ',', '*']:
-                    column_names.append(next_token.value)
-                next_token = next_token.next_token
-                if next_token.normalized == 'FROM':
-                    columns.extend(
-                        [(next_token.next_token.value + '.' + s if '.' not in s else s) for s in column_names])
-                    break
-
-    return columns
-
 
 def _create_build_instruction_tree() -> dict:
     """

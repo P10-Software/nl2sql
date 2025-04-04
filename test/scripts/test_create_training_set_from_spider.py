@@ -1,26 +1,19 @@
 import scripts.create_training_set_from_spider
 scripts.create_training_set_from_spider.PATH_TO_SPIDER_DIR = "test/scripts/mock_dataset"
 
-from scripts.create_training_set_from_spider import _load_schema_for_all_dbs, create_training_set, _repeat_columns_in_schema
+from scripts.create_training_set_from_spider import _load_schema_for_all_dbs, create_training_set, _extract_columns_in_schema
 import os
 import sqlite3
 import pytest
 import json
+import shutil
 
 @pytest.fixture
 def create_mock_database_folder():
-    if not os.path.exists("test/scripts/mock_dataset"):
-        os.makedirs("test/scripts/mock_dataset")
-
-    if not os.path.exists("test/scripts/mock_dataset/database/mock_db"):
-        os.makedirs("test/scripts/mock_dataset/database/mock_db")
-
-
+    os.makedirs("test/scripts/mock_dataset/database/mock_db")
     open("test/scripts/mock_dataset/database/mock_db/schema.sql", "w").close()
 
     db_path = "test/scripts/mock_dataset/database/mock_db/mock_db.sqlite"
-    if os.path.exists(f"{db_path}"):
-            os.remove(f"{db_path}")
     conn = sqlite3.connect(db_path)
 
     build_intstructions = """
@@ -49,6 +42,10 @@ def create_mock_database_folder():
     conn.executescript(build_intstructions)
     conn.commit()
     conn.close()
+
+    yield
+
+    shutil.rmtree('test/scripts/mock_dataset/database/mock_db')
     
 @pytest.fixture
 def mock_train_file():
@@ -56,7 +53,7 @@ def mock_train_file():
     with open("test/scripts/mock_dataset/train_spider.json", "w") as file:
         json.dump(train_content, file)
 
-def test__load_schema_for_all_dbs(create_mock_database_folder):
+def test_load_schema_for_all_dbs(create_mock_database_folder):
     # arrange
     expected_schema_dict = {
         "mock_db": {"schema": """
@@ -119,7 +116,7 @@ def test_create_training_set(create_mock_database_folder, mock_train_file):
     assert expected_repeated_columns_users in actual_training_set[0]["input"]
     assert expected_repeated_columns_orders in actual_training_set[0]["input"]
 
-def test__extract_column_names_from_mschema():
+def test_extract_column_names_from_mschema():
     # arrange
     input = """
 【DB_ID】 mock_db
@@ -141,7 +138,7 @@ def test__extract_column_names_from_mschema():
     expected_columns = "<< users user_id >>\n<< users name >>\n<< users email >>\n<< orders order_id >>\n<< orders user_id >>\n<< orders amount >>\n"
 
     # act
-    actual_columns = _repeat_columns_in_schema(input)
+    actual_columns = _extract_columns_in_schema(input)
 
     # assert
     assert expected_columns == actual_columns

@@ -39,6 +39,7 @@ def extract_column_table(query: str, db_path: str = "") -> dict[str, list[str]]:
     columns = parser.columns
 
     column_table_mapping = {}
+    ambiguity = False
 
     if len(tables) == 1:
         single_table = tables[0]
@@ -63,20 +64,25 @@ def extract_column_table(query: str, db_path: str = "") -> dict[str, list[str]]:
                 column_table_mapping.setdefault(
                     table_name, []).append(column_name)
             else:
-                logger.error("ERROR extracting columns, found ambiguity.")
-                raise RuntimeError(f"Ambiguity found in query {query}, quitting.")
+                ambiguity = True
+
+        if ambiguity:
+            logger.error(f"ERROR extracting columns, found ambiguity in query: {query}")
 
     return column_table_mapping
 
 
 def sanitise_query(query: str, db_path: str = ""):
-    query = re.sub(r"(?:\w+\(([\w\*]+)\))", r"\1", query, flags=re.IGNORECASE)
-    #query = re.sub(r"(LIKE\s*)'[^']*'", r"\1''", query, flags=re.IGNORECASE)
+    pre_sanitized_query = query
+    query = re.sub(r"\"[^\"]*\"", r"''", query, flags=re.IGNORECASE)
 
     # Replace * with all columns in tables if no other columns are selected
     if db_path:
-        select_part = query.split("FROM")[0]
-        if "*" in select_part and not "," in select_part:
+        # split at FROM keyword - if len > 2 a subquery is present
+        subparts = query.split("FROM") 
+        if "*" in subparts[0] and not "," in subparts[0]:
+            subparts[0] = re.sub(r"(?:\w+\(([\w\*]+)\))", r"\1", subparts[0], flags=re.IGNORECASE)
+            query = "FROM".join(subparts)
             with sqlite3.connect(db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute(query)
@@ -87,8 +93,18 @@ def sanitise_query(query: str, db_path: str = ""):
                     replacement_string = ", ".join(column_names)
                 else:
                     raise Exception("No column names returned")
-                updated_select_part = select_part.replace("*", replacement_string)
-                query = query.replace(select_part, updated_select_part)
+                subparts[0] = subparts[0].replace("*", replacement_string)
+                query = "FROM".join(subparts)
+    
+        if len(subparts) > 2:
+            index_of_current_subquery = 1
+            while index_of_current_subquery <= len(subparts) - 2:
+                if "*" in subparts[index_of_current_subquery]:
+                    logger.warning(f"Query might contain subquery: {pre_sanitized_query}")
+                    break
+                index_of_current_subquery += 1
+
+    query = re.sub(r"(?:\w+\(([\w\*]+)\))", r"\1", query, flags=re.IGNORECASE)
 
     return query
 

@@ -6,6 +6,11 @@ from src.core.extract_instructions import get_query_build_instruct, sanitise_que
 import shutil
 
 @pytest.fixture
+def mock_logger():
+    with patch('src.core.extract_instructions.logger') as mock_logger:
+        yield mock_logger
+
+@pytest.fixture
 def create_mock_database_file():
     os.makedirs("test/src/core/temp/")
     db_path = "test/src/core/temp/mock_db.sqlite"
@@ -74,30 +79,47 @@ def test_get_query_build_instructions(mock_build_tree, kind, expected):
     # Assert
     assert result.strip() == expected.strip()
 
-
 @pytest.mark.parametrize("sql, expected", [
     ("SELECT age FROM people;", "SELECT age FROM people;"),
     ("SELECT COUNT(name) FROM people;", "SELECT name FROM people;"),
-    ("SELECT COUNT(name) FROM people where age > AVG(age);", "SELECT name FROM people where age > age;")
+    ("SELECT COUNT(name) FROM people where age > AVG(age);", "SELECT name FROM people where age > age;"),
+    ("SELECT COUNT(*) FROM users;", "SELECT * FROM users;"),
+    ("SELECT name FROM people WHERE name = \"jane doe\";", "SELECT name FROM people WHERE name = '';")
 ])
-def test_sanitise_query_wo_db_access(sql, expected):
+def test_sanitise_query_wo_db_access(mock_logger, sql, expected):
     # Arrange + Act
     result = sanitise_query(sql)
 
     # Assert
     assert result == expected
+    assert not mock_logger.warning.called
+
 
 @pytest.mark.parametrize("sql, expected", [
     ("SELECT COUNT(*) FROM users;", "SELECT user_id, name, email FROM users;"),
-    ("SELECT name, COUNT(*) FROM users;", "SELECT name, * FROM users;")
+    ("SELECT name, COUNT(*) FROM users;", "SELECT name, * FROM users;"),
+    ("SELECT COUNT(*) FROM (SELECT name FROM users);", "SELECT name FROM (SELECT name FROM users);")
 ])
-def test_sanitise_query_w_db_access(create_mock_database_file, sql, expected):
+def test_sanitise_query_w_db_access(create_mock_database_file, mock_logger, sql, expected):
     # Arrange + Act
     result = sanitise_query(sql, "test/src/core/temp/mock_db.sqlite")
 
     # Assert
-    assert result == expected    
+    assert result == expected
+    assert not mock_logger.warning.called
 
+@pytest.mark.parametrize("sql, expected", [
+    ("SELECT COUNT(*) FROM (SELECT * FROM users);", "SELECT user_id, name, email FROM (SELECT * FROM users);"),
+    ("SELECT COUNT(*) FROM (SELECT name FROM (SELECT * FROM users));", "SELECT name FROM (SELECT name FROM (SELECT * FROM users));"),
+
+])
+def test_sanitise_query_identifies_potential_subquery_with_select_all(create_mock_database_file, mock_logger, sql, expected):
+    # Arrange + Act
+    result = sanitise_query(sql, "test/src/core/temp/mock_db.sqlite")
+
+    # Assert
+    assert result == expected
+    mock_logger.warning.assert_called_with(f"Query might contain subquery: {result}")
 
 @pytest.mark.parametrize("sql, expected", [
     ("SELECT name, age FROM people WHERE name LIKE '% s.c master%'", {'people': ['name', 'age']}),
@@ -108,7 +130,7 @@ def test_sanitise_query_w_db_access(create_mock_database_file, sql, expected):
     ("SELECT people.name FROM people and SELECT genders.gender FROM genders", {'people': ['name'], 'genders': ['gender']}),
     ("SELECT T1.name from people as T1", {'people': ['name']}),
     ("SELECT name, * FROM people;", {'people': ['name']}), # * should be ignored
-    ("SELECT name FROM people WHERE email = 'john@doe.com';", {'people': ['name', 'email']}),
+    ("SELECT name FROM people WHERE email = 'john.doe@doe.com';", {'people': ['name', 'email']}),
     ("SELECT name FROM people where gender LIKE 'female';", {"people": ["name", "gender"]}),
     ("SELECT name FROM people WHERE age > 18;", {"people": ["name", "age"]})
 ])
@@ -118,7 +140,6 @@ def test_extract_column_table(sql, expected):
 
     # Assert
     assert result == expected
-
 
 @pytest.mark.parametrize("kind, expected", [
     ('Full', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL,\n    pln_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);\n\nCREATE TABLE nu_pln (nu_id TEXT NOT NULL);"),

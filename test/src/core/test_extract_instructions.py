@@ -119,7 +119,7 @@ def test_sanitise_query_identifies_potential_subquery_with_select_all(create_moc
 
     # Assert
     assert result == expected
-    mock_logger.warning.assert_called_with(f"Query might contain subquery: {result}")
+    mock_logger.warning.assert_called_with(f"Query might contain subquery: {sql}")
 
 @pytest.mark.parametrize("sql, expected", [
     ("SELECT name, age FROM people WHERE name LIKE '% s.c master%'", {'people': ['name', 'age']}),

@@ -33,7 +33,7 @@ def create_training_set():
 
             valid_train_set.append({"input": f"{schema}\nTo answer: {question}\nWe need columns:\n{schema_repeated}", "goal answer": goal_columns})
         except:
-            invalid_train_set.append({"question": question, "query": {question_pair["query"]}})
+            invalid_train_set.append({"question": question, "query": question_pair["query"]})
 
     return valid_train_set, invalid_train_set
 
@@ -68,4 +68,4 @@ if __name__ == "__main__":
         dump(valid_training_set, file, indent=4)
 
     with open(".local/erroneous_spider_exsl_train.json", "w") as file:
-        dump(valid_training_set, file, indent=4)
+        dump(invalid_training_set, file, indent=4)

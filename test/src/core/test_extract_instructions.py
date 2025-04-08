@@ -84,7 +84,7 @@ def test_get_query_build_instructions(mock_build_tree, kind, expected):
     ("SELECT COUNT(name) FROM people;", "SELECT name FROM people;"),
     ("SELECT COUNT(name) FROM people where age > AVG(age);", "SELECT name FROM people where age > age;"),
     ("SELECT COUNT(*) FROM users;", "SELECT * FROM users;"),
-    ("SELECT name FROM people WHERE name = \"jane doe\";", "SELECT name FROM people WHERE name = '';")
+    ("SELECT name FROM people WHERE name = \"jane doe\";", "SELECT name FROM people WHERE name = '';"),
 ])
 def test_sanitise_query_wo_db_access(mock_logger, sql, expected):
     # Arrange + Act
@@ -96,7 +96,7 @@ def test_sanitise_query_wo_db_access(mock_logger, sql, expected):
 
 
 @pytest.mark.parametrize("sql, expected", [
-    ("SELECT COUNT(*) FROM users;", "SELECT user_id, name, email FROM users;"),
+    ("SELECT COUNT(*) FROM users;", "SELECT users.user_id, users.name, users.email FROM users;"),
     ("SELECT name, COUNT(*) FROM users;", "SELECT name, * FROM users;"),
     ("SELECT COUNT(*) FROM (SELECT name FROM users);", "SELECT name FROM (SELECT name FROM users);")
 ])
@@ -132,7 +132,9 @@ def test_sanitise_query_identifies_potential_subquery_with_select_all(create_moc
     ("SELECT name, * FROM people;", {'people': ['name']}), # * should be ignored
     ("SELECT name FROM people WHERE email = 'john.doe@doe.com';", {'people': ['name', 'email']}),
     ("SELECT name FROM people where gender LIKE 'female';", {"people": ["name", "gender"]}),
-    ("SELECT name FROM people WHERE age > 18;", {"people": ["name", "age"]})
+    ("SELECT name FROM people WHERE age > 18;", {"people": ["name", "age"]}),
+    ("SELECT name FROM people UNION SELECT name FROM aliens;", {"people": ["name"], "aliens": ["name"]})
+
 ])
 def test_extract_column_table(sql, expected):
     # Arrange + Act

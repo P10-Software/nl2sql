@@ -101,10 +101,10 @@ def test_create_training_set(create_mock_database_folder, mock_train_file):
     expected_question = "To answer: How many users exist?\nWe need columns:"
     expected_repeated_columns_users = "<< users user_id >>\n<< users name >>\n<< users email >>"
     expected_repeated_columns_orders = "<< orders order_id >>\n<< orders user_id >>\n<< orders amount >>"
-    expected_training_set = [{"input": None, "goal answer": ["users.user_id", "users.name", "users.email"]}]
+    expected_training_set = [{"input": None, "goal answer": ["users user_id", "users name", "users email"]}]
 
     # act
-    actual_training_set = create_training_set()
+    actual_training_set, _ = create_training_set()
 
     # assert
     assert len(expected_training_set) == len(actual_training_set)

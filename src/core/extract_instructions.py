@@ -25,8 +25,9 @@ def get_query_build_instruct(kind: SchemaKind, query: str, db_path: str = "") ->
     if query is None or '':
         kind = 'Full'
         query = ''
-
-    selected_tables_columns = extract_column_table(query, db_path)
+        selected_tables_columns = None
+    else:
+        selected_tables_columns = extract_column_table(query, db_path)
 
     schema_tree = _create_build_instruction_tree()
 
@@ -34,40 +35,43 @@ def get_query_build_instruct(kind: SchemaKind, query: str, db_path: str = "") ->
 
 
 def extract_column_table(query: str, db_path: str = "") -> dict[str, list[str]]:
-    parser = Parser(sanitise_query(query, db_path))
-    tables = parser.tables
-    columns = parser.columns
-
     column_table_mapping = {}
-    ambiguity = False
+    sanitised_query = sanitise_query(query, db_path)
+    subqueries = re.split(" UNION | INTERSECT | EXCEPT", sanitised_query)
+    for subquery in subqueries:
+        parser = Parser(subquery)
+        tables = parser.tables
+        columns = parser.columns
 
-    if len(tables) == 1:
-        single_table = tables[0]
-        for col in columns:
-            if '*' in col:
-                continue
-            if '.' in col:
-                table_name, column_name = col.split('.')
-                column_table_mapping.setdefault(
-                    table_name, []).append(column_name)
-            else:
-                column_table_mapping.setdefault(single_table, []).append(col)
-    else:
-        for col in columns:
-            if '*' in col:
-                continue
-            if '.' in col:
-                try:
+        if len(tables) == 1:
+            single_table = tables[0]
+            for col in columns:
+                if '*' in col:
+                    continue
+                if '.' in col:
                     table_name, column_name = col.split('.')
-                except:
-                    raise Exception(col)
-                column_table_mapping.setdefault(
-                    table_name, []).append(column_name)
-            else:
-                ambiguity = True
-
-        if ambiguity:
-            logger.error(f"ERROR extracting columns, found ambiguity in query: {query}")
+                    column_table_mapping.setdefault(
+                        table_name, []).append(column_name)
+                else:
+                    column_table_mapping.setdefault(single_table, []).append(col)
+        else:
+            for col in columns:
+                if '*' in col:
+                    continue
+                if '.' in col:
+                    try:
+                        table_name, column_name = col.split('.')
+                    except:
+                        raise Exception(col)
+                    column_table_mapping.setdefault(
+                        table_name, []).append(column_name)
+                else:
+                    logger.error(f"ERROR extracting columns, found ambiguity in query: {query}")
+                    raise Exception(f"ERROR extracting columns, found ambiguity in query: {query}")
+                
+    if not column_table_mapping: 
+        logger.error(f"ERROR empty column table mapping")
+        raise Exception(f"ERROR empty column table mapping")
 
     return column_table_mapping
 
@@ -87,6 +91,11 @@ def sanitise_query(query: str, db_path: str = ""):
                 cursor = conn.cursor()
                 cursor.execute(query)
                 column_names = [desc[0] for desc in cursor.description]
+                from_part_tokens = subparts[1].split("WHERE")[0].strip().split(" ")
+                if len(from_part_tokens) == 1:
+                    table_name = from_part_tokens[0].removesuffix(";")
+                    column_names = [f"{table_name}.{column}" for column in column_names]
+
                 if len(column_names) == 1:
                     replacement_string = column_names[0]
                 elif len(column_names) > 1:

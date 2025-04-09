@@ -4,19 +4,20 @@ import pandas as pd
 from sql_metadata import Parser
 from src.common.logger import get_logger
 from src.database.database import execute_query
-
+import sqlite3
 
 SchemaKind = Literal['Full', 'Tables', 'Columns']
 logger = get_logger(__name__)
 
 
-def get_query_build_instruct(kind: SchemaKind, query: str) -> str:
+def get_query_build_instruct(kind: SchemaKind, query: str, db_path: str = "") -> str:
     """
     Find the build instructions of the database based on a query.
 
     Args:
     - kind (SchemaKind): One of 'Full', 'Tables', 'Columns' specifying how restricted the schema should be.
     - query: SQL query in string format
+    - db_path: Optional path to sqlite DB
 
     Returns:
     - SQL build instructions (sql): SQL instructions specifying how to build the DB.
@@ -25,69 +26,97 @@ def get_query_build_instruct(kind: SchemaKind, query: str) -> str:
     if query is None or '':
         kind = 'Full'
         query = ''
-
-    selected_tables_columns = _extract_column_table(query)
+        selected_tables_columns = None
+    else:
+        selected_tables_columns = extract_column_table(query, db_path)
 
     schema_tree = _create_build_instruction_tree()
 
     return _create_build_instruction(schema_tree, selected_tables_columns, kind)
 
 
-def _extract_column_table(query: str) -> dict[str, list[str]]:
-    parser = Parser(sanitise_query(query))
-    tables = parser.tables
-    columns = _parse_column(parser)
-
+def extract_column_table(query: str, db_path: str = "") -> dict[str, list[str]]:
     column_table_mapping = {}
+    sanitised_query = sanitise_query(query, db_path)
+    subqueries = re.split(" UNION | INTERSECT | EXCEPT", sanitised_query)
+    for subquery in subqueries:
+        parser = Parser(subquery)
+        tables = parser.tables
+        columns = parser.columns
 
-    if len(tables) == 1:
-        single_table = tables[0]
-        for col in columns:
-            if '.' in col:
-                table_name, column_name = col.split('.')
-                column_table_mapping.setdefault(
-                    table_name, []).append(column_name)
-            else:
-                column_table_mapping.setdefault(single_table, []).append(col)
-    else:
-        for col in columns:
-            if '.' in col:
-                table_name, column_name = col.split('.')
-                column_table_mapping.setdefault(
-                    table_name, []).append(column_name)
-            else:
-                logger.error("ERROR extracting columns, found ambiguity.")
-                raise RuntimeError(f"Ambiguity found in query {query}, quitting.")
+        if len(tables) == 1:
+            single_table = tables[0]
+            for col in columns:
+                if '*' in col:
+                    continue
+                if '.' in col:
+                    table_name, column_name = col.split('.')
+                    column_table_mapping.setdefault(
+                        table_name, []).append(column_name)
+                else:
+                    column_table_mapping.setdefault(single_table, []).append(col)
+        else:
+            for col in columns:
+                if '*' in col:
+                    continue
+                if '.' in col:
+                    try:
+                        table_name, column_name = col.split('.')
+                    except:
+                        raise Exception(col)
+                    column_table_mapping.setdefault(
+                        table_name, []).append(column_name)
+                else:
+                    logger.error(f"ERROR extracting columns, found ambiguity in query: {query}")
+                    raise Exception(f"ERROR extracting columns, found ambiguity in query: {query}")
+                
+    if not column_table_mapping: 
+        logger.error(f"ERROR empty column table mapping")
+        raise Exception(f"ERROR empty column table mapping")
 
     return column_table_mapping
 
 
-def sanitise_query(query: str):
-    return re.sub(r"(LIKE\s*)'[^']*'", r"\1''", query, flags=re.IGNORECASE)
+def sanitise_query(query: str, db_path: str = ""):
+    pre_sanitized_query = query
+    query = re.sub(r"\"[^\"]*\"", r"''", query, flags=re.IGNORECASE)
 
+    # Replace * with all columns in tables if no other columns are selected
+    if db_path:
+        # split at FROM keyword - if len > 2 a subquery is present
+        subparts = query.split("FROM") 
+        if "*" in subparts[0] and not "," in subparts[0]:
+            subparts[0] = re.sub(r"(?:\w+\(([\w\*]+)\))", r"\1", subparts[0], flags=re.IGNORECASE)
+            query = "FROM".join(subparts)
+            with sqlite3.connect(db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(query)
+                column_names = [desc[0] for desc in cursor.description]
+                from_part_tokens = subparts[1].split("WHERE")[0].strip().split(" ")
+                if len(from_part_tokens) == 1:
+                    table_name = from_part_tokens[0].removesuffix(";")
+                    column_names = [f"{table_name}.{column}" for column in column_names]
 
-def _parse_column(parser: Parser):
-    columns = parser.columns
-    if all('.' in col for col in columns):
-        return columns
-
-    columns = []
-
-    for token in parser.tokens:
-        if token.is_keyword and token.normalized == 'SELECT':
-            next_token = token.next_token
-            column_names = []
-            while next_token is not None:
-                if next_token.value not in ['.', ',']:
-                    column_names.append(next_token.value)
-                next_token = next_token.next_token
-                if next_token.normalized == 'FROM':
-                    columns.extend(
-                        [(next_token.next_token.value + '.' + s if '.' not in s else s) for s in column_names])
+                if len(column_names) == 1:
+                    replacement_string = column_names[0]
+                elif len(column_names) > 1:
+                    replacement_string = ", ".join(column_names)
+                else:
+                    raise Exception("No column names returned")
+                subparts[0] = subparts[0].replace("*", replacement_string)
+                query = "FROM".join(subparts)
+    
+        if len(subparts) > 2:
+            index_of_current_subquery = 1
+            while index_of_current_subquery <= len(subparts) - 2:
+                if "*" in subparts[index_of_current_subquery]:
+                    logger.warning(f"Query might contain subquery: {pre_sanitized_query}")
                     break
+                index_of_current_subquery += 1
 
-    return columns
+    query = re.sub(r"(?:\w+\(([\w\*]+)\))", r"\1", query, flags=re.IGNORECASE)
 
+    return query
 
 def _create_build_instruction_tree() -> dict:
     """

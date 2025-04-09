@@ -17,6 +17,7 @@ def get_query_build_instruct(kind: SchemaKind, query: str, db_path: str = "") ->
     Args:
     - kind (SchemaKind): One of 'Full', 'Tables', 'Columns' specifying how restricted the schema should be.
     - query: SQL query in string format
+    - db_path: Optional path to sqlite DB
 
     Returns:
     - SQL build instructions (sql): SQL instructions specifying how to build the DB.

@@ -5,7 +5,6 @@ from os import walk
 from sqlalchemy import create_engine
 from mschema.schema_engine import SchemaEngine
 import re
-import os
 
 PATH_TO_SPIDER_DIR = "../spider_data/spider_data/"
 
@@ -38,13 +37,13 @@ def create_training_set():
     return valid_train_set, invalid_train_set
 
 def _load_schema_for_all_dbs():
-    ddl_dict = {}
+    schema_dict = {}
     database_paths = [join(dirpath,f) for (dirpath, _, filenames) in walk(join(PATH_TO_SPIDER_DIR, "database")) for f in filenames if f.endswith(".sqlite")]
     for database_path in database_paths:
         db_id = basename(database_path).split(".")[0]
         db_engine = create_engine(f'sqlite:///{database_path}')
-        ddl_dict[db_id] = {"schema": SchemaEngine(engine=db_engine, db_name=db_id).mschema.to_mschema(), "db_path": database_path}
-    return ddl_dict
+        schema_dict[db_id] = {"schema": SchemaEngine(engine=db_engine, db_name=db_id).mschema.to_mschema(), "db_path": database_path}
+    return schema_dict
 
 def _extract_columns_in_schema(mschema: str) -> str:
     columns_in_schema = ""

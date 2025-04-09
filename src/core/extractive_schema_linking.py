@@ -82,7 +82,7 @@ CREATE TABLE book (
 
     schema_linker = SchemaLinker()
     column_probs = schema_linker.get_relevance_for_schema_chunk(schema, question)
-    
-    for col, score in column_probs:
 
+    for col, score in column_probs:
+        print(f"{col}:{score}")
 

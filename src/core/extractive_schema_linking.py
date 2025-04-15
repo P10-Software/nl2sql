@@ -4,9 +4,11 @@ import torch.optim as optim
 from transformers import AutoModel, AutoTokenizer
 from torch.utils.data import Dataset, DataLoader
 import re
-import os
+import json
+from tqdm import tqdm
 
 TRAINED_MODEL_PATH="models/EXSL/coarse_grained_schema_linker.pth"
+TRAIN_SET_PATH=".local/spider_exsl_train.json"
 
 class ExSLcModel(nn.Module):
     def __init__(self, base_model_name):
@@ -18,6 +20,8 @@ class ExSLcModel(nn.Module):
         """
         super().__init__()
         self.base_model = AutoModel.from_pretrained(base_model_name, torch_dtype=torch.bfloat16)
+        for param in self.base_model.parameters():
+            param.requires_grad = False
         hidden_size = self.base_model.config.hidden_size
         
         # Single output for relevance (binary)
@@ -25,8 +29,6 @@ class ExSLcModel(nn.Module):
         
         # Special tokens for marking columns
         self.tokenizer = AutoTokenizer.from_pretrained(base_model_name)
-        self.tokenizer.add_tokens(["«", "»"])
-        self.base_model.resize_token_embeddings(len(self.tokenizer))
         
     def forward(self, input_ids, attention_mask):
         """
@@ -50,11 +52,13 @@ class ExSLcModel(nn.Module):
         relevance_logits = []
         
         for i in range(batch_size):
-            alpha_pos = (input_ids[i] == self.tokenizer.convert_tokens_to_ids("«")).nonzero().squeeze(-1)
-            omega_pos = (input_ids[i] == self.tokenizer.convert_tokens_to_ids("»")).nonzero().squeeze(-1)
+            input_tokens = self.tokenizer.convert_ids_to_tokens(input_ids[i])
+
+            alpha_positions = [j for j, tok in enumerate(input_tokens) if tok == "ĠÂ<<" or tok == "Â<<"]
+            omega_positions = [j for j, tok in enumerate(input_tokens) if tok == "ĠÂ>>"]
             
-            E_alpha = last_hidden_state[i, alpha_pos]
-            E_omega = last_hidden_state[i, omega_pos]
+            E_alpha = last_hidden_state[i, alpha_positions]
+            E_omega = last_hidden_state[i, omega_positions]
             
             # Concatenate embeddings
             C = torch.cat([E_alpha, E_omega], dim=-1)
@@ -69,8 +73,19 @@ def train_coarse_grained(model, train_data, config):
     # Prepare datasets
     train_dataset = SchemaLinkingDatasetCoarse(train_data, model.tokenizer, config["max_length"])
     
-    # Data loaders
-    train_loader = DataLoader(train_dataset, batch_size=config["batch_size"], shuffle=True)
+    # Data loader
+    def custom_collate_fn(batch):
+        input_ids = torch.stack([item["input_ids"] for item in batch])
+        attention_mask = torch.stack([item["attention_mask"] for item in batch])
+        labels = [item["labels"] for item in batch]  # we don't stack these as the number of labels per item differs (one query might use 2 columns, another 4)
+    
+        return {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "labels": labels
+        }
+
+    train_loader = DataLoader(train_dataset, batch_size=config["batch_size"], shuffle=True, collate_fn=custom_collate_fn)
     
     # Optimizer with paper's parameters
     optimizer = optim.AdamW(
@@ -81,19 +96,17 @@ def train_coarse_grained(model, train_data, config):
     
     criterion = nn.BCEWithLogitsLoss()
     
-    # Training loop for 2 epochs
+    # Training loop
     for epoch in range(config["epochs"]):
         model.train()
         total_loss = 0
         
-        for batch in train_loader:
+        for batch in tqdm(train_loader):
             optimizer.zero_grad()
-            batch = {k: v.to(dtype=torch.bfloat16) if v.dtype.is_floating_point else v for k, v in batch.items()}
-
             
             input_ids = batch["input_ids"].to(config["device"])
             attention_mask = batch["attention_mask"].to(config["device"])
-            labels = batch["labels"].to(config["device"])
+            labels = [label.to(config["device"]) for label in batch["labels"]]
             
             # Forward pass
             logits_list = model(input_ids, attention_mask)
@@ -134,48 +147,27 @@ class SchemaLinkingDatasetCoarse(Dataset):
     
     def __getitem__(self, idx):
         example = self.examples[idx]
-        
+        input, repeated_schema = prepare_input(example["question"], example["schema"])
         # Tokenize the input
         encoding = self.tokenizer(
-            example["input"],
+            input,
             max_length=self.max_length,
             truncation=True,
             padding="max_length",
             return_tensors="pt",
         )
-        
-        # Get positions of marked columns (<< >> in your case)
-        input_ids = encoding["input_ids"][0]
-        alpha_pos = (input_ids == self.tokenizer.convert_tokens_to_ids("<<")).nonzero().squeeze(-1)
-        
+            
         # Create binary labels tensor (1 for relevant, 0 otherwise)
-        num_columns = len(alpha_pos)
+        num_columns = len(repeated_schema)
         labels = torch.zeros(num_columns)
         
-        # Get all marked columns from input
-        marked_columns = []
-        input_tokens = self.tokenizer.convert_ids_to_tokens(input_ids)
-        current_column = []
-        collecting = False
-        
-        for token in input_tokens:
-            if token == "<<":
-                collecting = True
-                current_column = []
-            elif token == ">>":
-                collecting = False
-                marked_columns.append(" ".join(current_column).strip())
-            elif collecting:
-                current_column.append(token)
-        
         # Create label mapping based on "goal answer"
-        goal_columns = set([f"{table} {column}" for table, column in 
-                          [col.split() for col in example["goal answer"]]])
+        goal_columns = set(example["goal answer"])
         
-        for col_idx, col in enumerate(marked_columns):
+        for col_idx, col in enumerate(repeated_schema):
             if col in goal_columns:
                 labels[col_idx] = 1.0
-                
+
         return {
             "input_ids": encoding["input_ids"].squeeze(0),
             "attention_mask": encoding["attention_mask"].squeeze(0),
@@ -196,7 +188,7 @@ def predict_relevance_coarse(model, question, schema, device="auto"):
         Dictionary mapping (table, column) pairs to relevance probability
     """
     # Prepare input text
-    input_text = prepare_input(question, schema)
+    input_text, repeated_schema = prepare_input(question, schema)
     
     # Tokenize
     encoding = model.tokenizer(
@@ -222,23 +214,9 @@ def predict_relevance_coarse(model, question, schema, device="auto"):
         logits = logits_list[0]  # Single example
         probs = torch.sigmoid(logits).to(torch.float32).cpu().numpy()
         
-        # Parse the input to get column names
-        input_tokens = model.tokenizer.convert_ids_to_tokens(input_ids[0])
-        column_info = []
-        current_column = []
-        for token in input_tokens:
-            if token == "«":
-                current_column = []
-            elif token == "»":
-                column_info.append(" ".join(current_column).strip())
-                current_column = []
-            elif current_column is not None:
-                current_column.append(token)
-        
         # Create predictions dictionary
-        for col, prob in zip(column_info, probs):
-            table_col = tuple(col.split())  # (table_name, column_name)
-            predictions[table_col] = float(prob)
+        for col, prob in zip(repeated_schema, probs):
+            predictions[col] = float(prob)
     
     return predictions 
 
@@ -258,13 +236,14 @@ def prepare_input(question, schema):
     
     # Build the input text
     input_text = schema + "\n\nTo answer: " + question + "\n\nWe need columns:\n"
-    
+    repeated_schema = []
+
     # Add all columns with markers
     for table in tables_columns.keys():
         for column in tables_columns[table]:
-            input_text += f"« {table} {column} »\n"
-    
-    return input_text
+            input_text += f"<< {table} {column} >>\n"
+            repeated_schema.append(f"{table} {column}")
+    return input_text, repeated_schema
 
 def parse_schema(schema: str):
     columns_in_schema = {}
@@ -283,15 +262,18 @@ def parse_schema(schema: str):
 
     return columns_in_schema
 
+def load_schema_linker():
+    return torch.load(TRAINED_MODEL_PATH, weights_only=False)
+
 if __name__ == "__main__":
-    # Configuration matching paper's Table 12
+    # Configuration matching ExSL paper
     config = {
         "base_model": "deepseek-ai/deepseek-coder-6.7b-base",
         "max_length": 3000,
         "batch_size": 16,
         "learning_rate": 5e-6,
         "weight_decay": 0.0,
-        "epochs": 2,
+        "epochs": 1,
         "device": "cuda" if torch.cuda.is_available() else "cpu"
     }
 
@@ -299,24 +281,16 @@ if __name__ == "__main__":
     model = ExSLcModel(config["base_model"])
     model.to(config["device"])
 
+    # Load train data set
+    with open(TRAIN_SET_PATH, "r") as train_file:
+        train_set = json.load(train_file)
+
     # Example data format
-    example = {
-    "input": "\u3010DB_ID\u3011 culture_company\n\u3010Schema\u3011\n# Table: movie\n[\n(movie_id:INTEGER, Primary Key, Examples: [1, 2, 3]),\n(Title:TEXT, Examples: [The Boondock Saints, The Big Kahuna, Storm Catcher]),\n(Year:INTEGER, Examples: [1999, 2000, 2001]),\n(Director:TEXT, Examples: [Troy Duffy, John Swanbeck, Anthony Hickox]),\n(Budget_million:REAL, Examples: [6.0, 7.0, 5.0]),\n(Gross_worldwide:INTEGER, Examples: [30471, 3728888, 40500])\n]\n# Table: culture_company\n[\n(Company_name:TEXT, Primary Key, Examples: [Cathay Pacific Culture]),\n(Type:TEXT, Examples: [Corporate, Joint Venture, Subsidiary]),\n(Incorporated_in:TEXT, Examples: [China, Hong Kong]),\n(Group_Equity_Shareholding:REAL, Examples: [18.77, 49.0, 60.0]),\n(book_club_id:TEXT, Examples: [1, 2, 3]),\n(movie_id:TEXT, Examples: [2, 3, 4])\n]\n# Table: book_club\n[\n(book_club_id:INTEGER, Primary Key, Examples: [1, 2, 3]),\n(Year:INTEGER, Examples: [1989, 1990]),\n(Author_or_Editor:TEXT, Examples: [Michael Nava, Donald Ward, Michael Bishop]),\n(Book_Title:TEXT, Examples: [Goldenboy]),\n(Publisher:TEXT, Examples: [Alyson, St. Martin's Press, William Morrow]),\n(Category:TEXT, Examples: [Gay M/SF, Lesb. M/SF, Gay SF/F]),\n(Result:TEXT, Examples: [Won [A ], Nom, Won])\n]\n\u3010Foreign keys\u3011\nculture_company.book_club_id=book_club.book_club_id\nculture_company.movie_id=movie.movie_id\nTo answer: What are all company names that have a corresponding movie directed in the year 1999?\nWe need columns:\n<< movie movie_id >>\n<< movie Title >>\n<< movie Year >>\n<< movie Director >>\n<< movie Budget_million >>\n<< movie Gross_worldwide >>\n<< culture_company Company_name >>\n<< culture_company Type >>\n<< culture_company Incorporated_in >>\n<< culture_company Group_Equity_Shareholding >>\n<< culture_company book_club_id >>\n<< culture_company movie_id >>\n<< book_club book_club_id >>\n<< book_club Year >>\n<< book_club Author_or_Editor >>\n<< book_club Book_Title >>\n<< book_club Publisher >>\n<< book_club Category >>\n<< book_club Result >>\n",
-    "goal answer": [
-        "culture_company company_name",
-        "culture_company movie_id",
-        "movie movie_id",
-        "movie year"
-    ]
-}
-
-    # Train the model
-    trained_model = train_coarse_grained(model, [example], config)
-
-    # Example inference
     question = "What are all company names that have a corresponding movie directed in the year 1999?"
-    schema = """\u3010DB_ID\u3011 culture_company\n\u3010Schema\u3011\n# Table: movie\n[\n(movie_id:INTEGER, Primary Key, Examples: [1, 2, 3]),\n(Title:TEXT, Examples: [The Boondock Saints, The Big Kahuna, Storm Catcher]),\n(Year:INTEGER, Examples: [1999, 2000, 2001]),\n(Director:TEXT, Examples: [Troy Duffy, John Swanbeck, Anthony Hickox]),\n(Budget_million:REAL, Examples: [6.0, 7.0, 5.0]),\n(Gross_worldwide:INTEGER, Examples: [30471, 3728888, 40500])\n]\n# Table: culture_company\n[\n(Company_name:TEXT, Primary Key, Examples: [Cathay Pacific Culture]),\n(Type:TEXT, Examples: [Corporate, Joint Venture, Subsidiary]),\n(Incorporated_in:TEXT, Examples: [China, Hong Kong]),\n(Group_Equity_Shareholding:REAL, Examples: [18.77, 49.0, 60.0]),\n(book_club_id:TEXT, Examples: [1, 2, 3]),\n(movie_id:TEXT, Examples: [2, 3, 4])\n]\n# Table: book_club\n[\n(book_club_id:INTEGER, Primary Key, Examples: [1, 2, 3]),\n(Year:INTEGER, Examples: [1989, 1990]),\n(Author_or_Editor:TEXT, Examples: [Michael Nava, Donald Ward, Michael Bishop]),\n(Book_Title:TEXT, Examples: [Goldenboy]),\n(Publisher:TEXT, Examples: [Alyson, St. Martin's Press, William Morrow]),\n(Category:TEXT, Examples: [Gay M/SF, Lesb. M/SF, Gay SF/F]),\n(Result:TEXT, Examples: [Won [A ], Nom, Won])\n]\n\u3010Foreign keys\u3011\nculture_company.book_club_id=book_club.book_club_id\nculture_company.movie_id=movie.movie_id
-    """
+    schema = "\u3010DB_ID\u3011 culture_company\n\u3010Schema\u3011\n# Table: book_club\n[\n(book_club_id:INTEGER, Primary Key, Examples: [1, 2, 3]),\n(year:INTEGER, Examples: [1989, 1990]),\n(author_or_Editor:TEXT, Examples: [Michael Nava, Donald Ward, Michael Bishop]),\n(book_Title:TEXT, Examples: [Goldenboy]),\n(publisher:TEXT, Examples: [Alyson, St. Martin's Press, William Morrow]),\n(category:TEXT, Examples: [Gay M/SF, Lesb. M/SF, Gay SF/F]),\n(result:TEXT, Examples: [Won [A ], Nom, Won])\n]\n# Table: culture_company\n[\n(company_name:TEXT, Primary Key, Examples: [Cathay Pacific Culture]),\n(type:TEXT, Examples: [Corporate, Joint Venture, Subsidiary]),\n(incorporated_in:TEXT, Examples: [China, Hong Kong]),\n(group_Equity_Shareholding:REAL, Examples: [18.77, 49.0, 60.0]),\n(book_club_id:TEXT, Examples: [1, 2, 3]),\n(movie_id:TEXT, Examples: [2, 3, 4])\n]\n# Table: movie\n[\n(movie_id:INTEGER, Primary Key, Examples: [1, 2, 3]),\n(title:TEXT, Examples: [The Boondock Saints, The Big Kahuna, Storm Catcher]),\n(year:INTEGER, Examples: [1999, 2000, 2001]),\n(director:TEXT, Examples: [Troy Duffy, John Swanbeck, Anthony Hickox]),\n(budget_million:REAL, Examples: [6.0, 7.0, 5.0]),\n(gross_worldwide:INTEGER, Examples: [30471, 3728888, 40500])\n]\n\u3010Foreign keys\u3011\nculture_company.book_club_id=book_club.book_club_id\nculture_company.movie_id=movie.movie_id"
+    
+    # Train the model
+    trained_model = train_coarse_grained(model, train_set, config)
 
     predictions = predict_relevance_coarse(trained_model, question, schema, config["device"])
     print("Relevance Predictions:")
@@ -324,3 +298,9 @@ if __name__ == "__main__":
         print(f"{column}: {'RELEVANT' if prob > 0.5 else 'IRRELEVANT'} (prob: {prob:.2f})")
 
     torch.save(trained_model, TRAINED_MODEL_PATH)
+
+    loaded_model = load_schema_linker()
+    new_predictions = predict_relevance_coarse(loaded_model, question, schema, config["device"])
+    print("Relevance Predictions from loaded:")
+    for column, prob in new_predictions.items():
+        print(f"{column}: {'RELEVANT' if prob > 0.5 else 'IRRELEVANT'} (prob: {prob:.2f})")

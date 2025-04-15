@@ -67,6 +67,7 @@ def select_columns_for_removal(sql_distribution: Dict, percentage_removal: int):
     - A dictionary specifying:
         - The columns (grouped by database) to be removed.
     """
+    db_paths = _list_databases()
     columns_to_remove = {}
     for db, col_dist in sql_distribution.items():
         sorted_cols = sorted(col_dist.items(), key=lambda x: abs(x[1] - percentage_removal))
@@ -75,6 +76,9 @@ def select_columns_for_removal(sql_distribution: Dict, percentage_removal: int):
 
         for i, (col, percent) in enumerate(sorted_cols):
             if percent > percentage_removal:
+                continue
+            t, c = col.split('.', 1)
+            if not _is_safe_to_drop(db_paths[db], t, c):
                 continue
             selected.append(col)
             cumulative += percent
@@ -87,6 +91,11 @@ def select_columns_for_removal(sql_distribution: Dict, percentage_removal: int):
 
         for col, percent in remaining:
             if cumulative + percent > percentage_removal:
+                continue
+            if '.' not in col:
+                continue
+            table, column = col.split('.', 1)
+            if not _is_safe_to_drop(db_paths[db], table, column):
                 continue
             selected.append(col)
             cumulative += percent
@@ -115,7 +124,7 @@ def create_labelled_training_set(removable_columns: Dict, sql_queries: Dict, bir
     pass
 
 
-def _remove_cols_from_databases(removable_columns):
+def remove_cols_from_databases(removable_columns):
     database_paths = _list_databases()
 
     for db, cols in removable_columns.items():
@@ -137,7 +146,7 @@ def _remove_cols_from_databases(removable_columns):
         for table, columns in table_to_cols.items():
             for column in columns:
                 try:
-                    sql = f"ALTER TABLE {table} DROP COLUMN {column};"
+                    sql = f'ALTER TABLE "{table}" DROP COLUMN "{column}";'
                     c.execute(sql)
                     print(f"Dropped column {column} from {table} in {db}")
                 except sqlite3.OperationalError as e:
@@ -145,6 +154,37 @@ def _remove_cols_from_databases(removable_columns):
 
         conn.commit()
         conn.close()
+
+
+def _is_safe_to_drop(db_str, table, column) -> bool:
+    conn = sqlite3.connect(db_str)
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(f'PRAGMA table_info("{table}");')
+        table_info = cursor.fetchall()
+    except sqlite3.OperationalError as e:
+        print(f"[WARNING] Could not inspect table '{table}': {e}")
+        conn.close()
+        return False
+
+    all_columns = [row[1] for row in table_info]
+    pk_columns = [row[1] for row in table_info if row[5]]  # row[5] = pk flag
+
+    try:
+        cursor.execute(f'PRAGMA foreign_key_list("{table}");')
+        fk_columns = [row[3] for row in cursor.fetchall()]  # row[3] = 'from' column
+    except sqlite3.OperationalError as e:
+        print(f"[WARNING] Could not get foreign keys for table '{table}': {e}")
+        fk_columns = []
+
+    conn.close()
+
+    return (
+        column in all_columns and
+        column not in pk_columns and
+        column not in fk_columns
+    )
 
 
 def _list_databases(bird_train_locale=".local/train/train/train_databases/train_databases"):
@@ -236,7 +276,7 @@ if __name__ == '__main__':
 
     labelled_things = _label_queries(cols_to_del, gold_sql_dict)
 
-    _remove_cols_from_databases(cols_to_del)
+    remove_cols_from_databases(cols_to_del)
 
     with open(".local/BirdBertTest.json", 'w') as ff:
         dump(cols_to_del, ff, indent=5)

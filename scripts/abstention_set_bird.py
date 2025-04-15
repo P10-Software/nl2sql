@@ -1,7 +1,9 @@
 from sql_metadata import Parser
 from collections import Counter
-from typing import Literal, List
+from typing import Literal, List, Dict
 from json import dump
+import os
+import sqlite3
 
 
 def extract_gold_sql_db(file_path=".local/train/train/train_gold.sql") -> dict[str, list[str]]:
@@ -50,7 +52,7 @@ def pool_columns(sql_queries: List[str]) -> Counter:
     return Counter(dict(columns_pool.most_common()))  # Sorts the counter
 
 
-def select_columns_for_removal(sql_distribution, percentage_removal: int):
+def select_columns_for_removal(sql_distribution: Dict, percentage_removal: int):
     """
     Selects columns to remove from a database in order to make approximately [percentage_removal]% 
     of the gold SQL queries infeasible. If an exact match is not possible, the function selects as 
@@ -94,8 +96,89 @@ def select_columns_for_removal(sql_distribution, percentage_removal: int):
     return columns_to_remove
 
 
-def build_training_set():
+def create_labelled_training_set(removable_columns: Dict, sql_queries: Dict, bird_train_locale: str = ".local/train/train/train.json"):
+    """
+    Creates the training set with labels.
+    Uses training set from bird to create new abstention training set.
+
+    Args:
+    - removable_columns (dict): A Dictioanry containing which columns should be removed from which database.
+    - sql_queries (dict): A Dictionary containing sql queries and their database.
+    - bird_train_locale (str): Path to location of BIRD tain.json file.
+
+    Returns:
+    - A training set in dictionary form containing:
+        - db_id: name of the database
+        - question: The NL question
+        - feasible: wether the question is answerable, 0 for no, 1 for yes.
+    """
     pass
+
+
+def _remove_cols_from_databases(removable_columns):
+    database_paths = _list_databases()
+
+    for db, cols in removable_columns.items():
+        table_to_cols = {}
+        for col in cols:
+            if '.' not in col or 'T' in col or 'None' in col:
+                continue
+            table, column = col.split('.', 1)
+            table_to_cols.setdefault(table, []).append(column)
+
+        db_path = database_paths.get(db)
+        if not db_path:
+            print(f"Database path not found for {db}")
+            continue
+
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+
+        for table, columns in table_to_cols.items():
+            for column in columns:
+                try:
+                    sql = f"ALTER TABLE {table} DROP COLUMN {column};"
+                    c.execute(sql)
+                    print(f"Dropped column {column} from {table} in {db}")
+                except sqlite3.OperationalError as e:
+                    print(f"Failed to drop {column} from {table} in {db}: {e}")
+
+        conn.commit()
+        conn.close()
+
+
+def _list_databases(bird_train_locale=".local/train/train/train_databases/train_databases"):
+    root_dir = os.path.dirname(os.path.abspath(bird_train_locale))
+    db_paths = {}
+
+    for dirpath, dirnames, filenames in os.walk(root_dir):
+        dirnames[:] = [d for d in dirnames if not d.startswith('.') and not d.startswith('__')]
+
+        for filename in filenames:
+            if filename.startswith('.') or filename.startswith('__'):
+                continue
+            if filename.endswith(".sqlite"):
+                name = os.path.splitext(filename)[0]
+                full_path = os.path.join(dirpath, filename)
+                db_paths[name] = full_path
+
+    return db_paths
+
+
+def _label_queries(removable_columns, sql_queries):
+    infeasible = []
+    feasible = []
+    for db, queries in sql_queries.items():
+        columns_to_remove = set(removable_columns.get(db, []))
+        for query in queries:
+            sql = Parser(query)
+            used_columns = {_qualify_column(col, sql) for col in sql.columns}
+            if used_columns & columns_to_remove:
+                infeasible.append(query)
+            else:
+                feasible.append(query)
+
+    return feasible, infeasible
 
 
 def _qualify_column(col: str, sql) -> str:
@@ -139,6 +222,8 @@ def _find_table_recurs(token, direction: SEARCH_DIRECTION):
 
 
 if __name__ == '__main__':
+    dbs = _list_databases()
+
     gold_sql_dict = extract_gold_sql_db()
 
     column_count_dict = {}
@@ -148,6 +233,13 @@ if __name__ == '__main__':
         column_count_dict[key] = pool
 
     cols_to_del = select_columns_for_removal(column_count_dict, 15)
+
+    labelled_things = _label_queries(cols_to_del, gold_sql_dict)
+
+    _remove_cols_from_databases(cols_to_del)
+
+    with open(".local/BirdBertTest.json", 'w') as ff:
+        dump(cols_to_del, ff, indent=5)
 
     with open(".local/BirdBertTrain.json", 'w') as fp:
         dump(column_count_dict, fp, indent=5)

@@ -2,18 +2,18 @@ import sqlite3
 from unittest.mock import patch
 import pytest
 import os
-from src.core.extract_instructions import get_query_build_instruct, sanitise_query, extract_column_table
+from scripts.extract_instructions import get_query_build_instruct, sanitise_query, extract_column_table
 import shutil
 
 @pytest.fixture
 def mock_logger():
-    with patch('src.core.extract_instructions.logger') as mock_logger:
+    with patch('scripts.extract_instructions.logger') as mock_logger:
         yield mock_logger
 
 @pytest.fixture
 def create_mock_database_file():
-    os.makedirs("test/src/core/temp/")
-    db_path = "test/src/core/temp/mock_db.sqlite"
+    os.makedirs("test/scripts/temp/")
+    db_path = "test/scripts/temp/mock_db.sqlite"
     conn = sqlite3.connect(db_path)
 
     build_intstructions = """
@@ -45,14 +45,14 @@ def create_mock_database_file():
 
     yield
 
-    shutil.rmtree("test/src/core/temp/")
+    shutil.rmtree("test/scripts/temp/")
 
 @pytest.mark.parametrize("kind, expected", [
     ('Columns', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL);"),
     ('Tables', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL,\n    pln_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);"),
     ('Full', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL,\n    pln_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);\n\nCREATE TABLE nu_pln (nu_id TEXT NOT NULL);")
 ])
-@patch('src.core.extract_instructions._create_build_instruction_tree')
+@patch('scripts.extract_instructions._create_build_instruction_tree')
 def test_get_query_build_instructions(mock_build_tree, kind, expected):
     # Arrange
     mock_build_tree.return_value = {
@@ -102,7 +102,7 @@ def test_sanitise_query_wo_db_access(mock_logger, sql, expected):
 ])
 def test_sanitise_query_w_db_access(create_mock_database_file, mock_logger, sql, expected):
     # Arrange + Act
-    result = sanitise_query(sql, "test/src/core/temp/mock_db.sqlite")
+    result = sanitise_query(sql, "test/scripts/temp/mock_db.sqlite")
 
     # Assert
     assert result == expected
@@ -115,7 +115,7 @@ def test_sanitise_query_w_db_access(create_mock_database_file, mock_logger, sql,
 ])
 def test_sanitise_query_identifies_potential_subquery_with_select_all(create_mock_database_file, mock_logger, sql, expected):
     # Arrange + Act
-    result = sanitise_query(sql, "test/src/core/temp/mock_db.sqlite")
+    result = sanitise_query(sql, "test/scripts/temp/mock_db.sqlite")
 
     # Assert
     assert result == expected
@@ -148,7 +148,7 @@ def test_extract_column_table(sql, expected):
     ('Table', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL,\n    pln_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);\n\nCREATE TABLE nu_pln (nu_id TEXT NOT NULL);"),
     ('column', "CREATE TABLE tab_pln (pln_id TEXT NOT NULL,\n    pln_name TEXT,\n    created_at DATE DEFAULT CURRENT_TIMESTAMP);\n\nCREATE TABLE nu_pln (nu_id TEXT NOT NULL);")
 ])
-@patch('src.core.extract_instructions._create_build_instruction_tree')
+@patch('scripts.extract_instructions._create_build_instruction_tree')
 def test_none_query(mock_build_tree, kind, expected):
     # Arrange
     mock_build_tree.return_value = {

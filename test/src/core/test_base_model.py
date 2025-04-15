@@ -34,8 +34,7 @@ def mock_benchmark_set():
     return [{"question": "What are the users?", "golden_query": "SELECT * FROM users;"}]
 
 
-@patch('src.core.extract_instructions.get_query_build_instruct', return_value="MOCK SCHEMA")
-def test_nl2sql_init(mock_get_query_build_instruct, mock_benchmark_set):
+def test_nl2sql_init(mock_benchmark_set):
     # Arrange + Act
     model = MockNL2SQLModel(mock_benchmark_set)
 

@@ -1,10 +1,10 @@
-from src.core.extract_instructions import extract_column_table
+import re
 from json import load, dump
 from os.path import join, basename
 from os import walk
 from sqlalchemy import create_engine
 from mschema.schema_engine import SchemaEngine
-import re
+from scripts.extract_instructions import extract_column_table
 
 PATH_TO_SPIDER_DIR = "../spider_data/spider_data/"
 

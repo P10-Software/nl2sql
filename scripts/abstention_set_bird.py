@@ -37,12 +37,65 @@ def pool_columns(sql_queries: List[str]) -> Counter:
     columns_pool = Counter()
 
     for line in sql_queries:
+        cols = set()
         sql = Parser(line)
         for col in sql.columns:
             col = _qualify_column(col, sql)
-            columns_pool.update([col])
+            cols.add(col)
+        columns_pool.update(cols)
 
-    return Counter(dict(columns_pool.most_common()))
+    for col in columns_pool:
+        columns_pool[col] = round((columns_pool[col] / len(sql_queries)) * 100, 2)
+
+    return Counter(dict(columns_pool.most_common()))  # Sorts the counter
+
+
+def select_columns_for_removal(sql_distribution, percentage_removal: int):
+    """
+    Selects columns to remove from a database in order to make approximately [percentage_removal]% 
+    of the gold SQL queries infeasible. If an exact match is not possible, the function selects as 
+    close a percentage as possible without exceeding the target.
+
+    Args:
+    - sql_distribution (dict): A dictionary mapping each column to the number or percentage of 
+      gold queries in which it appears.
+    - percentage_removal (int): Target percentage of gold queries to make infeasible by removing columns.
+
+    Returns:
+    - A dictionary specifying:
+        - The columns (grouped by database) to be removed.
+    """
+    columns_to_remove = {}
+    for db, col_dist in sql_distribution.items():
+        sorted_cols = sorted(col_dist.items(), key=lambda x: abs(x[1] - percentage_removal))
+        selected = []
+        cumulative = 0
+
+        for i, (col, percent) in enumerate(sorted_cols):
+            if percent > percentage_removal:
+                continue
+            selected.append(col)
+            cumulative += percent
+            break
+
+        remaining = sorted(
+            [(col, p) for col, p in col_dist.items() if col not in selected],
+            key=lambda x: -x[1]
+        )
+
+        for col, percent in remaining:
+            if cumulative + percent > percentage_removal:
+                continue
+            selected.append(col)
+            cumulative += percent
+
+        columns_to_remove[db] = selected
+
+    return columns_to_remove
+
+
+def build_training_set():
+    pass
 
 
 def _qualify_column(col: str, sql) -> str:
@@ -93,6 +146,8 @@ if __name__ == '__main__':
     for key, val in gold_sql_dict.items():
         pool = pool_columns(val)
         column_count_dict[key] = pool
+
+    cols_to_del = select_columns_for_removal(column_count_dict, 15)
 
     with open(".local/BirdBertTrain.json", 'w') as fp:
         dump(column_count_dict, fp, indent=5)

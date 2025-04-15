@@ -1,6 +1,8 @@
 from sql_metadata import Parser
 from collections import Counter
-from src.core.extract_instructions import extract_column_table
+from typing import Literal, List
+from json import dump
+
 
 def extract_gold_sql_db(file_path=".local/train/train/train_gold.sql") -> dict[str, list[str]]:
     """
@@ -28,34 +30,69 @@ def extract_gold_sql_db(file_path=".local/train/train/train_gold.sql") -> dict[s
     return gold_sql
 
 
-def pool_columns(sql_queries: list[str]) -> Counter:
+def pool_columns(sql_queries: List[str]) -> Counter:
     """
     Pools all columns for gold sql for a database, used to remove x% of columns later.
     """
     columns_pool = Counter()
-    
+
     for line in sql_queries:
         sql = Parser(line)
         for col in sql.columns:
-            if '.' not in col and len(sql.tables) == 1:
-                col = sql.tables[0] + '.' + col
-            elif '.' not in col:
-                print('print')
-                for token in sql.tokens:
-                    if token.value == col and token.last_keyword.upper() != 'SELECT':
-                        def find_table_prev(t):
-                            if t.last_keyword == 'FROM' and t.is_name:
-                                return t.value
-                            find_table_prev(t.previ)
-
+            col = _qualify_column(col, sql)
             columns_pool.update([col])
 
-    return columns_pool
+    return Counter(dict(columns_pool.most_common()))
 
 
+def _qualify_column(col: str, sql) -> str:
+    if '.' in col:
+        return col
+
+    if len(sql.tables) == 1:
+        return f"{sql.tables[0]}.{col}"
+
+    return _infer_column_table(col, sql)
+
+
+def _infer_column_table(col: str, sql) -> str:
+    for token in sql.tokens:
+        if token.value != col:
+            continue
+
+        direction = 'back' if token.last_keyword.upper() != 'SELECT' else 'front'
+        table = _find_table_recurs(token, direction)
+        return f"{table}.{col}"
+
+    return col
+
+
+SEARCH_DIRECTION = Literal['front', 'back']
+
+
+def _find_table_recurs(token, direction: SEARCH_DIRECTION):
+    try:
+        if token.position == -1:
+            return 'None'
+
+        if token.last_keyword.upper() == 'FROM' and token.is_name:
+            return token.value
+
+        next_token = token.next_token if direction == 'front' else token.previous_token
+    except Exception:
+        return 'None'
+
+    return _find_table_recurs(next_token, direction)
 
 
 if __name__ == '__main__':
-    dict = extract_gold_sql_db()
-    for key, val in dict.items():
+    gold_sql_dict = extract_gold_sql_db()
+
+    column_count_dict = {}
+
+    for key, val in gold_sql_dict.items():
         pool = pool_columns(val)
+        column_count_dict[key] = pool
+
+    with open(".local/BirdBertTrain.json", 'w') as fp:
+        dump(column_count_dict, fp, indent=5)

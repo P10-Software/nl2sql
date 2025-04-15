@@ -1,10 +1,10 @@
 from typing import Literal
+import sqlite3
 import re
 import pandas as pd
 from sql_metadata import Parser
 from src.common.logger import get_logger
 from src.database.database import execute_query
-import sqlite3
 
 SchemaKind = Literal['Full', 'Tables', 'Columns']
 logger = get_logger(__name__)

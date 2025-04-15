@@ -1,5 +1,4 @@
 import pytest
-import pandas as pd
 from src.core.base_model import NL2SQLModel, PromptStrategy
 from unittest.mock import MagicMock, patch, call
 
@@ -35,8 +34,7 @@ def mock_benchmark_set():
     return [{"question": "What are the users?", "golden_query": "SELECT * FROM users;"}]
 
 
-@patch('src.core.extract_instructions.get_query_build_instruct', return_value="MOCK SCHEMA")
-def test_nl2sql_init(mock_get_query_build_instruct, mock_benchmark_set):
+def test_nl2sql_init(mock_benchmark_set):
     # Arrange + Act
     model = MockNL2SQLModel(mock_benchmark_set)
 
@@ -71,14 +69,12 @@ def test_prune_generated_query(mock_benchmark_set):
     assert res == "SELECT name FROM users WHERE age > 30;"
 
 
-@pytest.mark.parametrize("schema_kind", ["columns", "tables", "full"])
-@patch("src.core.base_model.get_query_build_instruct", return_value="MOCK SCHEMA")
-def test_run(mock_get_query_build_instruct, mock_benchmark_set, mock_logger, schema_kind):
+def test_run(mock_benchmark_set, mock_logger):
     # Arrange
     model = MockNL2SQLModel(mock_benchmark_set)
 
     with patch.object(model, "_answer_single_question", return_value="SELECT * FROM users;"):
-        model.run(schema_size=schema_kind)
+        model.run()
 
     # Assert
     assert len(model.results) == len(mock_benchmark_set)

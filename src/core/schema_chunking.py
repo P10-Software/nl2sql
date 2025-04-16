@@ -12,7 +12,7 @@ def chunk_mschema(mschema: str, context_size) -> list[str]:
     - mschema (str): DB schema in M-Schema format.
     - context_size: The size of a models context window
     """
-    
+
     test = mschema.split("#")
     print(test[92])
     # [print(x) for x in test]
@@ -21,13 +21,23 @@ def chunk_mschema(mschema: str, context_size) -> list[str]:
 
 if __name__ == "__main__":
     mschema = ""
-    with open(".local/mschema_abbreviated.txt", "r") as file:
+    with open(".local/mschema_trial_metadata_abbreviated.txt", "r") as file:
         mschema = file.read()
 
-        dataset = {"question": "test question", "golden_query": "test gold"}
-        prompt_strategy = XiYanSQLPromptStrategy("sqlite")
-        model = XiYanSQLModel(dataset, prompt_strategy, mschema=True)
+    dataset = [{"question": "test question", "golden_query": "test gold"}]
+    prompt_strategy = XiYanSQLPromptStrategy("sqlite")
+    model = XiYanSQLModel(dataset, prompt_strategy, mschema=True)
 
-    print("Chunking")
+    #mschema = mschema.split("#")
 
-    chunk_mschema(mschema, 1000)
+    prompt = model.prompt_strategy.get_prompt(mschema, "This is a question template")
+
+    print(prompt)
+    print("Characters in prompt: ", len(prompt))
+    tokens = model.tokenizer(prompt, return_tensors="pt", truncation=False)["input_ids"][0]
+    print("Tokens in prompt: ", len(tokens))
+    context_length = getattr(model.model.config, "max_position_embeddings", None)
+
+    print("Model context length: ", context_length)
+
+    #chunk_mschema(mschema, 1000)

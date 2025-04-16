@@ -9,6 +9,9 @@ import os
 import sqlite3
 
 
+SEARCH_DIRECTION = Literal['front', 'back']
+
+
 def extract_gold_sql_db(file_path=".local/train/train/train_gold.sql") -> dict[str, list[str]]:
     """
     Groups gold SQL by their database. Used for later processing.
@@ -246,7 +249,7 @@ def _list_databases(bird_train_locale=".local/train/train/train_databases/train_
     db_paths = {}
 
     for dirpath, dirnames, filenames in os.walk(root_dir):
-        dirnames[:] = [d for d in dirnames if not d.startswith('.') and not d.startswith('__')]
+        dirnames = [d for d in dirnames if not d.startswith('.') and not d.startswith('__')]
 
         for filename in filenames:
             if filename.startswith('.') or filename.startswith('__'):
@@ -297,9 +300,6 @@ def _infer_column_table(col: str, sql) -> str:
     return col
 
 
-SEARCH_DIRECTION = Literal['front', 'back']
-
-
 def _find_table_recurs(token, direction: SEARCH_DIRECTION):
     try:
         if token.position == -1:
@@ -316,20 +316,20 @@ def _find_table_recurs(token, direction: SEARCH_DIRECTION):
 
 
 if __name__ == '__main__':
-    # m schema :)
-    dbs = _list_databases()
+    infeasible_sql_percent = 15
 
     gold_sql_dict = extract_gold_sql_db()
 
     column_count_dict = {}
-
     for key, val in gold_sql_dict.items():
         pool = pool_columns(val)
         column_count_dict[key] = pool
 
-    cols_to_del = select_columns_for_removal(column_count_dict, 15)
+    cols_to_del = select_columns_for_removal(column_count_dict, infeasible_sql_percent)
+
+    remove_cols_from_databases(cols_to_del)
 
     new_dataset = create_labelled_training_set(cols_to_del, gold_sql_dict)
 
-    with open(".local/BirdBertTrain.json", 'w') as fp:
-        dump(new_dataset, fp, indent=5)
+    with open(".local/bird_abstention_train_set.json", 'w') as fp:
+        dump(new_dataset, fp, indent=4)

@@ -25,7 +25,6 @@ PRE_ABSTENTION = bool(int(os.getenv('PRE_ABSTENTION', 0)))
 POST_ABSTENTION = bool(int(os.getenv('POST_ABSTENTION', 0)))
 DATE = date.today()
 
-SCHEMA_SIZES = ["Full", "Tables", "Columns"]
 
 def load_dataset(dataset_path: str):
     with open(dataset_path, "r") as file:
@@ -66,11 +65,10 @@ def get_model() -> NL2SQLModel:
 
 def run_experiments(model: NL2SQLModel) -> None:
     for i in range(NUMBER_OF_RUNS):
-        for schema_size in SCHEMA_SIZES:
-            model.run(schema_size)
-            file_name = f"{MODEL}{DATASET_NAME}{schema_size}{'Natural' if DB_NATURAL else 'Abbreviated'}{'MSchema' if MSCHEMA else ''}{'PreAbstention' if PRE_ABSTENTION else ''}{'PostAbstention' if POST_ABSTENTION else ''}_{i + 1}.json"
-            save_results(f"{RESULTS_DIR}/{DB_NAME}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/{file_name}", model)
-            model.results = {}
+        model.run()
+        file_name = f"{MODEL}{DATASET_NAME}{'Natural' if DB_NATURAL else 'Abbreviated'}{'MSchema' if MSCHEMA else ''}{'PreAbstention' if PRE_ABSTENTION else ''}{'PostAbstention' if POST_ABSTENTION else ''}_{i + 1}.json"
+        save_results(f"{RESULTS_DIR}/{DB_NAME}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/{file_name}", model)
+        model.results = {}
 
 
 if __name__ == "__main__":

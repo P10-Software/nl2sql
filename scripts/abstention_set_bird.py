@@ -161,7 +161,7 @@ def create_labelled_training_set(removable_columns: Dict, sql_queries: Dict, bir
 
     bird_abstention_set = []
 
-    for val in tqdm(bird_train_set, desc="Bulding training set, on val:"):
+    for val in tqdm(bird_train_set, desc="Building training set, on val:"):
         question = {
             'db_id': val.get('db_id'),
             'question': val.get('question'),

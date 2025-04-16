@@ -1,7 +1,7 @@
 from sql_metadata import Parser
 from collections import Counter
 from typing import Literal, List, Dict
-from json import dump
+from json import dump, load
 import os
 import sqlite3
 
@@ -121,7 +121,27 @@ def create_labelled_training_set(removable_columns: Dict, sql_queries: Dict, bir
         - question: The NL question
         - feasible: wether the question is answerable, 0 for no, 1 for yes.
     """
-    pass
+    feasible, infeasible = _label_queries(removable_columns, sql_queries)
+    with open(bird_train_locale, 'r') as fp:
+        bird_train_set = load(fp)
+
+    bird_abstention_set = []
+
+    for val in bird_train_set:
+        question = {
+            'db_id': val.get('db_id'),
+            'question': val.get('question'),
+            'SQL': val.get('SQL')
+        }
+        if val.get('SQL') in infeasible:
+            question['feasible'] = 0
+        elif val.get('SQL') in feasible:
+            question['feasible'] = 1
+        else:
+            question['feasible'] = None
+        bird_abstention_set.append(question)
+
+    return bird_abstention_set
 
 
 def remove_cols_from_databases(removable_columns):
@@ -274,12 +294,7 @@ if __name__ == '__main__':
 
     cols_to_del = select_columns_for_removal(column_count_dict, 15)
 
-    labelled_things = _label_queries(cols_to_del, gold_sql_dict)
-
-    remove_cols_from_databases(cols_to_del)
-
-    with open(".local/BirdBertTest.json", 'w') as ff:
-        dump(cols_to_del, ff, indent=5)
+    new_dataset = create_labelled_training_set(cols_to_del, gold_sql_dict)
 
     with open(".local/BirdBertTrain.json", 'w') as fp:
-        dump(column_count_dict, fp, indent=5)
+        dump(new_dataset, fp, indent=5)

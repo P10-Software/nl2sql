@@ -282,6 +282,7 @@ def _find_table_recurs(token, direction: SEARCH_DIRECTION):
 
 
 if __name__ == '__main__':
+    # m schema :)
     dbs = _list_databases()
 
     gold_sql_dict = extract_gold_sql_db()

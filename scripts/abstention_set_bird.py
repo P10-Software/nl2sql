@@ -212,7 +212,7 @@ def _list_databases(bird_train_locale=".local/train/train/train_databases/train_
     db_paths = {}
 
     for dirpath, dirnames, filenames in os.walk(root_dir):
-        dirnames[:] = [d for d in dirnames if not d.startswith('.') and not d.startswith('__')]
+        dirnames = [d for d in dirnames if not d.startswith('.') and not d.startswith('__')]
 
         for filename in filenames:
             if filename.startswith('.') or filename.startswith('__'):

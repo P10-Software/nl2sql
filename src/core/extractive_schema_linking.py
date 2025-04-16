@@ -7,7 +7,7 @@ import re
 import json
 from tqdm import tqdm
 
-TRAINED_MODEL_PATH="models/EXSL/coarse_grained_schema_linker.pth"
+TRAINED_MODEL_PATH="models/EXSL/coarse_grained_schema_linker_no_batch.pth"
 TRAIN_SET_PATH=".local/spider_exsl_train.json"
 
 class ExSLcModel(Module):
@@ -30,62 +30,42 @@ class ExSLcModel(Module):
         # Special tokens for marking columns
         self.tokenizer = AutoTokenizer.from_pretrained(base_model_name)
         
-    def forward(self, input_ids, attention_mask):
+    def forward(self, prompt):
         """
         Forward pass of the model
         
         Args:
-            input_ids: Tokenized input sequence
-            attention_mask: Attention mask for the input
+            prompt: A formatted input containing schema, question and repeated schema
             
         Returns:
             relevance_logits: Logits for relevance of each marked column
         """
-        outputs = self.base_model(
-            input_ids=input_ids,
-            attention_mask=attention_mask
-        )
+
+        # Tokenize input
+        inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
+
+        with no_grad():
+            outputs = self.base_model(**inputs)
+
         last_hidden_state = outputs.last_hidden_state
         
-        # Find positions of « and » tokens
-        batch_size = input_ids.size(0)
-        relevance_logits = []
+        # Find positions of « and » tokens        
+        input_tokens = self.tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])        
+        alpha_positions = [j for j, tok in enumerate(input_tokens) if tok == "<<"]
+        omega_positions = [j for j, tok in enumerate(input_tokens) if tok == "Ġ>>"]
         
-        for i in range(batch_size):
-            input_tokens = self.tokenizer.convert_ids_to_tokens(input_ids[i])
-
-            alpha_positions = [j for j, tok in enumerate(input_tokens) if tok == "<<"]
-            omega_positions = [j for j, tok in enumerate(input_tokens) if tok == "Ġ>>"]
-            
-            E_alpha = last_hidden_state[i, alpha_positions]
-            E_omega = last_hidden_state[i, omega_positions]
-            
-            # Concatenate embeddings
-            C = cat([E_alpha, E_omega], dim=-1)
-            
-            # Predict relevance (single logit per column)
-            rho = self.w_relevance(C).squeeze(-1)  # Shape: [num_columns]
-            relevance_logits.append(rho)
+        embeddings_alpha = last_hidden_state[0, alpha_positions]
+        embeddings_omega = last_hidden_state[0, omega_positions]
         
-        return relevance_logits
-    
+        # Concatenate embeddings
+        column_embeddings = cat([embeddings_alpha, embeddings_omega], dim=-1)
+        
+        # Predict relevance (single logit per column)
+        return self.w_relevance(column_embeddings).squeeze(-1)  # Shape: [num_columns]
+            
 def train_coarse_grained(model, train_data, config):
     # Prepare datasets
-    train_dataset = SchemaLinkingDatasetCoarse(train_data, model.tokenizer, config["max_length"])
-    
-    # Data loader
-    def custom_collate_fn(batch):
-        input_ids = stack([item["input_ids"] for item in batch])
-        attention_mask = stack([item["attention_mask"] for item in batch])
-        labels = [item["labels"] for item in batch]  # we don't stack these as the number of labels per item differs (one query might use 2 columns, another 4)
-    
-        return {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "labels": labels
-        }
-
-    train_loader = DataLoader(train_dataset, batch_size=config["batch_size"], shuffle=True, collate_fn=custom_collate_fn)
+    train_dataset = SchemaLinkingDatasetCoarse(train_data)
     
     # Optimizer with paper's parameters
     optimizer = AdamW(
@@ -101,46 +81,36 @@ def train_coarse_grained(model, train_data, config):
         model.train()
         total_loss = 0
         
-        for batch in tqdm(train_loader):
+        for example in tqdm(train_dataset):
             optimizer.zero_grad()
-            
-            input_ids = batch["input_ids"].to(config["device"])
-            attention_mask = batch["attention_mask"].to(config["device"])
-            labels = [label.to(config["device"]) for label in batch["labels"]]
+
+            labels = example["labels"].to(config["device"])
             
             # Forward pass
-            logits_list = model(input_ids, attention_mask)
+            logits = model(example["input"])
             
-            losses = []
-
-            for i, logits in enumerate(logits_list):
-                if logits.size(0) > 0:
-                    loss = criterion(logits, labels[i][:logits.size(0)].float())
-                    losses.append(loss)
-
-            if losses:
-                batch_loss = stack(losses).mean()
-            else:
-                continue  # skip backward if there's no valid loss
-
+            loss = 0
+            if logits.size(0) > 0:
+                loss = criterion(logits, labels)
             
+            if not loss:
+                continue
+
             # Backward pass
-            batch_loss.backward()
+            loss.backward()
             optimizer.step()
             
             # Accumulate for reporting
-            total_loss += batch_loss.item()
+            total_loss += loss.item()
         
         print(f"Epoch {epoch + 1}/{config['epochs']}")
-        print(f"Train Loss: {total_loss / len(train_loader):.4f}")
+        print(f"Train Loss: {total_loss / len(train_dataset):.4f}")
     
     return model
     
 class SchemaLinkingDatasetCoarse(Dataset):
-    def __init__(self, examples, tokenizer, max_length=3000):
+    def __init__(self, examples):
         self.examples = examples
-        self.tokenizer = tokenizer
-        self.max_length = max_length
         
     def __len__(self):
         return len(self.examples)
@@ -148,13 +118,6 @@ class SchemaLinkingDatasetCoarse(Dataset):
     def __getitem__(self, idx):
         example = self.examples[idx]
         input, repeated_schema = prepare_input(example["question"], example["schema"])
-        # Tokenize the input
-        encoding = self.tokenizer(
-            input,
-            max_length=self.max_length,
-            padding="max_length",
-            return_tensors="pt",
-        )
             
         # Create binary labels tensor (1 for relevant, 0 otherwise)
         num_columns = len(repeated_schema)
@@ -168,8 +131,7 @@ class SchemaLinkingDatasetCoarse(Dataset):
                 labels[col_idx] = 1.0
 
         return {
-            "input_ids": encoding["input_ids"].squeeze(0),
-            "attention_mask": encoding["attention_mask"].squeeze(0),
+            "input": input,
             "labels": labels
         }
 
@@ -189,32 +151,18 @@ def predict_relevance_coarse(model, question, schema, device="auto"):
     # Prepare input text
     input_text, repeated_schema = prepare_input(question, schema)
     
-    # Tokenize
-    encoding = model.tokenizer(
-        input_text,
-        max_length=16384,
-        padding="max_length",
-        return_tensors="pt"
-    )
-    
-    # Move to device
-    input_ids = encoding["input_ids"].to(device)
-    attention_mask = encoding["attention_mask"].to(device)
-    
     # Predict
     model.eval()
     with no_grad():
-        logits_list = model(input_ids, attention_mask)
+        logits = model(input_text)
     
     # Parse results
     predictions = {}
-    if logits_list:
-        logits = logits_list[0]  # Single example
-        probs = sigmoid(logits).to(float32).cpu().numpy()
-        
-        # Create predictions dictionary
-        for col, prob in zip(repeated_schema, probs):
-            predictions[col] = float(prob)
+    probs = sigmoid(logits).to(float32).cpu().numpy()
+    
+    # Create predictions dictionary
+    for col, prob in zip(repeated_schema, probs):
+        predictions[col] = float(prob)
     
     return predictions 
 
@@ -267,11 +215,9 @@ if __name__ == "__main__":
     # Configuration matching ExSL paper
     config = {
         "base_model": "deepseek-ai/deepseek-coder-6.7b-base",
-        "max_length": 16384,
-        "batch_size": 1,
         "learning_rate": 5e-6,
         "weight_decay": 0.0,
-        "epochs": 2,
+        "epochs": 1,
         "device": "cuda" if cuda.is_available() else "cpu"
     }
 

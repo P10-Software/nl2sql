@@ -297,4 +297,4 @@ if __name__ == '__main__':
     new_dataset = create_labelled_training_set(cols_to_del, gold_sql_dict)
 
     with open(".local/BirdBertTrain.json", 'w') as fp:
-        dump(new_dataset, fp, indent=5)
+        dump(new_dataset, fp, indent=4)

@@ -1,8 +1,17 @@
-from src.core.extractive_schema_linking import prepare_input
+from unittest.mock import patch, MagicMock
 
-def test_extract_column_names_from_mschema():
-    # arrange
-    schema = """
+with patch.dict('sys.modules', {
+    'torch': MagicMock(),
+    'torch.nn': MagicMock(),
+    'torch.optim': MagicMock(),
+    'torch.utils.data': MagicMock(),
+    'transformers': MagicMock(),
+}):
+    from src.core.extractive_schema_linking import prepare_input
+
+    def test_extract_column_names_from_mschema():
+        # arrange
+        schema = """
 【DB_ID】 mock_db
 【Schema】
 # Table: users
@@ -19,10 +28,10 @@ def test_extract_column_names_from_mschema():
 ]
 """
 
-    expected_columns = ["users user_id", "users name", "users email", "orders order_id", "orders user_id", "orders amount"]
+        expected_columns = ["users user_id", "users name", "users email", "orders order_id", "orders user_id", "orders amount"]
 
-    # act
-    _, actual_columns = prepare_input("", schema)
-
-    # assert
-    assert expected_columns == actual_columns
+        # act
+        _, actual_columns = prepare_input("", schema)
+    
+        # assert
+        assert expected_columns == actual_columns

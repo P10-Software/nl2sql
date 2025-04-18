@@ -7,8 +7,8 @@ import re
 import json
 from tqdm import tqdm
 
-TRAINED_MODEL_PATH="models/EXSL/coarse_grained_schema_linker_no_batch.pth"
-TRAIN_SET_PATH=".local/spider_exsl_train.json"
+TRAINED_MODEL_PATH="models/EXSL/coarse_grained_schema_linker_bird.pth"
+TRAIN_SET_PATH=".local/bird_testing_set.json"
 
 class ExSLcModel(Module):
     def __init__(self, base_model_name):
@@ -110,7 +110,12 @@ def train_coarse_grained(model, train_data, config):
     
 class SchemaLinkingDatasetCoarse(Dataset):
     def __init__(self, examples):
-        self.examples = examples
+        self.dataset_contains_feasibility = "feasible" in examples[0].keys()
+
+        if self.dataset_contains_feasibility:
+            self.examples = [example for example in examples if example["feasible"] is not None]
+        else:
+            self.examples = examples
         
     def __len__(self):
         return len(self.examples)
@@ -124,11 +129,15 @@ class SchemaLinkingDatasetCoarse(Dataset):
         labels = zeros(num_columns)
         
         # Create label mapping based on "goal answer"
-        goal_columns = set(example["goal answer"])
-        
-        for col_idx, col in enumerate(repeated_schema):
-            if col in goal_columns:
-                labels[col_idx] = 1.0
+        if self.dataset_contains_feasibility:
+            goal_columns = {" ".join(column.split(".")) for column in example["columns"]}
+        else:
+            goal_columns = set(example["goal answer"])
+
+        if not self.dataset_contains_feasibility or example["feasible"] == 1:
+            for col_idx, col in enumerate(repeated_schema):
+                if col in goal_columns:
+                    labels[col_idx] = 1.0
 
         return {
             "input": input,
@@ -217,7 +226,7 @@ if __name__ == "__main__":
         "base_model": "deepseek-ai/deepseek-coder-6.7b-base",
         "learning_rate": 5e-6,
         "weight_decay": 0.0,
-        "epochs": 1,
+        "epochs": 2,
         "device": "cuda" if cuda.is_available() else "cpu"
     }
 

@@ -2,10 +2,7 @@ from unittest.mock import patch, MagicMock
 
 with patch.dict('sys.modules', {
     'torch': MagicMock(),
-    'torch.nn': MagicMock(),
-    'torch.optim': MagicMock(),
-    'torch.utils.data': MagicMock(),
-    'transformers': MagicMock(),
+    'transformers': MagicMock()
 }):
     from src.core.extractive_schema_linking import prepare_input
 

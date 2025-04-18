@@ -1,8 +1,5 @@
-from torch.nn import Module, Linear, BCEWithLogitsLoss
-from torch import bfloat16, cat, stack, zeros, no_grad, float32, sigmoid, cuda, save, load
-from torch.optim import AdamW
+import torch
 from transformers import AutoModel, AutoTokenizer
-from torch.utils.data import Dataset, DataLoader
 import re
 import json
 from tqdm import tqdm
@@ -10,7 +7,7 @@ from tqdm import tqdm
 TRAINED_MODEL_PATH="models/EXSL/coarse_grained_schema_linker_bird.pth"
 TRAIN_SET_PATH=".local/bird_testing_set.json"
 
-class ExSLcModel(Module):
+class ExSLcModel(torch.nn.Module):
     def __init__(self, base_model_name):
         """
         Coarse-Grained Extractive Schema Linking Model
@@ -19,13 +16,13 @@ class ExSLcModel(Module):
             base_model_name: Name of the pretrained decoder-only model (e.g., "deepseek-ai/deepseek-coder-6.7b")
         """
         super().__init__()
-        self.base_model = AutoModel.from_pretrained(base_model_name, torch_dtype=bfloat16)
+        self.base_model = AutoModel.from_pretrained(base_model_name, torch_dtype=torch.torch.bfloat16)
         for param in self.base_model.parameters():
             param.requires_grad = False
         hidden_size = self.base_model.config.hidden_size
         
         # Single output for relevance (binary)
-        self.w_relevance = Linear(hidden_size * 2, 1, dtype=bfloat16)  # Only predict relevance
+        self.w_relevance = torch.nn.Linear(hidden_size * 2, 1, dtype=torch.torch.bfloat16)  # Only predict relevance
         
         # Special tokens for marking columns
         self.tokenizer = AutoTokenizer.from_pretrained(base_model_name)
@@ -44,7 +41,7 @@ class ExSLcModel(Module):
         # Tokenize input
         inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
 
-        with no_grad():
+        with torch.no_grad():
             outputs = self.base_model(**inputs)
 
         last_hidden_state = outputs.last_hidden_state
@@ -58,7 +55,7 @@ class ExSLcModel(Module):
         embeddings_omega = last_hidden_state[0, omega_positions]
         
         # Concatenate embeddings
-        column_embeddings = cat([embeddings_alpha, embeddings_omega], dim=-1)
+        column_embeddings = torch.cat([embeddings_alpha, embeddings_omega], dim=-1)
         
         # Predict relevance (single logit per column)
         return self.w_relevance(column_embeddings).squeeze(-1)  # Shape: [num_columns]
@@ -68,13 +65,13 @@ def train_coarse_grained(model, train_data, config):
     train_dataset = SchemaLinkingDatasetCoarse(train_data)
     
     # Optimizer with paper's parameters
-    optimizer = AdamW(
+    optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=config["learning_rate"],
         weight_decay=config["weight_decay"]
     )
     
-    criterion = BCEWithLogitsLoss()
+    criterion = torch.nn.BCEWithLogitsLoss()
     
     # Training loop
     for epoch in range(config["epochs"]):
@@ -108,7 +105,7 @@ def train_coarse_grained(model, train_data, config):
     
     return model
     
-class SchemaLinkingDatasetCoarse(Dataset):
+class SchemaLinkingDatasetCoarse(torch.utils.data.Dataset):
     def __init__(self, examples):
         self.dataset_contains_feasibility = "feasible" in examples[0].keys()
 
@@ -126,7 +123,7 @@ class SchemaLinkingDatasetCoarse(Dataset):
             
         # Create binary labels tensor (1 for relevant, 0 otherwise)
         num_columns = len(repeated_schema)
-        labels = zeros(num_columns)
+        labels = torch.zeros(num_columns)
         
         # Create label mapping based on "goal answer"
         if self.dataset_contains_feasibility:
@@ -162,12 +159,12 @@ def predict_relevance_coarse(model, question, schema, device="auto"):
     
     # Predict
     model.eval()
-    with no_grad():
+    with torch.no_grad():
         logits = model(input_text)
     
     # Parse results
     predictions = {}
-    probs = sigmoid(logits).to(float32).cpu().numpy()
+    probs = torch.sigmoid(logits).to(torch.float32).cpu().numpy()
     
     # Create predictions dictionary
     for col, prob in zip(repeated_schema, probs):
@@ -218,7 +215,7 @@ def parse_schema(schema: str):
     return columns_in_schema
 
 def load_schema_linker():
-    return load(TRAINED_MODEL_PATH, weights_only=False)
+    return torch.load(TRAINED_MODEL_PATH, weights_only=False)
 
 if __name__ == "__main__":
     # Configuration matching ExSL paper
@@ -227,7 +224,7 @@ if __name__ == "__main__":
         "learning_rate": 5e-6,
         "weight_decay": 0.0,
         "epochs": 2,
-        "device": "cuda" if cuda.is_available() else "cpu"
+        "device": "cuda" if torch.cuda.is_available() else "cpu"
     }
 
     # Initialize model
@@ -248,12 +245,12 @@ if __name__ == "__main__":
     predictions = predict_relevance_coarse(trained_model, question, schema, config["device"])
     print("Relevance Predictions:")
     for column, prob in predictions.items():
-        print(f"{column}: {'RELEVANT' if prob > 0.5 else 'IRRELEVANT'} (prob: {prob:.2f})")
+        print(f"{column}: {prob:.2f}")
 
-    save(trained_model, TRAINED_MODEL_PATH)
+    torch.save(trained_model, TRAINED_MODEL_PATH)
 
     loaded_model = load_schema_linker()
     new_predictions = predict_relevance_coarse(loaded_model, question, schema, config["device"])
     print("Relevance Predictions from loaded:")
     for column, prob in new_predictions.items():
-        print(f"{column}: {'RELEVANT' if prob > 0.5 else 'IRRELEVANT'} (prob: {prob:.2f})")
+        print(f"{column}: {prob:.2f}")

@@ -11,6 +11,7 @@ dash-html-components==2.0.0
 dash-table==5.0.0
 distlib==0.3.9
 distro==1.9.0
+datasets==3.5.0
 easybuild==4.9.4
 easybuild-easyblocks==4.9.4
 easybuild-easyconfigs==4.9.4

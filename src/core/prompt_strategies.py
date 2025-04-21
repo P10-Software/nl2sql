@@ -1,4 +1,5 @@
 from src.core.base_model import PromptStrategy
+from transformers import AutoTokenizer
 
 class DeepSeekPromptStrategy(PromptStrategy):
     def __init__(self, sql_dialect):
@@ -89,3 +90,18 @@ class SQLCoderAbstentionPromptStrategy(PromptStrategy):
             return self.pre_sql_prompt_template.format(SQL_DIALECT=self.sql_dialect, DDL_INSTRUCTIONS=schema, NL_QUESTION=question)
         else:
             return self.post_sql_prompt_template.format(SQL_DIALECT=self.sql_dialect, DDL_INSTRUCTIONS=schema, NL_QUESTION=question, SQL=generated_sql)
+
+
+class ModernBERTPromptStrategy(PromptStrategy):
+    def __init__(self):
+        super().__init__()
+        self.tokenizer = AutoTokenizer.from_pretrained("answerdotai/ModernBERT-large")
+
+    def get_prompt(self, schema, question):
+        """Returns a tokenized prompt"""
+        return self.tokenizer(
+            question,
+            schema,
+            truncation=True,
+            return_tensors="pt"
+        )

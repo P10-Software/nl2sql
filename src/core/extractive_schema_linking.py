@@ -136,6 +136,9 @@ class SchemaLinkingDatasetCoarse(torch.utils.data.Dataset):
                 if col in goal_columns:
                     labels[col_idx] = 1.0
 
+            if (labels == 0).all():
+                raise Exception(f"No goal columns for feasible question: {example[question]}")            
+
         return {
             "input": input,
             "labels": labels

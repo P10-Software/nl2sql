@@ -45,11 +45,24 @@ def _load_schema_for_all_dbs():
     return schema_dict
 
 def _lowercase_column_and_table_names(schema: str) -> str:
-    # Column name to lower
-    updated_schema = re.sub(r"\(\s*(\w+):(\w+)", lambda m: "(" + m.group(1).lower() + ":" + m.group(2), schema)
-    # Table name to lower
-    updated_schema = re.sub(r"(# Table:\s*)([A-Z])(\w+)", lambda m: m.group(1) + m.group(2).lower() + m.group(3), updated_schema)
-    return updated_schema
+    # Lowercase table names in "# Table: ..."
+    output = re.sub(r"(# Table:\s*)([A-Za-z_][\w]*)", lambda m: m.group(1) + m.group(2).lower(), schema)
+
+    # Lowercase column names (first token in each parentheses)
+    output = re.sub(
+        r"\(\s*([A-Za-z_][\w]*)",
+        lambda m: "(" + m.group(1).lower(),
+        output
+    )
+
+    # Find the Foreign keys section, keep header as-is, lowercase rest
+    def fix_foreign_keys_section(match):
+        header = "【Foreign keys】"
+        body = match.group(1)
+        body_fixed = re.sub(r"\b([A-Za-z_][\w]*)", lambda m: m.group(1).lower(), body)
+        return f"{header}\n{body_fixed}"
+
+    return re.sub(r"【Foreign keys】\n([\s\S]*)", fix_foreign_keys_section, output)
 
 if __name__ == "__main__":
     valid_training_set, invalid_training_set = create_training_set()

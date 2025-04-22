@@ -126,7 +126,10 @@ def test_lowercase_column_and_table_names():
 (Order_id:INTEGER, Primary Key, Examples: [1, 2, 3]),
 (useR_id:INTEGER, Examples: [1, 2]),
 (Amount:REAL, Examples: [99.99, 149.5, 200.0])
-]"""
+]
+【Foreign keys】
+Users.user_id=orders.useR_id
+"""
     expected_lowered_schema = """
 【DB_ID】 mock_db
 【Schema】
@@ -141,7 +144,10 @@ def test_lowercase_column_and_table_names():
 (order_id:INTEGER, Primary Key, Examples: [1, 2, 3]),
 (user_id:INTEGER, Examples: [1, 2]),
 (amount:REAL, Examples: [99.99, 149.5, 200.0])
-]"""
+]
+【Foreign keys】
+users.user_id=orders.user_id
+"""
 
     # act
     actual_lowered_schema = _lowercase_column_and_table_names(input_schema)

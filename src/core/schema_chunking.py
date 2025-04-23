@@ -31,14 +31,14 @@ def chunk_mschema(mschema: str, context_size):
     new_chunk_size = 0
     for i, table_size in enumerate(tables_tokens_size):
         new_chunk_size = new_chunk_size + table_size
-        if new_chunk_size < max_mschema_size:
-            chunk = chunk + tables[i]
-        else:
+        if new_chunk_size > max_mschema_size:
             print(new_chunk_size)
             chunks.append(chunk)
             # break
             chunk = tables[i]
             new_chunk_size = 0
+        else:
+            chunk = chunk + tables[i]
 
     chunks.append(chunk)
 

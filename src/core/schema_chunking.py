@@ -14,6 +14,9 @@ def chunk_mschema(mschema: str, model) -> list[str]:
     """
 
     context_size = getattr(model.model.config, "max_position_embeddings", None)
+    if context_size is None:
+        raise ValueError("Model context size (max_position_embeddings) is not set.")
+
     max_mschema_size = context_size // 1.5
 
     mschema_split = mschema.split("#")
@@ -23,16 +26,16 @@ def chunk_mschema(mschema: str, model) -> list[str]:
     chunks = []
     chunk = ""
     new_chunk_size = 0
-    for i, table in enumerate(mschema_tables):
+    for table in mschema_tables:
         table_size = len(model.tokenizer(table, return_tensors="pt", truncation=False)["input_ids"][0])
         new_chunk_size = new_chunk_size + table_size
         if new_chunk_size > max_mschema_size:
             if chunk:
                 chunks.append(mschema_header_text + chunk)
-            chunk = mschema_tables[i]
+            chunk = table
             new_chunk_size = table_size
         else:
-            chunk = chunk + mschema_tables[i]
+            chunk = chunk + table
 
     if chunk:
         chunks.append(mschema_header_text + chunk)

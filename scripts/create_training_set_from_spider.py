@@ -27,8 +27,7 @@ def create_training_set():
             goal_columns = []
             for table in column_table.keys():
                 for column in column_table[table]:
-                    goal_columns.append(f"{table} {column}")
-            goal_columns = [s[0].lower() + s[1:] if s else s for s in goal_columns]
+                    goal_columns.append(f"{table.lower()} {column.lower()}")
 
             valid_train_set.append({"question": question, "schema": schema, "goal answer": goal_columns})
         except:
@@ -42,19 +41,28 @@ def _load_schema_for_all_dbs():
     for database_path in database_paths:
         db_id = basename(database_path).split(".")[0]
         db_engine = create_engine(f'sqlite:///{database_path}')
-        schema_dict[db_id] = {"schema": _lowercase_column_names(SchemaEngine(engine=db_engine, db_name=db_id).mschema.to_mschema()), "db_path": database_path}
+        schema_dict[db_id] = {"schema": _lowercase_column_and_table_names(SchemaEngine(engine=db_engine, db_name=db_id).mschema.to_mschema()), "db_path": database_path}
     return schema_dict
 
-def _lowercase_column_names(schema: str) -> str:
-    def lowercase_column(match):
-        column_name = match.group(1)
-        if column_name[0].isupper():
-            column_name = column_name[0].lower() + column_name[1:]
-        return f"({column_name}:{match.group(2)}"
+def _lowercase_column_and_table_names(schema: str) -> str:
+    # Lowercase table names in "# Table: ..."
+    output = re.sub(r"(# Table:\s*)([A-Za-z_][\w]*)", lambda m: m.group(1) + m.group(2).lower(), schema)
 
-    # Apply to every column inside (column_name:TYPE, ...)
-    updated_schema = re.sub(r"\(\s*(\w+):(\w+)", lowercase_column, schema)
-    return updated_schema
+    # Lowercase column names (first token in each parentheses)
+    output = re.sub(
+        r"\(\s*([A-Za-z_][\w]*)",
+        lambda m: "(" + m.group(1).lower(),
+        output
+    )
+
+    # Find the Foreign keys section, keep header as-is, lowercase rest
+    def fix_foreign_keys_section(match):
+        header = "【Foreign keys】"
+        body = match.group(1)
+        body_fixed = re.sub(r"\b([A-Za-z_][\w]*)", lambda m: m.group().lower(), body)
+        return f"{header}\n{body_fixed}"
+
+    return re.sub(r"【Foreign keys】\n([\s\S]*)", fix_foreign_keys_section, output)
 
 if __name__ == "__main__":
     valid_training_set, invalid_training_set = create_training_set()

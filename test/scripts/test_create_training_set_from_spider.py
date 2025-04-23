@@ -1,7 +1,7 @@
 import scripts.create_training_set_from_spider
 scripts.create_training_set_from_spider.PATH_TO_SPIDER_DIR = "test/scripts/mock_dataset"
 
-from scripts.create_training_set_from_spider import _load_schema_for_all_dbs, create_training_set, _lowercase_column_names
+from scripts.create_training_set_from_spider import _load_schema_for_all_dbs, create_training_set, _lowercase_column_and_table_names
 import os
 import sqlite3
 import pytest
@@ -110,12 +110,12 @@ def test_create_training_set(create_mock_database_folder, mock_train_file):
     assert expected_table_users in actual_training_set[0]["schema"]
     assert expected_question == actual_training_set[0]["question"]
 
-def test_lowercase_column_names():
+def test_lowercase_column_and_table_names():
     # arrange
     input_schema = """
 【DB_ID】 mock_db
 【Schema】
-# Table: users
+# Table: Users
 [
 (user_id:INTEGER, Primary Key, Examples: [1, 2]),
 (name:TEXT, Examples: [Alice Johnson, Bob Smith]),
@@ -124,9 +124,12 @@ def test_lowercase_column_names():
 # Table: orders
 [
 (Order_id:INTEGER, Primary Key, Examples: [1, 2, 3]),
-(user_id:INTEGER, Examples: [1, 2]),
+(useR_id:INTEGER, Examples: [1, 2]),
 (Amount:REAL, Examples: [99.99, 149.5, 200.0])
-]"""
+]
+【Foreign keys】
+Users.user_id=orders.useR_id
+"""
     expected_lowered_schema = """
 【DB_ID】 mock_db
 【Schema】
@@ -141,10 +144,13 @@ def test_lowercase_column_names():
 (order_id:INTEGER, Primary Key, Examples: [1, 2, 3]),
 (user_id:INTEGER, Examples: [1, 2]),
 (amount:REAL, Examples: [99.99, 149.5, 200.0])
-]"""
+]
+【Foreign keys】
+users.user_id=orders.user_id
+"""
 
     # act
-    actual_lowered_schema = _lowercase_column_names(input_schema)
+    actual_lowered_schema = _lowercase_column_and_table_names(input_schema)
 
     # assert
     assert expected_lowered_schema == actual_lowered_schema

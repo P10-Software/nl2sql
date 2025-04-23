@@ -4,8 +4,11 @@ import re
 import json
 from tqdm import tqdm
 
-TRAINED_MODEL_PATH="models/EXSL/coarse_grained_schema_linker_bird.pth"
-TRAIN_SET_PATH=".local/bird_testing_set.json"
+TRAINED_MODEL_PATH="models/EXSL/coarse_grained_schema_linker_spider.pth"
+TRAIN_SET_PATH=".local/spider_exsl_train.json"
+EVAL_SET_PATH=".local/spider_exsl_test.json"
+K=10
+RESULT_FILE_PATH=f".local/spider_exsl_recall_at_{K}.json"
 
 class ExSLcModel(torch.nn.Module):
     def __init__(self, base_model_name):
@@ -61,7 +64,7 @@ class ExSLcModel(torch.nn.Module):
         return self.w_relevance(column_embeddings).squeeze(-1)  # Shape: [num_columns]
             
 def train_coarse_grained(model, train_data, config):
-    # Prepare datasets
+    # Prepare dataset
     train_dataset = SchemaLinkingDatasetCoarse(train_data)
     
     # Optimizer with paper's parameters
@@ -104,7 +107,35 @@ def train_coarse_grained(model, train_data, config):
         print(f"Train Loss: {total_loss / len(train_dataset):.4f}")
     
     return model
-    
+
+def evaluate_coarse_grained(model, eval_data, k):
+    # Prepare dataset
+    dataset_contains_feasibility = "feasible" in eval_data[0].keys()
+    if dataset_contains_feasibility:
+        eval_set = [example for example in eval_data if example["feasible"] is not None]
+    else:
+        eval_set = eval_data
+
+    eval_result = []
+    sum_recall_at_k = 0
+    for example in tqdm(eval_set):
+        if dataset_contains_feasibility:
+            goal_columns = {" ".join(column.split(".")) for column in example["columns"]}
+        else:
+            goal_columns = set(example["goal answer"])
+
+        predictions = predict_relevance_coarse(model, example["question"], example["schema"])
+        top_k_predictions = sorted(predictions.items(), reverse=True, key= lambda pair: pair[1])[:k]
+
+        relevant_items = [(column, relevance) for column, relevance in top_k_predictions if column in goal_columns]
+        recall_at_k = len(relevant_items) / len(goal_columns)
+
+        sum_recall_at_k += recall_at_k
+        eval_result.append({"question": example["question"], "goal columns": goal_columns, "top k predictions": top_k_predictions, "recall@k": recall_at_k})
+
+    eval_result.append({"Amount of questions": len(eval_set), "Total recall@k": sum_recall_at_k / len(eval_set), "K": k})
+    return eval_result
+
 class SchemaLinkingDatasetCoarse(torch.utils.data.Dataset):
     def __init__(self, examples):
         self.dataset_contains_feasibility = "feasible" in examples[0].keys()
@@ -137,14 +168,14 @@ class SchemaLinkingDatasetCoarse(torch.utils.data.Dataset):
                     labels[col_idx] = 1.0
 
             if (labels == 0).all():
-                raise Exception(f"No goal columns for feasible question: {example[question]}")            
+                raise Exception(f"No goal columns for feasible question: {example['question']}")            
 
         return {
             "input": input,
             "labels": labels
         }
 
-def predict_relevance_coarse(model, question, schema, device="auto"):
+def predict_relevance_coarse(model, question, schema):
     """
     Predict which schema elements are relevant to the question
     
@@ -238,22 +269,18 @@ if __name__ == "__main__":
     with open(TRAIN_SET_PATH, "r") as train_file:
         train_set = json.load(train_file)
 
-    # Example data format
-    question = "What are all company names that have a corresponding movie directed in the year 1999?"
-    schema = "\u3010DB_ID\u3011 culture_company\n\u3010Schema\u3011\n# Table: book_club\n[\n(book_club_id:INTEGER, Primary Key, Examples: [1, 2, 3]),\n(year:INTEGER, Examples: [1989, 1990]),\n(author_or_Editor:TEXT, Examples: [Michael Nava, Donald Ward, Michael Bishop]),\n(book_Title:TEXT, Examples: [Goldenboy]),\n(publisher:TEXT, Examples: [Alyson, St. Martin's Press, William Morrow]),\n(category:TEXT, Examples: [Gay M/SF, Lesb. M/SF, Gay SF/F]),\n(result:TEXT, Examples: [Won [A ], Nom, Won])\n]\n# Table: culture_company\n[\n(company_name:TEXT, Primary Key, Examples: [Cathay Pacific Culture]),\n(type:TEXT, Examples: [Corporate, Joint Venture, Subsidiary]),\n(incorporated_in:TEXT, Examples: [China, Hong Kong]),\n(group_Equity_Shareholding:REAL, Examples: [18.77, 49.0, 60.0]),\n(book_club_id:TEXT, Examples: [1, 2, 3]),\n(movie_id:TEXT, Examples: [2, 3, 4])\n]\n# Table: movie\n[\n(movie_id:INTEGER, Primary Key, Examples: [1, 2, 3]),\n(title:TEXT, Examples: [The Boondock Saints, The Big Kahuna, Storm Catcher]),\n(year:INTEGER, Examples: [1999, 2000, 2001]),\n(director:TEXT, Examples: [Troy Duffy, John Swanbeck, Anthony Hickox]),\n(budget_million:REAL, Examples: [6.0, 7.0, 5.0]),\n(gross_worldwide:INTEGER, Examples: [30471, 3728888, 40500])\n]\n\u3010Foreign keys\u3011\nculture_company.book_club_id=book_club.book_club_id\nculture_company.movie_id=movie.movie_id"
-    
-    # Train the model
+    # Train and save model
     trained_model = train_coarse_grained(model, train_set, config)
-
-    predictions = predict_relevance_coarse(trained_model, question, schema, config["device"])
-    print("Relevance Predictions:")
-    for column, prob in predictions.items():
-        print(f"{column}: {prob:.2f}")
-
     torch.save(trained_model, TRAINED_MODEL_PATH)
 
+    # Load model
     loaded_model = load_schema_linker()
-    new_predictions = predict_relevance_coarse(loaded_model, question, schema, config["device"])
-    print("Relevance Predictions from loaded:")
-    for column, prob in new_predictions.items():
-        print(f"{column}: {prob:.2f}")
+
+    # Load eval data and evaluate
+    with open(EVAL_SET_PATH, "r") as eval_file:
+        eval_set = json.load(train_file)
+
+    eval_result = evaluate_coarse_grained(loaded_model, eval_set, K)
+
+    with open(RESULT_FILE_PATH, "w") as result_file:
+        json.dump(eval_result, eval_file, indent=4)

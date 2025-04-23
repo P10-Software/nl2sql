@@ -120,9 +120,9 @@ def evaluate_coarse_grained(model, eval_data, k):
     sum_recall_at_k = 0
     for example in tqdm(eval_set):
         if dataset_contains_feasibility:
-            goal_columns = {" ".join(column.split(".")) for column in example["columns"]}
+            goal_columns = [" ".join(column.split(".")) for column in example["columns"]]
         else:
-            goal_columns = set(example["goal answer"])
+            goal_columns = example["goal answer"]
 
         predictions = predict_relevance_coarse(model, example["question"], example["schema"])
         columns, relevance = zip(*(sorted(predictions.items(), reverse=True, key= lambda pair: pair[1])[:k]))

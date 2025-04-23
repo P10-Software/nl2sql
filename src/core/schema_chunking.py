@@ -7,6 +7,7 @@ from src.core.base_model import NL2SQLModel
 def chunk_mschema(mschema: str, model) -> list[str]:
     """
     Transform the M-Schema into a list of M-Schemas that fits within a given context window.
+    Each chunk contains only whole tables from the mschema.
 
     Args:
     - model: Used to get context size and tokenize mschema.
@@ -43,23 +44,6 @@ def chunk_mschema(mschema: str, model) -> list[str]:
     return chunks
 
 
-# def test_token(mschema):
-#     dataset = [{"question": "test question", "golden_query": "test gold"}]
-#     prompt_strategy = XiYanSQLPromptStrategy("sqlite")
-#     model = XiYanSQLModel(dataset, prompt_strategy, mschema=True)
-#
-#     #mschema = mschema.split("#")
-#
-#     prompt = model.prompt_strategy.get_prompt(mschema, "This is a question template")
-#
-#     print(prompt)
-#     print("Characters in prompt: ", len(prompt))
-#     tokens = model.tokenizer(prompt, return_tensors="pt", truncation=False)["input_ids"][0]
-#     print("Tokens in prompt: ", len(tokens))
-#     context_length = getattr(model.model.config, "max_position_embeddings", None)
-#     print("Model context length: ", context_length)
-
-
 if __name__ == "__main__":
     with open(".local/mschema_trial_metadata_abbreviated.txt", "r") as file:
         mschema = file.read()
@@ -72,3 +56,4 @@ if __name__ == "__main__":
 
     print("Chunk sizes")
     print([len(x) for x in chunks])
+    print(chunks[1])

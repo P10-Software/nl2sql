@@ -59,7 +59,7 @@ def _lowercase_column_and_table_names(schema: str) -> str:
     def fix_foreign_keys_section(match):
         header = "【Foreign keys】"
         body = match.group(1)
-        body_fixed = re.sub(r"\b([A-Za-z_][\w]*)", lambda m: m.group(1).lower(), body)
+        body_fixed = re.sub(r"\b([A-Za-z_][\w]*)", lambda m: m.group().lower(), body)
         return f"{header}\n{body_fixed}"
 
     return re.sub(r"【Foreign keys】\n([\s\S]*)", fix_foreign_keys_section, output)

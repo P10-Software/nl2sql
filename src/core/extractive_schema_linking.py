@@ -19,13 +19,13 @@ class ExSLcModel(torch.nn.Module):
             base_model_name: Name of the pretrained decoder-only model (e.g., "deepseek-ai/deepseek-coder-6.7b")
         """
         super().__init__()
-        self.base_model = AutoModel.from_pretrained(base_model_name, torch_dtype=torch.torch.bfloat16)
+        self.base_model = AutoModel.from_pretrained(base_model_name, torch_dtype=torch.bfloat16)
         for param in self.base_model.parameters():
             param.requires_grad = False
         hidden_size = self.base_model.config.hidden_size
         
         # Single output for relevance (binary)
-        self.w_relevance = torch.nn.Linear(hidden_size * 2, 1, dtype=torch.torch.bfloat16)  # Only predict relevance
+        self.w_relevance = torch.nn.Linear(hidden_size * 2, 1, dtype=torch.bfloat16)  # Only predict relevance
         
         # Special tokens for marking columns
         self.tokenizer = AutoTokenizer.from_pretrained(base_model_name)
@@ -125,13 +125,14 @@ def evaluate_coarse_grained(model, eval_data, k):
             goal_columns = set(example["goal answer"])
 
         predictions = predict_relevance_coarse(model, example["question"], example["schema"])
-        top_k_predictions = sorted(predictions.items(), reverse=True, key= lambda pair: pair[1])[:k]
-
-        relevant_items = [(column, relevance) for column, relevance in top_k_predictions if column in goal_columns]
-        recall_at_k = len(relevant_items) / len(goal_columns)
+        columns, relevance = zip(*(sorted(predictions.items(), reverse=True, key= lambda pair: pair[1])[:k]))
+        columns, relevance = list(columns), list(relevance)
+    
+        relevant_columns = [column for column in columns if column in goal_columns]
+        recall_at_k = len(relevant_columns) / len(goal_columns)
 
         sum_recall_at_k += recall_at_k
-        eval_result.append({"question": example["question"], "goal columns": goal_columns, "top k predictions": top_k_predictions, "recall@k": recall_at_k})
+        eval_result.append({"question": example["question"], "goal columns": list(goal_columns), "top k columns": columns, "top k relevance": relevance, "recall@k": recall_at_k})
 
     eval_result.append({"Amount of questions": len(eval_set), "Total recall@k": sum_recall_at_k / len(eval_set), "K": k})
     return eval_result
@@ -278,9 +279,10 @@ if __name__ == "__main__":
 
     # Load eval data and evaluate
     with open(EVAL_SET_PATH, "r") as eval_file:
-        eval_set = json.load(train_file)
+        eval_set = json.load(eval_file)
 
     eval_result = evaluate_coarse_grained(loaded_model, eval_set, K)
 
     with open(RESULT_FILE_PATH, "w") as result_file:
-        json.dump(eval_result, eval_file, indent=4)
+        json.dump(eval_result, result_file, indent=4)
+

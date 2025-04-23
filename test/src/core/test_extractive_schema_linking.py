@@ -40,7 +40,7 @@ with patch.dict('sys.modules', {
         goal_columns = ["users user_id", "orders amount"]
         input_data = [{"question": question, "schema": schema, "goal answer": goal_columns}]
         k = 5
-        expected_result = [{"question": question, "goal columns": set(goal_columns), "top k predictions": [("orders order_id", 0.8), ("users user_id", 0.7), ("users name", 0.65), ("orders amount", 0.65), ("orders user_id", 0.6)], "recall@k": 1.0}, 
+        expected_result = [{"question": question, "goal columns": goal_columns, "top k columns": ["orders order_id", "users user_id", "users name", "orders amount", "orders user_id"], "top k relevance": [0.8, 0.7, 0.65, 0.65, 0.6], "recall@k": 1.0}, 
                            {"Amount of questions": 1, "Total recall@k": 1.0, "K": 5}]
 
         mock_return_value = {"users user_id": 0.7, "users name": 0.65, "users email": 0.50, "orders order_id": 0.8, "orders user_id": 0.6,"orders amount": 0.65}

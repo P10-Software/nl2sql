@@ -1,8 +1,5 @@
 import torch
-from src.core.model_implementations import LlamaModel, DeepSeekLlamaModel, DeepSeekQwenModel, XiYanSQLModel
-from src.core.prompt_strategies import Llama3PromptStrategy, DeepSeekPromptStrategy, XiYanSQLPromptStrategy
-from src.core.base_model import NL2SQLModel
-#
+
 
 def chunk_mschema(mschema: str, model) -> list[str]:
     """
@@ -42,18 +39,3 @@ def chunk_mschema(mschema: str, model) -> list[str]:
         chunks.append(mschema_header_text + chunk)
 
     return chunks
-
-
-if __name__ == "__main__":
-    with open(".local/mschema_trial_metadata_abbreviated.txt", "r") as file:
-        mschema = file.read()
-
-    dataset = [{"question": "test question", "golden_query": "test gold"}]
-    prompt_strategy = XiYanSQLPromptStrategy("sqlite")
-    model = XiYanSQLModel(dataset, prompt_strategy, mschema=True)
-
-    chunks = chunk_mschema(mschema, model)
-
-    print("Chunk sizes")
-    print([len(x) for x in chunks])
-    print(chunks[1])

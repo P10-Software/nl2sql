@@ -57,7 +57,6 @@ with patch.dict('sys.modules', {
         [col_a:TEXT]
         [col_t:TEXT]""")
 
-        # Since we have 3 tables and a low max token limit, we expect multiple chunks
         assert len(chunks) >= 2
         assert chunks[0].strip() == expected_1.strip()
         assert chunks[1].strip() == expected_2.strip()

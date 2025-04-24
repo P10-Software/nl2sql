@@ -117,24 +117,34 @@ def evaluate_coarse_grained(model, eval_data, k):
         eval_set = eval_data
 
     eval_result = []
-    sum_recall_at_k = 0
+    sum_column_recall_at_k = 0
+    sum_table_recall_at_k = 0
     for example in tqdm(eval_set):
         if dataset_contains_feasibility:
             goal_columns = [" ".join(column.split(".")) for column in example["columns"]]
         else:
             goal_columns = example["goal answer"]
 
+        # Make relevance predictions
         predictions = predict_relevance_coarse(model, example["question"], example["schema"])
         columns, relevance = zip(*(sorted(predictions.items(), reverse=True, key= lambda pair: pair[1])[:k]))
         columns, relevance = list(columns), list(relevance)
     
+        # Evaluate column level recall@k
         relevant_columns = [column for column in columns if column in goal_columns]
-        recall_at_k = len(relevant_columns) / len(goal_columns)
+        column_recall_at_k = len(relevant_columns) / len(goal_columns)
+        sum_column_recall_at_k += column_recall_at_k
 
-        sum_recall_at_k += recall_at_k
-        eval_result.append({"question": example["question"], "goal columns": list(goal_columns), "top k columns": columns, "top k relevance": relevance, "recall@k": recall_at_k})
 
-    eval_result.append({"Amount of questions": len(eval_set), "Total recall@k": sum_recall_at_k / len(eval_set), "K": k})
+        # Evaluate table level recall@k
+        relevant_tables = {column.split(" ")[0] for column in relevant_columns}
+        goal_tables = {column.split(" ")[0] for column in goal_columns}
+        table_recall_at_k = len(relevant_tables) / len(goal_tables)
+        sum_table_recall_at_k += table_recall_at_k
+
+        eval_result.append({"question": example["question"], "goal columns": list(goal_columns), "top k columns": columns, "top k relevance": relevance, "column recall@k": column_recall_at_k, "table recall@k": table_recall_at_k})
+
+    eval_result.append({"Amount of questions": len(eval_set), "Total column recall@k": sum_column_recall_at_k / len(eval_set), "Total table recall@k": sum_table_recall_at_k / len(eval_set), "K": k})
     return eval_result
 
 class SchemaLinkingDatasetCoarse(torch.utils.data.Dataset):

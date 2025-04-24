@@ -57,7 +57,7 @@ with patch.dict('sys.modules', {
         [col_a:TEXT]
         [col_t:TEXT]""")
 
-        assert len(chunks) >= 2
+        assert len(chunks) == 3
         assert chunks[0].strip() == expected_1.strip()
         assert chunks[1].strip() == expected_2.strip()
         assert chunks[2].strip() == expected_3.strip()

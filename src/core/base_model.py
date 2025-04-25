@@ -4,7 +4,7 @@ import re
 from tqdm import tqdm
 from dotenv import load_dotenv
 from src.common.logger import get_logger
-from src.core.extract_instructions import get_query_build_instruct, SchemaKind
+from src.database.database import execute_query
 
 logger = get_logger(__name__)
 load_dotenv()
@@ -37,15 +37,14 @@ class NL2SQLModel(ABC):
         self.analysis = None
         self.mschema = mschema
 
-    def run(self, schema_size: SchemaKind):
+    def run(self):
         logger.info(f"Started benchmarking of {self.__class__.__name__}.")
+
+        schema = self._get_mschema() if self.mschema else self._get_DDL()
+
         for idx, pair in enumerate(tqdm(self.benchmark)):
             question = pair['question']
             goal = pair['golden_query']
-            if self.mschema:
-                schema = self.get_mschema()
-            else:
-                schema = get_query_build_instruct(schema_size, goal)
 
             answer = self._answer_single_question(question, schema)
 
@@ -73,9 +72,25 @@ class NL2SQLModel(ABC):
         # Remove \n
         return query.replace("\n", "")
 
-    def get_mschema(self):
+    def _get_mschema(self):
         """
         Read database m-schema from file.
         """
         with open(f".local/mschema_{DB_NAME}_{'natural' if DB_NATURAL else 'abbreviated'}.txt", "r") as file:
             return file.read()
+
+    def _get_DDL(self):
+        """
+        Get database DDL instructions from the database.
+        """
+        query = """
+            SELECT sql
+            FROM sqlite_master
+            WHERE type IN ('table', 'index', 'view', 'trigger')
+        """
+        result = execute_query(query)
+
+        ddl_statements = [row[0] for row in result]
+        full_ddl = ";\n\n".join(ddl_statements) + ";"
+
+        return full_ddl

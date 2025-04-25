@@ -1,7 +1,7 @@
 import scripts.create_training_set_from_spider
 scripts.create_training_set_from_spider.PATH_TO_SPIDER_DIR = "test/scripts/mock_dataset"
 
-from scripts.create_training_set_from_spider import _load_schema_for_all_dbs, create_training_set, _extract_columns_in_schema
+from scripts.create_training_set_from_spider import _load_schema_for_all_dbs, create_training_set, _lowercase_column_and_table_names
 import os
 import sqlite3
 import pytest
@@ -90,35 +90,47 @@ def test_create_training_set(create_mock_database_folder, mock_train_file):
 (order_id:INTEGER, Primary Key, Examples: [1, 2, 3]),
 (user_id:INTEGER, Examples: [1, 2]),
 (amount:REAL, Examples: [99.99, 149.5, 200.0])
-]
-"""
+]"""
     expected_table_users = """# Table: users
 [
 (user_id:INTEGER, Primary Key, Examples: [1, 2]),
 (name:TEXT, Examples: [Alice Johnson, Bob Smith]),
 (email:TEXT)
 ]"""
-    expected_question = "To answer: How many users exist?\nWe need columns:"
-    expected_repeated_columns_users = "<< users user_id >>\n<< users name >>\n<< users email >>"
-    expected_repeated_columns_orders = "<< orders order_id >>\n<< orders user_id >>\n<< orders amount >>"
-    expected_training_set = [{"input": None, "goal answer": ["users user_id", "users name", "users email"]}]
+    expected_question = "How many users exist?"
+    expected_goal_answer = ["users user_id", "users name", "users email"]
 
     # act
     actual_training_set, _ = create_training_set()
 
     # assert
-    assert len(expected_training_set) == len(actual_training_set)
-    assert actual_training_set[0]["goal answer"] == expected_training_set[0]["goal answer"]
-    assert expected_db in actual_training_set[0]["input"]
-    assert expected_table_orders in actual_training_set[0]["input"]
-    assert expected_table_users in actual_training_set[0]["input"]
-    assert expected_question in actual_training_set[0]["input"]
-    assert expected_repeated_columns_users in actual_training_set[0]["input"]
-    assert expected_repeated_columns_orders in actual_training_set[0]["input"]
+    assert actual_training_set[0]["goal answer"] == expected_goal_answer
+    assert expected_db in actual_training_set[0]["schema"]
+    assert expected_table_orders in actual_training_set[0]["schema"]
+    assert expected_table_users in actual_training_set[0]["schema"]
+    assert expected_question == actual_training_set[0]["question"]
 
-def test_extract_column_names_from_mschema():
+def test_lowercase_column_and_table_names():
     # arrange
-    input = """
+    input_schema = """
+【DB_ID】 mock_db
+【Schema】
+# Table: Users
+[
+(user_id:INTEGER, Primary Key, Examples: [1, 2]),
+(name:TEXT, Examples: [Alice Johnson, Bob Smith]),
+(email:TEXT)
+]
+# Table: orders
+[
+(Order_id:INTEGER, Primary Key, Examples: [1, 2, 3]),
+(useR_id:INTEGER, Examples: [1, 2]),
+(Amount:REAL, Examples: [99.99, 149.5, 200.0])
+]
+【Foreign keys】
+Users.user_id=orders.useR_id
+"""
+    expected_lowered_schema = """
 【DB_ID】 mock_db
 【Schema】
 # Table: users
@@ -133,12 +145,12 @@ def test_extract_column_names_from_mschema():
 (user_id:INTEGER, Examples: [1, 2]),
 (amount:REAL, Examples: [99.99, 149.5, 200.0])
 ]
+【Foreign keys】
+users.user_id=orders.user_id
 """
 
-    expected_columns = "<< users user_id >>\n<< users name >>\n<< users email >>\n<< orders order_id >>\n<< orders user_id >>\n<< orders amount >>\n"
-
     # act
-    actual_columns = _extract_columns_in_schema(input)
+    actual_lowered_schema = _lowercase_column_and_table_names(input_schema)
 
     # assert
-    assert expected_columns == actual_columns
+    assert expected_lowered_schema == actual_lowered_schema

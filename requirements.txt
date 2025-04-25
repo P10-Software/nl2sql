@@ -8,6 +8,7 @@ scikit_learn==1.6.1
 sql_metadata==2.15.0
 SQLAlchemy==2.0.38
 tqdm==4.67.1
+transformer_heads==0.2.2
 transformers==4.48.3
 pyreadstat==1.2.8
 torch==2.6.0

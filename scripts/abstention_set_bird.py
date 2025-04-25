@@ -2,6 +2,9 @@ from sql_metadata import Parser
 from collections import Counter
 from typing import Literal, List, Dict
 from json import dump, load
+from sqlalchemy import create_engine
+from mschema import schema_engine
+from tqdm import tqdm
 import os
 import sqlite3
 
@@ -53,6 +56,32 @@ def pool_columns(sql_queries: List[str]) -> Counter:
         columns_pool[col] = round((columns_pool[col] / len(sql_queries)) * 100, 2)
 
     return Counter(dict(columns_pool.most_common()))  # Sorts the counter
+
+
+def extract_gold_columns(sql_query: str) -> List[str]:
+    """
+    Extracts the needed columns of an SQL query.
+    """
+    sql = Parser(sql_query)
+    cols = set()
+    for col in sql.columns:
+        col = _qualify_column(col, sql)
+        cols.add(col)
+    return list(cols)
+
+
+def extract_m_schemas(db_paths):
+    """
+    Extracts the m-schema of a database.
+
+    Args:
+    - db_path: A dictionary where the db name is the key, and its file path the value.
+    """
+    m_schemas = {}
+    for db_id, db_path in tqdm(db_paths.items(), desc="mschemas"):
+        db_engine = create_engine(f'sqlite:///{db_path}')
+        m_schemas[db_id] = schema_engine.SchemaEngine(engine=db_engine, db_name=db_id).mschema.to_mschema()
+    return m_schemas             
 
 
 def select_columns_for_removal(sql_distribution: Dict, percentage_removal: int):
@@ -125,12 +154,14 @@ def create_labelled_training_set(removable_columns: Dict, sql_queries: Dict, bir
         - feasible: wether the question is answerable, 0 for no, 1 for yes.
     """
     feasible, infeasible = _label_queries(removable_columns, sql_queries)
+    db_paths = _list_databases()
+    m_schemas = extract_m_schemas(db_paths)
     with open(bird_train_locale, 'r') as fp:
         bird_train_set = load(fp)
 
     bird_abstention_set = []
 
-    for val in bird_train_set:
+    for val in tqdm(bird_train_set, desc="Building training set, on val:"):
         question = {
             'db_id': val.get('db_id'),
             'question': val.get('question'),
@@ -138,10 +169,13 @@ def create_labelled_training_set(removable_columns: Dict, sql_queries: Dict, bir
         }
         if val.get('SQL') in infeasible:
             question['feasible'] = 0
+            question['columns'] = []
         elif val.get('SQL') in feasible:
             question['feasible'] = 1
+            question['columns'] = extract_gold_columns(val.get('SQL'))
         else:
             question['feasible'] = None
+        question['schema'] = m_schemas[val.get('db_id')]
         bird_abstention_set.append(question)
 
     return bird_abstention_set

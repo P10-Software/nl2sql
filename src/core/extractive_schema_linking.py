@@ -4,11 +4,11 @@ import re
 import json
 from tqdm import tqdm
 
-TRAINED_MODEL_PATH="models/EXSL/coarse_grained_schema_linker_spider.pth"
-TRAIN_SET_PATH=".local/spider_exsl_train.json"
-EVAL_SET_PATH=".local/spider_exsl_test.json"
-K=10
-RESULT_FILE_PATH=f".local/spider_exsl_recall_at_{K}.json"
+TRAINED_MODEL_PATH="models/EXSL/xiyan_7B_coarse_grained_schema_linker_spider.pth"
+TRAIN_SET_PATH=".local/SchemaLinker/spider_exsl_train.json"
+EVAL_SET_PATH=".local/SchemaLinker/spider_exsl_test.json"
+K=5
+RESULT_FILE_PATH=f".local/SchemaLinker/Xiyan7B/spider_exsl_recall_at_{K}.json"
 
 class ExSLcModel(torch.nn.Module):
     def __init__(self, base_model_name):
@@ -29,6 +29,8 @@ class ExSLcModel(torch.nn.Module):
         
         # Special tokens for marking columns
         self.tokenizer = AutoTokenizer.from_pretrained(base_model_name)
+        self.tokenizer.add_tokens(">>")
+        self.base_model.resize_token_embeddings(len(self.tokenizer))
         
     def forward(self, prompt):
         """
@@ -50,9 +52,9 @@ class ExSLcModel(torch.nn.Module):
         last_hidden_state = outputs.last_hidden_state
         
         # Find positions of « and » tokens        
-        input_tokens = self.tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])        
+        input_tokens = self.tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])  
         alpha_positions = [j for j, tok in enumerate(input_tokens) if tok == "<<"]
-        omega_positions = [j for j, tok in enumerate(input_tokens) if tok == "Ġ>>"]
+        omega_positions = [j for j, tok in enumerate(input_tokens) if tok == ">>"]
         
         embeddings_alpha = last_hidden_state[0, alpha_positions]
         embeddings_omega = last_hidden_state[0, omega_positions]
@@ -263,9 +265,9 @@ def load_schema_linker():
     return torch.load(TRAINED_MODEL_PATH, weights_only=False)
 
 if __name__ == "__main__":
-    # Configuration matching ExSL paper
+    # Train config
     config = {
-        "base_model": "deepseek-ai/deepseek-coder-6.7b-base",
+        "base_model": "XGenerationLab/XiYanSQL-QwenCoder-7B-2502",
         "learning_rate": 5e-6,
         "weight_decay": 0.0,
         "epochs": 2,

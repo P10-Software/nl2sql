@@ -1,5 +1,5 @@
 from src.core.base_model import PromptStrategy
-from transformers import AutoTokenizer
+
 
 class DeepSeekPromptStrategy(PromptStrategy):
     def __init__(self, sql_dialect):
@@ -16,7 +16,8 @@ class DeepSeekPromptStrategy(PromptStrategy):
 
     def get_prompt(self, schema, question):
         return self.prompt_template.format(SQL_DIALECT=self.sql_dialect, DDL_INSTRUCTIONS=schema, NL_QUESTION=question)
-    
+
+
 class XiYanSQLPromptStrategy(PromptStrategy):
     def __init__(self, sql_dialect):
         self.sql_dialect = sql_dialect
@@ -37,7 +38,8 @@ class XiYanSQLPromptStrategy(PromptStrategy):
 
     def get_prompt(self, schema, question):
         return self.prompt_template.format(SQL_DIALECT=self.sql_dialect, DDL_INSTRUCTIONS=schema, NL_QUESTION=question, EVIDENCE="")
-    
+
+
 class Llama3PromptStrategy(PromptStrategy):
     def __init__(self, sql_dialect):
         self.sql_dialect = sql_dialect
@@ -53,7 +55,8 @@ class Llama3PromptStrategy(PromptStrategy):
 
     def get_prompt(self, schema, question):
         return self.prompt_template.format(SQL_DIALECT=self.sql_dialect, DDL_INSTRUCTIONS=schema, NL_QUESTION=question)
-    
+
+
 class SQLCoderAbstentionPromptStrategy(PromptStrategy):
     def __init__(self, sql_dialect):
         self.sql_dialect = sql_dialect
@@ -90,18 +93,3 @@ class SQLCoderAbstentionPromptStrategy(PromptStrategy):
             return self.pre_sql_prompt_template.format(SQL_DIALECT=self.sql_dialect, DDL_INSTRUCTIONS=schema, NL_QUESTION=question)
         else:
             return self.post_sql_prompt_template.format(SQL_DIALECT=self.sql_dialect, DDL_INSTRUCTIONS=schema, NL_QUESTION=question, SQL=generated_sql)
-
-
-class ModernBERTPromptStrategy(PromptStrategy):
-    def __init__(self):
-        super().__init__()
-        self.tokenizer = AutoTokenizer.from_pretrained("answerdotai/ModernBERT-large")
-
-    def get_prompt(self, schema, question):
-        """Returns a tokenized prompt"""
-        return self.tokenizer(
-            question,
-            schema,
-            truncation=True,
-            return_tensors="pt"
-        )

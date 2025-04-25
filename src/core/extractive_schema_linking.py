@@ -3,12 +3,13 @@ from transformers import AutoModel, AutoTokenizer
 import re
 import json
 from tqdm import tqdm
+from accelerate import Accelerator
 
-TRAINED_MODEL_PATH="models/EXSL/xiyan_7B_coarse_grained_schema_linker_spider.pth"
+TRAINED_MODEL_PATH="models/EXSL/xiyan_7B_finetuned_coarse_grained_schema_linker_spider.pth"
 TRAIN_SET_PATH=".local/SchemaLinker/spider_exsl_train.json"
 EVAL_SET_PATH=".local/SchemaLinker/spider_exsl_test.json"
 K=5
-RESULT_FILE_PATH=f".local/SchemaLinker/Xiyan7B/spider_exsl_recall_at_{K}.json"
+RESULT_FILE_PATH=f".local/SchemaLinker/Xiyan7B_finetuned/spider_exsl_recall_at_{K}.json"
 
 class ExSLcModel(torch.nn.Module):
     def __init__(self, base_model_name, freeze_base: bool = True):
@@ -70,8 +71,12 @@ class ExSLcModel(torch.nn.Module):
         return self.w_relevance(column_embeddings).squeeze(-1)  # Shape: [num_columns]
             
 def train_coarse_grained(model, train_data, config):
+    # Initialize Accelerator
+    accelerator = Accelerator()
+
     # Prepare dataset
     train_dataset = SchemaLinkingDatasetCoarse(train_data)
+    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=1)
     
     # Optimizer with paper's parameters
     optimizer = torch.optim.AdamW(
@@ -79,7 +84,8 @@ def train_coarse_grained(model, train_data, config):
         lr=config["learning_rate"],
         weight_decay=config["weight_decay"]
     )
-    
+
+    model, optimizer, train_dataloader = accelerator.prepare(model, optimizer, train_dataloader)    
     criterion = torch.nn.BCEWithLogitsLoss()
     
     # Training loop
@@ -87,10 +93,10 @@ def train_coarse_grained(model, train_data, config):
         model.train()
         total_loss = 0
         
-        for example in tqdm(train_dataset):
+        for example in tqdm(train_dataloader):
             optimizer.zero_grad()
 
-            labels = example["labels"].to(config["device"])
+            labels = example["labels"].squeeze(0).to(accelerator.device)
             
             # Forward pass
             logits = model(example["input"], config["freeze_base"])
@@ -98,12 +104,9 @@ def train_coarse_grained(model, train_data, config):
             loss = 0
             if logits.size(0) > 0:
                 loss = criterion(logits, labels)
-            
-            if not loss:
-                continue
 
             # Backward pass
-            loss.backward()
+            accelerator.backward(loss)
             optimizer.step()
             
             # Accumulate for reporting
@@ -200,7 +203,6 @@ def predict_relevance_coarse(model, question, schema):
         model: Trained ExSLc model
         question: Natural language question
         schema: Database schema
-        device: Device to run inference on
         
     Returns:
         Dictionary mapping (table, column) pairs to relevance probability
@@ -276,12 +278,10 @@ if __name__ == "__main__":
         "learning_rate": 5e-6,
         "weight_decay": 0.0,
         "epochs": 2,
-        "device": "cuda" if torch.cuda.is_available() else "cpu"
     }
 
     # Initialize model
     model = ExSLcModel(config["base_model"], config["freeze_base"])
-    model.to(config["device"])
 
     # Load train data set
     with open(TRAIN_SET_PATH, "r") as train_file:
@@ -302,4 +302,3 @@ if __name__ == "__main__":
 
     with open(RESULT_FILE_PATH, "w") as result_file:
         json.dump(eval_result, result_file, indent=4)
-

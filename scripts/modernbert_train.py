@@ -7,12 +7,16 @@ from transformers import (
 )
 from src.common.logger import get_logger
 from datasets import Dataset
-from sklearn.metrics import precision_score, recall_score
+from sklearn.metrics import (
+    precision_score,
+    recall_score,
+    classification_report
+    )
 import json
 import numpy as np
 
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 
 TRAIN_DATA_FILEPATH = ".local/bird_testing_set.json"
@@ -28,10 +32,11 @@ def objective(trial: optuna.Trial):
     weight_decay = trial.suggest_float("weight_decay", 0.0, 0.1)
     learning_rate = trial.suggest_float("learning_rate", 1e-6, 5e-5, log=True)
     num_train_epochs = trial.suggest_int("num_train_epochs", 2, 5)
-    logger.info(f"Running trial {trial.number}, using parameters: {trial.params}")
+    logger.info(
+        f"Running trial {trial.number}, using parameters: {trial.params}")
 
-    dataset = _load_filtered_dataset(TRAIN_DATA_FILEPATH)
-    dataset = dataset.train_test_split(test_size=0.1, seed=42)
+    dataset = _load_feasibility_dataset(TRAIN_DATA_FILEPATH)
+    dataset = dataset.train_test_split(test_size=0.1)
 
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
     tokenized_dataset = dataset.map(
@@ -71,7 +76,7 @@ def objective(trial: optuna.Trial):
 
 def run_study():
     """
-    Creates or resumes an Optuna study and launches hyperparameter 
+    Creates or resumes an Optuna study and launches hyperparameter
     optimization.
     """
     study = optuna.create_study(
@@ -90,19 +95,19 @@ def _tokenize_function(batch, tokenizer):
     return tokenizer(combined_inputs, truncation=True, padding="max_length")
 
 
-def _load_filtered_dataset(filepath):
+def _load_feasibility_dataset(filepath):
     with open(filepath, "r") as fp:
         raw_data = json.load(fp)
+    filtered_data = []
 
-    filtered_data = [
-        {
-            "question": entry["question"],
-            "schema": entry["schema"],
-            "label": int(entry["feasible"])
-        }
-        for entry in raw_data
-        if entry.get("feasible") is not None
-    ]
+    for entry in raw_data:
+        if entry.get("feasible"):
+            filtered_data.append({
+                "question": entry.get["question"],
+                "schema": entry.get["schema"],
+                "label": int(entry.get["feasible"])
+            })
+
     return Dataset.from_list(filtered_data)
 
 
@@ -110,19 +115,28 @@ def _compute_fbeta(preds, labels, b=4):
     """
     Computes a fβ measure, defaults to f4.
     """
-    precision = precision_score(y_true=labels, y_pred=preds)
-    recall = recall_score(y_true=labels, y_pred=preds)
+    precision = precision_score(y_true=labels, y_pred=preds, pos_label=0)
+    recall = recall_score(y_true=labels, y_pred=preds, pos_label=0)
 
-    skewed_fb = (1 + b**2) * (precision * recall) / ((b**2 * precision) + recall)
+    denominator = ((b**2 * precision) + recall)
+    if denominator == 0:
+        return 0.0
+
+    skewed_fb = (1 + b**2) * (precision * recall) / denominator
     return skewed_fb
 
 
 def _compute_metrics_custom(eval_pred):
+    target_names = ['infeasible', 'feasible']
     logits, labels = eval_pred
     preds = np.argmax(logits, axis=1)
+    logger.info(classification_report(
+        y_true=labels,
+        y_pred=preds,
+        target_names=target_names))
     return {
-        "precision": precision_score(labels, preds),
-        "recall": recall_score(labels, preds),
+        "precision": precision_score(labels, preds, pos_label=0),
+        "recall": recall_score(labels, preds, pos_label=0),
         "skewed_fbeta": _compute_fbeta(preds, labels),
     }
 

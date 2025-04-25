@@ -11,7 +11,7 @@ K=5
 RESULT_FILE_PATH=f".local/SchemaLinker/Xiyan7B/spider_exsl_recall_at_{K}.json"
 
 class ExSLcModel(torch.nn.Module):
-    def __init__(self, base_model_name):
+    def __init__(self, base_model_name, freeze_base: bool = True):
         """
         Coarse-Grained Extractive Schema Linking Model
         
@@ -20,8 +20,9 @@ class ExSLcModel(torch.nn.Module):
         """
         super().__init__()
         self.base_model = AutoModel.from_pretrained(base_model_name, torch_dtype=torch.bfloat16)
-        for param in self.base_model.parameters():
-            param.requires_grad = False
+        if freeze_base:
+            for param in self.base_model.parameters():
+                param.requires_grad = False
         hidden_size = self.base_model.config.hidden_size
         
         # Single output for relevance (binary)
@@ -32,7 +33,7 @@ class ExSLcModel(torch.nn.Module):
         self.tokenizer.add_tokens(">>")
         self.base_model.resize_token_embeddings(len(self.tokenizer))
         
-    def forward(self, prompt):
+    def forward(self, prompt, freeze_base: bool = True):
         """
         Forward pass of the model
         
@@ -46,7 +47,10 @@ class ExSLcModel(torch.nn.Module):
         # Tokenize input
         inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
 
-        with torch.no_grad():
+        if freeze_base:
+            with torch.no_grad():
+                outputs = self.base_model(**inputs)
+        else:
             outputs = self.base_model(**inputs)
 
         last_hidden_state = outputs.last_hidden_state
@@ -89,7 +93,7 @@ def train_coarse_grained(model, train_data, config):
             labels = example["labels"].to(config["device"])
             
             # Forward pass
-            logits = model(example["input"])
+            logits = model(example["input"], config["freeze_base"])
             
             loss = 0
             if logits.size(0) > 0:
@@ -268,6 +272,7 @@ if __name__ == "__main__":
     # Train config
     config = {
         "base_model": "XGenerationLab/XiYanSQL-QwenCoder-7B-2502",
+        "freeze_base": False,
         "learning_rate": 5e-6,
         "weight_decay": 0.0,
         "epochs": 2,
@@ -275,7 +280,7 @@ if __name__ == "__main__":
     }
 
     # Initialize model
-    model = ExSLcModel(config["base_model"])
+    model = ExSLcModel(config["base_model"], config["freeze_base"])
     model.to(config["device"])
 
     # Load train data set

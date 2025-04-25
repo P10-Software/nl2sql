@@ -5,10 +5,14 @@ from transformers import (
     Trainer,
     TrainingArguments,
 )
+from src.common.logger import get_logger
 from datasets import Dataset
 from sklearn.metrics import precision_score, recall_score
 import json
 import numpy as np
+
+
+logger = get_logger()
 
 
 TRAIN_DATA_FILEPATH = ".local/bird_testing_set.json"
@@ -16,6 +20,16 @@ MODEL_NAME = "answerdotai/ModernBERT-large"
 
 
 def objective(trial: optuna.Trial):
+    """
+    Defines the training objective for an Optuna trial.
+    Sets and applies sampled hyperparameters, trains a model,
+    and returns a skewed F-beta score for evaluation.
+    """
+    weight_decay = trial.suggest_float("weight_decay", 0.0, 0.1)
+    learning_rate = trial.suggest_float("learning_rate", 1e-6, 5e-5, log=True)
+    num_train_epochs = trial.suggest_int("num_train_epochs", 2, 5)
+    logger.info(f"Running trial {trial.number}, using parameters: {trial.params}")
+
     dataset = _load_filtered_dataset(TRAIN_DATA_FILEPATH)
     dataset = dataset.train_test_split(test_size=0.1, seed=42)
 
@@ -24,12 +38,6 @@ def objective(trial: optuna.Trial):
         lambda x: _tokenize_function(x, tokenizer), batched=True)
     tokenized_dataset.set_format(
         type="torch", columns=["input_ids", "attention_mask", "label"])
-
-    weight_decay = trial.suggest_float("weight_decay", 0.0, 0.1)
-    learning_rate = trial.suggest_float("learning_rate", 1e-6, 5e-5, log=True)
-    num_train_epochs = trial.suggest_int("num_train_epochs", 2, 5)
-
-    print(f"Running trial {trial.number}, using parameters: {trial.params}")
 
     training_args = TrainingArguments(
         output_dir=f".local/optuna-bert-{trial.number}",
@@ -62,6 +70,10 @@ def objective(trial: optuna.Trial):
 
 
 def run_study():
+    """
+    Creates or resumes an Optuna study and launches hyperparameter 
+    optimization.
+    """
     study = optuna.create_study(
         direction="maximize",
         study_name="modernbert_study",
@@ -69,7 +81,7 @@ def run_study():
         load_if_exists=True
     )
     study.optimize(objective, n_trials=50)
-    print(f"Best trial: {study.best_trial}")
+    logger.info(f"Best trial: {study.best_trial}")
 
 
 def _tokenize_function(batch, tokenizer):
@@ -94,7 +106,7 @@ def _load_filtered_dataset(filepath):
     return Dataset.from_list(filtered_data)
 
 
-def _compute_skewed_fb(preds, labels, b=4):
+def _compute_fbeta(preds, labels, b=4):
     """
     Computes a fβ measure, defaults to f4.
     """
@@ -111,7 +123,7 @@ def _compute_metrics_custom(eval_pred):
     return {
         "precision": precision_score(labels, preds),
         "recall": recall_score(labels, preds),
-        "skewed_fbeta": _compute_skewed_fb(preds, labels),
+        "skewed_fbeta": _compute_fbeta(preds, labels),
     }
 
 

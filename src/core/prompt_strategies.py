@@ -1,5 +1,6 @@
 from src.core.base_model import PromptStrategy
 
+
 class DeepSeekPromptStrategy(PromptStrategy):
     def __init__(self, sql_dialect):
         self.sql_dialect = sql_dialect
@@ -15,7 +16,8 @@ class DeepSeekPromptStrategy(PromptStrategy):
 
     def get_prompt(self, schema, question):
         return self.prompt_template.format(SQL_DIALECT=self.sql_dialect, DDL_INSTRUCTIONS=schema, NL_QUESTION=question)
-    
+
+
 class XiYanSQLPromptStrategy(PromptStrategy):
     def __init__(self, sql_dialect):
         self.sql_dialect = sql_dialect
@@ -36,7 +38,8 @@ class XiYanSQLPromptStrategy(PromptStrategy):
 
     def get_prompt(self, schema, question):
         return self.prompt_template.format(SQL_DIALECT=self.sql_dialect, DDL_INSTRUCTIONS=schema, NL_QUESTION=question, EVIDENCE="")
-    
+
+
 class Llama3PromptStrategy(PromptStrategy):
     def __init__(self, sql_dialect):
         self.sql_dialect = sql_dialect
@@ -52,7 +55,8 @@ class Llama3PromptStrategy(PromptStrategy):
 
     def get_prompt(self, schema, question):
         return self.prompt_template.format(SQL_DIALECT=self.sql_dialect, DDL_INSTRUCTIONS=schema, NL_QUESTION=question)
-    
+
+
 class SQLCoderAbstentionPromptStrategy(PromptStrategy):
     def __init__(self, sql_dialect):
         self.sql_dialect = sql_dialect

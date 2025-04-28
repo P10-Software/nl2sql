@@ -9,7 +9,7 @@ from scripts.extract_instructions import extract_column_table
 PATH_TO_SPIDER_DIR = "../spider_data/spider_data/"
 
 
-def create_training_set():
+def create_training_set(replace_all_with_single: bool = False):
     with open(join(PATH_TO_SPIDER_DIR, "train_spider.json"), "r") as train_file:
         spider_train_set = load(train_file)
 
@@ -23,7 +23,7 @@ def create_training_set():
         
         # Extract goal columns from query
         try:
-            column_table = extract_column_table(question_pair["query"], schema_dict[question_pair["db_id"]]["db_path"])
+            column_table = extract_column_table(question_pair["query"], schema_dict[question_pair["db_id"]]["db_path"], replace_all_with_single)
             goal_columns = []
             for table in column_table.keys():
                 for column in column_table[table]:
@@ -65,7 +65,7 @@ def _lowercase_column_and_table_names(schema: str) -> str:
     return re.sub(r"【Foreign keys】\n([\s\S]*)", fix_foreign_keys_section, output)
 
 if __name__ == "__main__":
-    valid_training_set, invalid_training_set = create_training_set()
+    valid_training_set, invalid_training_set = create_training_set(False)
     with open(".local/spider_exsl_train.json", "w") as file:
         dump(valid_training_set, file, indent=4)
 

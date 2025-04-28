@@ -3,7 +3,6 @@ from transformers import AutoModel, AutoTokenizer
 import re
 import json
 from tqdm import tqdm
-from accelerate import Accelerator
 
 TRAINED_MODEL_PATH="models/EXSL/xiyan_7B_finetuned_coarse_grained_schema_linker_spider.pth"
 TRAIN_SET_PATH=".local/SchemaLinker/spider_exsl_train.json"
@@ -12,7 +11,7 @@ K=5
 RESULT_FILE_PATH=f".local/SchemaLinker/Xiyan7B_finetuned/spider_exsl_recall_at_{K}.json"
 
 class ExSLcModel(torch.nn.Module):
-    def __init__(self, base_model_name, freeze_base: bool = True):
+    def __init__(self, base_model_name, freeze_final_layer: bool = True):
         """
         Coarse-Grained Extractive Schema Linking Model
         
@@ -21,9 +20,13 @@ class ExSLcModel(torch.nn.Module):
         """
         super().__init__()
         self.base_model = AutoModel.from_pretrained(base_model_name, torch_dtype=torch.bfloat16)
-        if freeze_base:
-            for param in self.base_model.parameters():
-                param.requires_grad = False
+
+        for param in self.base_model.parameters():
+            param.requires_grad = False
+
+        if not freeze_final_layer:
+            pass
+
         hidden_size = self.base_model.config.hidden_size
         
         # Single output for relevance (binary)
@@ -34,7 +37,7 @@ class ExSLcModel(torch.nn.Module):
         self.tokenizer.add_tokens(">>")
         self.base_model.resize_token_embeddings(len(self.tokenizer))
         
-    def forward(self, prompt, freeze_base: bool = True):
+    def forward(self, prompt, freeze_final_layer: bool = True):
         """
         Forward pass of the model
         
@@ -48,7 +51,7 @@ class ExSLcModel(torch.nn.Module):
         # Tokenize input
         inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
 
-        if freeze_base:
+        if freeze_final_layer:
             with torch.no_grad():
                 outputs = self.base_model(**inputs)
         else:
@@ -72,11 +75,10 @@ class ExSLcModel(torch.nn.Module):
             
 def train_coarse_grained(model, train_data, config):
     # Initialize Accelerator
-    accelerator = Accelerator()
 
     # Prepare dataset
     train_dataset = SchemaLinkingDatasetCoarse(train_data)
-    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=1)
+    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True)
     
     # Optimizer with paper's parameters
     optimizer = torch.optim.AdamW(
@@ -85,7 +87,6 @@ def train_coarse_grained(model, train_data, config):
         weight_decay=config["weight_decay"]
     )
 
-    model, optimizer, train_dataloader = accelerator.prepare(model, optimizer, train_dataloader)    
     criterion = torch.nn.BCEWithLogitsLoss()
     
     # Training loop
@@ -96,17 +97,17 @@ def train_coarse_grained(model, train_data, config):
         for example in tqdm(train_dataloader):
             optimizer.zero_grad()
 
-            labels = example["labels"].squeeze(0).to(accelerator.device)
+            labels = example["labels"].squeeze(0).to("cuda")
             
             # Forward pass
-            logits = model(example["input"], config["freeze_base"])
+            logits = model(example["input"][0], config["freeze_base"])
             
             loss = 0
             if logits.size(0) > 0:
                 loss = criterion(logits, labels)
 
             # Backward pass
-            accelerator.backward(loss)
+            loss.backward(loss)
             optimizer.step()
             
             # Accumulate for reporting
@@ -274,14 +275,14 @@ if __name__ == "__main__":
     # Train config
     config = {
         "base_model": "XGenerationLab/XiYanSQL-QwenCoder-7B-2502",
-        "freeze_base": False,
+        "freeze_final_layer": False,
         "learning_rate": 5e-6,
         "weight_decay": 0.0,
         "epochs": 2,
     }
 
     # Initialize model
-    model = ExSLcModel(config["base_model"], config["freeze_base"])
+    model = ExSLcModel(config["base_model"], config["freeze_final_layer"])
 
     # Load train data set
     with open(TRAIN_SET_PATH, "r") as train_file:

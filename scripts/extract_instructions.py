@@ -35,9 +35,9 @@ def get_query_build_instruct(kind: SchemaKind, query: str, db_path: str = "") ->
     return _create_build_instruction(schema_tree, selected_tables_columns, kind)
 
 
-def extract_column_table(query: str, db_path: str = "") -> dict[str, list[str]]:
+def extract_column_table(query: str, db_path: str = "", replace_all_with_single: bool = False) -> dict[str, list[str]]:
     column_table_mapping = {}
-    sanitised_query = sanitise_query(query, db_path)
+    sanitised_query = sanitise_query(query, db_path, replace_all_with_single)
     subqueries = re.split(" UNION | INTERSECT | EXCEPT", sanitised_query)
     for subquery in subqueries:
         parser = Parser(subquery)
@@ -77,7 +77,7 @@ def extract_column_table(query: str, db_path: str = "") -> dict[str, list[str]]:
     return column_table_mapping
 
 
-def sanitise_query(query: str, db_path: str = ""):
+def sanitise_query(query: str, db_path: str = "", replace_all_with_single: bool = False):
     pre_sanitized_query = query
     query = re.sub(r"\"[^\"]*\"", r"''", query, flags=re.IGNORECASE)
 
@@ -97,12 +97,13 @@ def sanitise_query(query: str, db_path: str = ""):
                     table_name = from_part_tokens[0].removesuffix(";")
                     column_names = [f"{table_name}.{column}" for column in column_names]
 
-                if len(column_names) == 1:
-                    replacement_string = column_names[0]
-                elif len(column_names) > 1:
-                    replacement_string = ", ".join(column_names)
-                else:
+                if len(column_names) < 1:
                     raise Exception("No column names returned")
+                elif len(column_names) == 1 or replace_all_with_single:
+                    replacement_string = column_names[0]
+                else:
+                    replacement_string = ", ".join(column_names)
+
                 subparts[0] = subparts[0].replace("*", replacement_string)
                 query = "FROM".join(subparts)
     

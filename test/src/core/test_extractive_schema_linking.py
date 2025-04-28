@@ -2,7 +2,8 @@ from unittest.mock import patch, MagicMock
 
 with patch.dict('sys.modules', {
     'torch': MagicMock(),
-    'transformers': MagicMock()
+    'transformers': MagicMock(),
+    'accelerate': MagicMock()
 }):
     from src.core.extractive_schema_linking import prepare_input, evaluate_coarse_grained
 

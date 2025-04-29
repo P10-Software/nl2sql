@@ -3,7 +3,8 @@ from unittest.mock import patch, MagicMock
 with patch.dict('sys.modules', {
     'torch': MagicMock(),
     'transformers': MagicMock(),
-    'accelerate': MagicMock()
+    'accelerate': MagicMock(),
+    'optuna': MagicMock()
 }):
     from scripts.schema_linker_train import evaluate_coarse_grained
     def test_evaluate_coarse_grained():

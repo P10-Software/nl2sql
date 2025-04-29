@@ -10,9 +10,12 @@ import sqlite3
 
 
 SEARCH_DIRECTION = Literal['front', 'back']
+SQL_LOCALE = ".local\dev_20240627\dev.sql"
+DB_ROOT = ".local\dev_20240627\dev_databases\dev_databases"
+JSON_LOCALE = ".local\dev_20240627\dev.json"
 
 
-def extract_gold_sql_db(file_path=".local/train/train/train_gold.sql") -> dict[str, list[str]]:
+def extract_gold_sql_db(file_path=SQL_LOCALE) -> dict[str, list[str]]:
     """
     Groups gold SQL by their database. Used for later processing.
 
@@ -137,7 +140,7 @@ def select_columns_for_removal(sql_distribution: Dict, percentage_removal: int):
     return columns_to_remove
 
 
-def create_labelled_training_set(removable_columns: Dict, sql_queries: Dict, bird_train_locale: str = ".local/train/train/train.json"):
+def create_labelled_training_set(removable_columns: Dict, sql_queries: Dict, bird_train_locale: str = JSON_LOCALE):
     """
     Creates the training set with labels.
     Uses training set from bird to create new abstention training set.
@@ -244,7 +247,7 @@ def _is_safe_to_drop(db_str, table, column) -> bool:
     )
 
 
-def _list_databases(bird_train_locale=".local/train/train/train_databases/train_databases"):
+def _list_databases(bird_train_locale=DB_ROOT):
     root_dir = os.path.dirname(os.path.abspath(bird_train_locale))
     db_paths = {}
 
@@ -316,7 +319,7 @@ def _find_table_recurs(token, direction: SEARCH_DIRECTION):
 
 
 if __name__ == '__main__':
-    infeasible_sql_percent = 15
+    infeasible_sql_percent = 30
 
     gold_sql_dict = extract_gold_sql_db()
 
@@ -331,5 +334,5 @@ if __name__ == '__main__':
 
     new_dataset = create_labelled_training_set(cols_to_del, gold_sql_dict)
 
-    with open(".local/bird_abstention_train_set.json", 'w') as fp:
+    with open(".local/bird_abstention_eval_set.json", 'w') as fp:
         dump(new_dataset, fp, indent=4)

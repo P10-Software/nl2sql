@@ -14,12 +14,14 @@ from sklearn.metrics import (
     )
 import json
 import numpy as np
+import os
 
 
 logger = get_logger(__name__)
 
 
 TRAIN_DATA_FILEPATH = ".local/bird_testing_set.json"
+EVAL_DATA_FILEPATH = ".local/bird_abstention_eval_set.json"
 MODEL_NAME = "answerdotai/ModernBERT-large"
 
 
@@ -89,6 +91,47 @@ def run_study():
     logger.info(f"Best trial: {study.best_trial}")
 
 
+def evaluate_models(trial_no: list[int]):
+    """
+    Evaluates models, based on the bird eval abstenmtion set.
+    Args:
+    - trial_no: A list of trials to evaluate, indicated by their trial number.  
+    """
+    dataset = _load_feasibility_dataset(EVAL_DATA_FILEPATH)
+    best_score = -1
+    best_trial = None
+    best_result = None
+
+    for idx in trial_no:
+        model_dir = f".local/AbstentionClassifier/optuna-bert-{idx}"
+        if not os.path.exists(model_dir):
+            logger.warning(f"Model directory for trial {idx} not found.")
+            continue
+
+        checkpoint_dirs = [os.path.join(model_dir, d) for d in os.listdir(model_dir) if d.startswith("checkpoint")]
+        if not checkpoint_dirs:
+            logger.warning(f"No checkpoints found for trial {idx}.")
+            continue
+
+        latest_checkpoint = sorted(checkpoint_dirs)[-1]
+
+        tokenizer = AutoTokenizer.from_pretrained(latest_checkpoint)
+        tokenized_data = dataset.map(lambda x: _tokenize_function(x, tokenizer), batched=True)
+        tokenized_data.set_format(type="torch", columns=["input_ids", "attention_mask", "label"])
+
+        model = AutoModelForSequenceClassification.from_pretrained(latest_checkpoint)
+        trainer = Trainer(model=model, tokenizer=tokenizer, compute_metrics=_compute_metrics_custom)
+        results = trainer.evaluate(eval_dataset=tokenized_data)
+
+        logger.info(f"Result for trial {idx}: {results}")
+        if results["skewed_fbeta"] > best_score:
+            best_score = results["skewed_fbeta"]
+            best_trial = idx
+            best_result = results
+
+    logger.info(f"Best trial: {best_trial} with skewed_fbeta: {best_score:.4f}. Full results: {best_result}")
+
+
 def _tokenize_function(batch, tokenizer):
     combined_inputs = [
         f"{q} [SEP] {s}" for q, s in zip(batch["question"], batch["schema"])]
@@ -103,17 +146,17 @@ def _load_feasibility_dataset(filepath):
     for entry in raw_data:
         if entry.get("feasible"):
             filtered_data.append({
-                "question": entry.get["question"],
-                "schema": entry.get["schema"],
-                "label": int(entry.get["feasible"])
+                "question": entry.get("question"),
+                "schema": entry.get("schema"),
+                "label": int(entry.get("feasible"))
             })
 
     return Dataset.from_list(filtered_data)
 
 
-def _compute_fbeta(preds, labels, b=4):
+def _compute_fbeta(preds, labels, b=2):
     """
-    Computes a fβ measure, defaults to f4.
+    Computes a fβ measure, defaults to f2.
     """
     precision = precision_score(y_true=labels, y_pred=preds, pos_label=0)
     recall = recall_score(y_true=labels, y_pred=preds, pos_label=0)

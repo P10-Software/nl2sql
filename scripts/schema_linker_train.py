@@ -1,13 +1,63 @@
 import torch
+import optuna
 import json
 from tqdm import tqdm
+from src.common.logger import get_logger
 from src.core.extractive_schema_linking import ExSLcModel, prepare_input, predict_relevance_coarse
 
 TRAINED_MODEL_PATH="models/EXSL/xiyan_7B_finetuned_coarse_grained_schema_linker_spider.pth"
 TRAIN_SET_PATH=".local/SchemaLinker/spider_exsl_train.json"
 EVAL_SET_PATH=".local/SchemaLinker/spider_exsl_test.json"
 K=5
-RESULT_FILE_PATH=f".local/SchemaLinker/Xiyan7B_finetuned/spider_exsl_recall_at_{K}.json"
+RESULT_DIR_PATH=f".local/SchemaLinker/Xiyan7B_finetuned/"
+BASE_MODEL="XGenerationLab/XiYanSQL-QwenCoder-7B-2502"
+FREEZE_FINAL_LAYER=True
+
+logger = get_logger(__name__)
+
+def run_study():
+    """
+    Creates or resumes an Optuna study and launches hyperparameter
+    optimization.
+    """
+    study = optuna.create_study(
+        direction="maximize",
+        study_name="schema_linker_study",
+        storage="sqlite:///optuna_study_schema_linker.db",
+        load_if_exists=True
+    )
+    study.optimize(objective, n_trials=50)
+    logger.info(f"Best trial: {study.best_trial}")
+
+def objective(trial: optuna.trial):
+    model = ExSLcModel(BASE_MODEL, FREEZE_FINAL_LAYER)
+
+    config = {
+        "weight_decay": trial.suggest_float("weight_decay", 0.0, 0.1),
+        "learning_rate": trial.suggest_float("learning_rate", 5e-5, 5e-7, log=True),
+        "epochs": trial.suggest_int("epochs", 2, 5)
+    }
+
+    logger.info(
+        f"Running trial {trial.number}, using parameters: {trial.params}")
+
+    # Load train data set
+    with open(TRAIN_SET_PATH, "r") as train_file:
+        train_set = json.load(train_file)
+
+    trained_model = train_coarse_grained(model, train_set, config)
+
+    # Load eval data and evaluate
+    with open(EVAL_SET_PATH, "r") as eval_file:
+        eval_set = json.load(eval_file)
+
+    eval_result = evaluate_coarse_grained(trained_model, eval_set, K)
+
+    with open(RESULT_DIR_PATH + f"spider_exsl_recall_at_{K}_trial_{trial.number}.json", "w") as result_file:
+        json.dump(eval_result, result_file, indent=4)
+    logger.info(eval_result[-1])
+
+    return eval_result[-1]["table recall@k"]
 
 def train_coarse_grained(model, train_data, config):
     # Initialize Accelerator
@@ -36,7 +86,7 @@ def train_coarse_grained(model, train_data, config):
             labels = example["labels"].squeeze(0).to("cuda")
             
             # Forward pass
-            logits = model(example["input"][0], config["freeze_base"])
+            logits = model(example["input"][0], FREEZE_FINAL_LAYER)
             
             loss = 0
             if logits.size(0) > 0:
@@ -133,31 +183,4 @@ class SchemaLinkingDatasetCoarse(torch.utils.data.Dataset):
         }
 
 if __name__ == "__main__":
-    # Train config
-    config = {
-        "base_model": "XGenerationLab/XiYanSQL-QwenCoder-7B-2502",
-        "freeze_final_layer": False,
-        "learning_rate": 5e-6,
-        "weight_decay": 0.0,
-        "epochs": 2,
-    }
-
-    # Initialize model
-    model = ExSLcModel(config["base_model"], config["freeze_final_layer"])
-
-    # Load train data set
-    with open(TRAIN_SET_PATH, "r") as train_file:
-        train_set = json.load(train_file)
-
-    # Train and save model
-    trained_model = train_coarse_grained(model, train_set, config)
-    torch.save(trained_model, TRAINED_MODEL_PATH)
-
-    # Load eval data and evaluate
-    with open(EVAL_SET_PATH, "r") as eval_file:
-        eval_set = json.load(eval_file)
-
-    eval_result = evaluate_coarse_grained(trained_model, eval_set, K)
-
-    with open(RESULT_FILE_PATH, "w") as result_file:
-        json.dump(eval_result, result_file, indent=4)
+    run_study()

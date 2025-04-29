@@ -1,10 +1,6 @@
 import torch
 from transformers import AutoModel, AutoTokenizer
 import re
-import json
-from tqdm import tqdm
-
-MODEL_PATH="INSERT"
 
 class ExSLcModel(torch.nn.Module):
     def __init__(self, base_model_name, freeze_final_layer: bool = True):
@@ -141,9 +137,5 @@ def parse_schema(schema: str):
 
     return columns_in_schema
 
-def load_schema_linker():
-    return torch.load(MODEL_PATH, weights_only=False)
-
-if __name__ == "__main__":
-    # Load model
-    schema_linker = load_schema_linker()
+def load_schema_linker(model_path):
+    return torch.load(model_path, weights_only=False)

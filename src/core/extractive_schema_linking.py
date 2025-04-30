@@ -3,7 +3,7 @@ from transformers import AutoModel, AutoTokenizer
 import re
 
 class ExSLcModel(torch.nn.Module):
-    def __init__(self, base_model_name, freeze_final_layer: bool = True):
+    def __init__(self, base_model_name):
         """
         Coarse-Grained Extractive Schema Linking Model
         
@@ -12,12 +12,8 @@ class ExSLcModel(torch.nn.Module):
         """
         super().__init__()
         self.base_model = AutoModel.from_pretrained(base_model_name, torch_dtype=torch.bfloat16)
-
         for param in self.base_model.parameters():
             param.requires_grad = False
-
-        if not freeze_final_layer:
-            pass
 
         hidden_size = self.base_model.config.hidden_size
         
@@ -26,10 +22,10 @@ class ExSLcModel(torch.nn.Module):
         
         # Special tokens for marking columns
         self.tokenizer = AutoTokenizer.from_pretrained(base_model_name)
-        self.tokenizer.add_tokens(">>")
+        self.tokenizer.add_tokens([">>", "<<"])
         self.base_model.resize_token_embeddings(len(self.tokenizer))
         
-    def forward(self, prompt, freeze_final_layer: bool = True):
+    def forward(self, prompt):
         """
         Forward pass of the model
         
@@ -43,10 +39,7 @@ class ExSLcModel(torch.nn.Module):
         # Tokenize input
         inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
 
-        if freeze_final_layer:
-            with torch.no_grad():
-                outputs = self.base_model(**inputs)
-        else:
+        with torch.no_grad():
             outputs = self.base_model(**inputs)
 
         last_hidden_state = outputs.last_hidden_state

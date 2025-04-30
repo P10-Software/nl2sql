@@ -3,15 +3,14 @@ import optuna
 import json
 from tqdm import tqdm
 from src.common.logger import get_logger
-from src.core.extractive_schema_linking import ExSLcModel, prepare_input, predict_relevance_coarse
+from src.core.extractive_schema_linking import ExSLcModel, prepare_input, predict_relevance_coarse, load_schema_linker
 
-TRAINED_MODEL_PATH="models/EXSL/xiyan_7B_finetuned_coarse_grained_schema_linker_spider.pth"
-TRAIN_SET_PATH=".local/SchemaLinker/spider_exsl_train.json"
-EVAL_SET_PATH=".local/SchemaLinker/spider_exsl_test.json"
+TRAIN_SET_PATH=".local/SchemaLinker/spider_exsl_all_to_single_train.json"
+EVAL_SET_PATH=".local/SchemaLinker/spider_exsl_all_to_single_test.json"
 K=5
-RESULT_DIR_PATH=f".local/SchemaLinker/Xiyan7B_finetuned/"
-BASE_MODEL="XGenerationLab/XiYanSQL-QwenCoder-7B-2502"
-FREEZE_FINAL_LAYER=True
+RESULT_DIR_PATH=f".local/SchemaLinker/OmniSQL7B_optuna/"
+BASE_MODEL="seeklhy/OmniSQL-7B"
+NUMBER_OF_TRIALS=50
 
 logger = get_logger(__name__)
 
@@ -23,19 +22,20 @@ def run_study():
     study = optuna.create_study(
         direction="maximize",
         study_name="schema_linker_study",
-        storage="sqlite:///optuna_study_schema_linker.db",
+        storage="sqlite:///optuna_study_schema_linker_omnisql.db",
         load_if_exists=True
     )
-    study.optimize(objective, n_trials=50)
+    study.optimize(objective, n_trials=NUMBER_OF_TRIALS)
     logger.info(f"Best trial: {study.best_trial}")
 
 def objective(trial: optuna.trial):
-    model = ExSLcModel(BASE_MODEL, FREEZE_FINAL_LAYER)
+    model = ExSLcModel(BASE_MODEL)
+    model.to("cuda")
 
     config = {
         "weight_decay": trial.suggest_float("weight_decay", 0.0, 0.1),
-        "learning_rate": trial.suggest_float("learning_rate", 5e-5, 5e-7, log=True),
-        "epochs": trial.suggest_int("epochs", 2, 5)
+        "learning_rate": trial.suggest_float("learning_rate", 5e-7, 5e-5, log=True),
+        "epochs": trial.suggest_int("epochs", 2, 4)
     }
 
     logger.info(
@@ -57,7 +57,7 @@ def objective(trial: optuna.trial):
         json.dump(eval_result, result_file, indent=4)
     logger.info(eval_result[-1])
 
-    return eval_result[-1]["table recall@k"]
+    return eval_result[-1]["Total table recall@k"]
 
 def train_coarse_grained(model, train_data, config):
     # Initialize Accelerator
@@ -86,7 +86,7 @@ def train_coarse_grained(model, train_data, config):
             labels = example["labels"].squeeze(0).to("cuda")
             
             # Forward pass
-            logits = model(example["input"][0], FREEZE_FINAL_LAYER)
+            logits = model(example["input"][0])
             
             loss = 0
             if logits.size(0) > 0:
@@ -133,8 +133,8 @@ def evaluate_coarse_grained(model, eval_data, k):
 
 
         # Evaluate table level recall@k
-        relevant_tables = {column.split(" ")[0] for column in relevant_columns}
         goal_tables = {column.split(" ")[0] for column in goal_columns}
+        relevant_tables = {column.split(" ")[0] for column in columns if column.split(" ")[0] in goal_tables}
         table_recall_at_k = len(relevant_tables) / len(goal_tables)
         sum_table_recall_at_k += table_recall_at_k
 

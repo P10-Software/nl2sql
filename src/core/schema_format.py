@@ -8,7 +8,7 @@ DB_NAME = os.getenv('DB_NAME')
 DB_NATURAL = bool(int(os.getenv('DB_NATURAL', 0)))
 
 
-def schema_filtering(relevant_tables: set) -> str:
+def schema_filtering(relevant_tables) -> str:
     """
     Receives a set of relevant table names from the schema linking process.
     Creates an M-Schema containing only relevant tables.
@@ -19,7 +19,18 @@ def schema_filtering(relevant_tables: set) -> str:
 
     mschema = get_mschema()
 
-    return ""
+    mschema_split = mschema.split('#')
+    mschema_header = mschema_split[0]
+    mschema_tables = ['#' + table for table in mschema_split[1:]]
+
+    relevant_mschema_tables = mschema_header
+
+    for relevant_table_name in relevant_tables:
+        for mschema_table in mschema_tables:
+            if "# Table: " + relevant_table_name in mschema_table:
+                relevant_mschema_tables = relevant_mschema_tables + mschema_table
+
+    return relevant_mschema_tables
 
 
 def get_mschema():

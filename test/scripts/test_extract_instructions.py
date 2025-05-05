@@ -95,14 +95,15 @@ def test_sanitise_query_wo_db_access(mock_logger, sql, expected):
     assert not mock_logger.warning.called
 
 
-@pytest.mark.parametrize("sql, expected", [
-    ("SELECT COUNT(*) FROM users;", "SELECT users.user_id, users.name, users.email FROM users;"),
-    ("SELECT name, COUNT(*) FROM users;", "SELECT name, * FROM users;"),
-    ("SELECT COUNT(*) FROM (SELECT name FROM users);", "SELECT name FROM (SELECT name FROM users);")
+@pytest.mark.parametrize("sql, replace_all_with_single, expected", [
+    ("SELECT COUNT(*) FROM users;", False, "SELECT users.user_id, users.name, users.email FROM users;"),
+    ("SELECT name, COUNT(*) FROM users;", False, "SELECT name, * FROM users;"),
+    ("SELECT COUNT(*) FROM (SELECT name FROM users);", False, "SELECT name FROM (SELECT name FROM users);"),
+    ("SELECT COUNT(*) FROM users;", True, "SELECT users.user_id FROM users;")
 ])
-def test_sanitise_query_w_db_access(create_mock_database_file, mock_logger, sql, expected):
+def test_sanitise_query_w_db_access(create_mock_database_file, mock_logger, sql, replace_all_with_single, expected):
     # Arrange + Act
-    result = sanitise_query(sql, "test/scripts/temp/mock_db.sqlite")
+    result = sanitise_query(sql, "test/scripts/temp/mock_db.sqlite", replace_all_with_single)
 
     # Assert
     assert result == expected

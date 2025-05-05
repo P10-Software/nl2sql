@@ -1,14 +1,6 @@
 import torch
 from transformers import AutoModel, AutoTokenizer
 import re
-import json
-from tqdm import tqdm
-
-TRAINED_MODEL_PATH="models/EXSL/coarse_grained_schema_linker_spider.pth"
-TRAIN_SET_PATH=".local/spider_exsl_train.json"
-EVAL_SET_PATH=".local/spider_exsl_test.json"
-K=10
-RESULT_FILE_PATH=f".local/spider_exsl_recall_at_{K}.json"
 
 class ExSLcModel(torch.nn.Module):
     def __init__(self, base_model_name):
@@ -22,6 +14,7 @@ class ExSLcModel(torch.nn.Module):
         self.base_model = AutoModel.from_pretrained(base_model_name, torch_dtype=torch.bfloat16)
         for param in self.base_model.parameters():
             param.requires_grad = False
+
         hidden_size = self.base_model.config.hidden_size
         
         # Single output for relevance (binary)
@@ -29,6 +22,8 @@ class ExSLcModel(torch.nn.Module):
         
         # Special tokens for marking columns
         self.tokenizer = AutoTokenizer.from_pretrained(base_model_name)
+        self.tokenizer.add_tokens([">>", "<<"])
+        self.base_model.resize_token_embeddings(len(self.tokenizer))
         
     def forward(self, prompt):
         """
@@ -50,9 +45,9 @@ class ExSLcModel(torch.nn.Module):
         last_hidden_state = outputs.last_hidden_state
         
         # Find positions of « and » tokens        
-        input_tokens = self.tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])        
+        input_tokens = self.tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])  
         alpha_positions = [j for j, tok in enumerate(input_tokens) if tok == "<<"]
-        omega_positions = [j for j, tok in enumerate(input_tokens) if tok == "Ġ>>"]
+        omega_positions = [j for j, tok in enumerate(input_tokens) if tok == ">>"]
         
         embeddings_alpha = last_hidden_state[0, alpha_positions]
         embeddings_omega = last_hidden_state[0, omega_positions]
@@ -63,119 +58,6 @@ class ExSLcModel(torch.nn.Module):
         # Predict relevance (single logit per column)
         return self.w_relevance(column_embeddings).squeeze(-1)  # Shape: [num_columns]
             
-def train_coarse_grained(model, train_data, config):
-    # Prepare dataset
-    train_dataset = SchemaLinkingDatasetCoarse(train_data)
-    
-    # Optimizer with paper's parameters
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=config["learning_rate"],
-        weight_decay=config["weight_decay"]
-    )
-    
-    criterion = torch.nn.BCEWithLogitsLoss()
-    
-    # Training loop
-    for epoch in range(config["epochs"]):
-        model.train()
-        total_loss = 0
-        
-        for example in tqdm(train_dataset):
-            optimizer.zero_grad()
-
-            labels = example["labels"].to(config["device"])
-            
-            # Forward pass
-            logits = model(example["input"])
-            
-            loss = 0
-            if logits.size(0) > 0:
-                loss = criterion(logits, labels)
-            
-            if not loss:
-                continue
-
-            # Backward pass
-            loss.backward()
-            optimizer.step()
-            
-            # Accumulate for reporting
-            total_loss += loss.item()
-        
-        print(f"Epoch {epoch + 1}/{config['epochs']}")
-        print(f"Train Loss: {total_loss / len(train_dataset):.4f}")
-    
-    return model
-
-def evaluate_coarse_grained(model, eval_data, k):
-    # Prepare dataset
-    dataset_contains_feasibility = "feasible" in eval_data[0].keys()
-    if dataset_contains_feasibility:
-        eval_set = [example for example in eval_data if example["feasible"] is not None]
-    else:
-        eval_set = eval_data
-
-    eval_result = []
-    sum_recall_at_k = 0
-    for example in tqdm(eval_set):
-        if dataset_contains_feasibility:
-            goal_columns = [" ".join(column.split(".")) for column in example["columns"]]
-        else:
-            goal_columns = example["goal answer"]
-
-        predictions = predict_relevance_coarse(model, example["question"], example["schema"])
-        columns, relevance = zip(*(sorted(predictions.items(), reverse=True, key= lambda pair: pair[1])[:k]))
-        columns, relevance = list(columns), list(relevance)
-    
-        relevant_columns = [column for column in columns if column in goal_columns]
-        recall_at_k = len(relevant_columns) / len(goal_columns)
-
-        sum_recall_at_k += recall_at_k
-        eval_result.append({"question": example["question"], "goal columns": list(goal_columns), "top k columns": columns, "top k relevance": relevance, "recall@k": recall_at_k})
-
-    eval_result.append({"Amount of questions": len(eval_set), "Total recall@k": sum_recall_at_k / len(eval_set), "K": k})
-    return eval_result
-
-class SchemaLinkingDatasetCoarse(torch.utils.data.Dataset):
-    def __init__(self, examples):
-        self.dataset_contains_feasibility = "feasible" in examples[0].keys()
-
-        if self.dataset_contains_feasibility:
-            self.examples = [example for example in examples if example["feasible"] is not None]
-        else:
-            self.examples = examples
-        
-    def __len__(self):
-        return len(self.examples)
-    
-    def __getitem__(self, idx):
-        example = self.examples[idx]
-        input, repeated_schema = prepare_input(example["question"], example["schema"])
-            
-        # Create binary labels tensor (1 for relevant, 0 otherwise)
-        num_columns = len(repeated_schema)
-        labels = torch.zeros(num_columns)
-        
-        # Create label mapping based on "goal answer"
-        if self.dataset_contains_feasibility:
-            goal_columns = {" ".join(column.split(".")) for column in example["columns"]}
-        else:
-            goal_columns = set(example["goal answer"])
-
-        if not self.dataset_contains_feasibility or example["feasible"] == 1:
-            for col_idx, col in enumerate(repeated_schema):
-                if col in goal_columns:
-                    labels[col_idx] = 1.0
-
-            if (labels == 0).all():
-                raise Exception(f"No goal columns for feasible question: {example['question']}")            
-
-        return {
-            "input": input,
-            "labels": labels
-        }
-
 def predict_relevance_coarse(model, question, schema):
     """
     Predict which schema elements are relevant to the question
@@ -184,7 +66,6 @@ def predict_relevance_coarse(model, question, schema):
         model: Trained ExSLc model
         question: Natural language question
         schema: Database schema
-        device: Device to run inference on
         
     Returns:
         Dictionary mapping (table, column) pairs to relevance probability
@@ -249,40 +130,5 @@ def parse_schema(schema: str):
 
     return columns_in_schema
 
-def load_schema_linker():
-    return torch.load(TRAINED_MODEL_PATH, weights_only=False)
-
-if __name__ == "__main__":
-    # Configuration matching ExSL paper
-    config = {
-        "base_model": "deepseek-ai/deepseek-coder-6.7b-base",
-        "learning_rate": 5e-6,
-        "weight_decay": 0.0,
-        "epochs": 2,
-        "device": "cuda" if torch.cuda.is_available() else "cpu"
-    }
-
-    # Initialize model
-    model = ExSLcModel(config["base_model"])
-    model.to(config["device"])
-
-    # Load train data set
-    with open(TRAIN_SET_PATH, "r") as train_file:
-        train_set = json.load(train_file)
-
-    # Train and save model
-    trained_model = train_coarse_grained(model, train_set, config)
-    torch.save(trained_model, TRAINED_MODEL_PATH)
-
-    # Load model
-    loaded_model = load_schema_linker()
-
-    # Load eval data and evaluate
-    with open(EVAL_SET_PATH, "r") as eval_file:
-        eval_set = json.load(eval_file)
-
-    eval_result = evaluate_coarse_grained(loaded_model, eval_set, K)
-
-    with open(RESULT_FILE_PATH, "w") as result_file:
-        json.dump(eval_result, result_file, indent=4)
-
+def load_schema_linker(model_path):
+    return torch.load(model_path, weights_only=False)

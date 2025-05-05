@@ -127,7 +127,7 @@ def evaluate_coarse_grained(model, eval_data, k):
         columns, relevance = list(columns), list(relevance)
     
         # Evaluate column level recall@k
-        relevant_columns = [column for column in columns if column in goal_columns]
+        relevant_columns = {column for column in columns if column in goal_columns}
         column_recall_at_k = len(relevant_columns) / len(goal_columns)
         sum_column_recall_at_k += column_recall_at_k
 

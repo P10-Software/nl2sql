@@ -57,6 +57,14 @@ class ExSLcModel(torch.nn.Module):
         
         # Predict relevance (single logit per column)
         return self.w_relevance(column_embeddings).squeeze(-1)  # Shape: [num_columns]
+    
+def predict_relevance_for_chunks(model, question, chunks):
+    predictions = list()
+
+    for chunk in chunks:
+        predictions += predict_relevance_coarse(model, question, chunk).items()
+    predictions.sort(key=lambda pair: pair[1], reverse=True)
+    return predictions
             
 def predict_relevance_coarse(model, question, schema):
     """

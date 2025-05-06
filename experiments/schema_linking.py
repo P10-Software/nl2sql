@@ -1,7 +1,8 @@
-from src.core.extractive_schema_linking import load_schema_linker, predict_relevance_coarse
+from src.core.extractive_schema_linking import load_schema_linker, predict_relevance_coarse, predict_relevance_for_chunks
+from src.core.schema_chunking import mschema_to_k_chunks
 from tqdm import tqdm
 
-def evaluate_extractive_schema_linking(schema_linker_path: str, dataset: list, split_count: int = 0):
+def evaluate_extractive_schema_linking(schema_linker_path: str, dataset: list, chunk_amount: int = 0):
     schema_linker = load_schema_linker(schema_linker_path)
     sum_column_recall_at_5 = 0
     sum_column_recall_at_10 = 0
@@ -9,17 +10,24 @@ def evaluate_extractive_schema_linking(schema_linker_path: str, dataset: list, s
     sum_table_recall_at_10 = 0
     sum_column_recall_100 = 0
     sum_table_recall_100 = 0
+    count_raises_chunk_size_error = 0
     report = []
 
     for example in tqdm(dataset):
-        # TODO: Make split of data
+        context_size = getattr(schema_linker.base_model.config, "max_position_embeddings", None)
+
+        try:
+            chunks = mschema_to_k_chunks(example["schema"], schema_linker.tokenizer, context_size, chunk_amount)
+        except:
+            count_raises_chunk_size_error += 1
+            continue
 
         goal_columns = example["goal answer"]
         goal_tables = {column.split(" ")[0] for column in goal_columns}
 
         # Make relevance predictions
-        predictions = predict_relevance_coarse(schema_linker, example["question"], example["schema"])
-        columns, relevance = zip(*(sorted(predictions.items(), reverse=True, key= lambda pair: pair[1])))
+        predictions = predict_relevance_for_chunks(schema_linker, example["question"], chunks)
+        columns, relevance = zip(*(predictions))
         columns, relevance = list(columns), list(relevance)
     
         # Evaluate column level recall@5
@@ -62,13 +70,10 @@ def evaluate_extractive_schema_linking(schema_linker_path: str, dataset: list, s
         report.append({"question": example["question"], "goal columns": list(goal_columns), "top 5 columns": relevant_columns_at_5, "top 5 relevance": relevance[:5], "column recall@5": column_recall_at_5, "table recall@5": table_recall_at_5,
                        "top 10 columns": relevant_columns_at_10, "top 10 relevance": relevance[:10], "column recall@10": column_recall_at_10, "table recall@10": table_recall_at_10, "column recall 100 count": column_recall_100, "table recall 100 count": table_recall_100})
 
-    report.append({"Amount of questions": len(dataset), "Total column recall@5": sum_column_recall_at_5 / len(dataset), "Total table recall@5": sum_table_recall_at_5 / len(dataset), "Total column recall@10": sum_column_recall_at_10 / len(dataset), 
-                   "Total table recall@5": sum_table_recall_at_10 / len(dataset),  "Average column recall 100": sum_column_recall_100 / len(dataset), "Average table recall 100": sum_table_recall_100 / len(dataset)})
+    questions_answered = len(dataset) - count_raises_chunk_size_error
+    report.append({"Dataset Size": len(dataset), "Questions Answered": questions_answered, "Total column recall@5": sum_column_recall_at_5 / questions_answered, "Total table recall@5": sum_table_recall_at_5 / questions_answered, "Total column recall@10": sum_column_recall_at_10 / questions_answered, 
+                   "Total table recall@5": sum_table_recall_at_10 / questions_answered,  "Average column recall 100": sum_column_recall_100 / questions_answered, "Average table recall 100": sum_table_recall_100 / questions_answered})
     return report
-
-
-        
-
 
 if __name__ == "__main__":
     pass

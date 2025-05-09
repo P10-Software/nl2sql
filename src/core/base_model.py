@@ -1,16 +1,10 @@
-import os
 from abc import abstractmethod, ABC
 import re
 from tqdm import tqdm
-from dotenv import load_dotenv
 from src.common.logger import get_logger
-from src.database.database import execute_query
+from src.core.schema_format import get_mschema, get_DDL, schema_filtering
 
 logger = get_logger(__name__)
-load_dotenv()
-
-DB_NAME = os.getenv('DB_NAME')
-DB_NATURAL = bool(int(os.getenv('DB_NATURAL', 0)))
 
 class PromptStrategy(ABC):
     @abstractmethod
@@ -40,7 +34,7 @@ class NL2SQLModel(ABC):
     def run(self):
         logger.info(f"Started benchmarking of {self.__class__.__name__}.")
 
-        schema = self._get_mschema() if self.mschema else self._get_DDL()
+        schema = get_mschema() if self.mschema else get_DDL()
 
         for idx, pair in enumerate(tqdm(self.benchmark)):
             question = pair['question']
@@ -71,26 +65,3 @@ class NL2SQLModel(ABC):
         query = re.sub(r';.*', ';', query, flags=(re.IGNORECASE | re.DOTALL))
         # Remove \n
         return query.replace("\n", "")
-
-    def _get_mschema(self):
-        """
-        Read database m-schema from file.
-        """
-        with open(f".local/mschema_{DB_NAME}_{'natural' if DB_NATURAL else 'abbreviated'}.txt", "r") as file:
-            return file.read()
-
-    def _get_DDL(self):
-        """
-        Get database DDL instructions from the database.
-        """
-        query = """
-            SELECT sql
-            FROM sqlite_master
-            WHERE type IN ('table', 'index', 'view', 'trigger')
-        """
-        result = execute_query(query)
-
-        ddl_statements = [row[0] for row in result]
-        full_ddl = ";\n\n".join(ddl_statements) + ";"
-
-        return full_ddl

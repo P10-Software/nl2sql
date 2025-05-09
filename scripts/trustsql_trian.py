@@ -14,6 +14,7 @@ from src.common.logger import get_logger
 logger = get_logger(__name__)
 SAVE_LOCALE = ""
 DATASET_LOCALE = ""
+SQL_CODER_MODEL = ""
 
 
 def train_t5_sql_gen():
@@ -25,7 +26,12 @@ def train_t5_sql_gen():
     def preprocess(example):
         input_text = f"{example.get('question')} {example.get('schema')}"
         target_text = example.get('sql')
-        return tokenizer(input_text, text_target=target_text, truncation=True, padding="max_length", max_length=512)
+        return tokenizer(
+            input_text,
+            text_target=target_text,
+            truncation=True,
+            padding="max_length",
+            max_length=512)
 
     tokenized_dataset = dataset.map(preprocess)
     train_dataset = tokenized_dataset.train_test_split(test_size=0.1)
@@ -40,7 +46,8 @@ def train_t5_sql_gen():
         save_total_limit=2,
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
-        greater_is_better=False
+        greater_is_better=False,
+        num_train_epochs=10
     )
 
     early_stopping = EarlyStoppingCallback(early_stopping_patience=2)
@@ -55,14 +62,104 @@ def train_t5_sql_gen():
     )
 
     trainer.train()
+    trainer.save_model(f"{SAVE_LOCALE}/t5_sqlgen/final")
+    tokenizer.save_pretrained(f"{SAVE_LOCALE}/t5_sqlgen/tokenizer")
 
 
 def train_sqlcoder_feasibility():
-    raise NotImplementedError()
+    dataset = load_dataset(DATASET_LOCALE)
+
+    tokenizer = AutoTokenizer(SQL_CODER_MODEL)
+    model = AutoModelForSequenceClassification(SQL_CODER_MODEL)
+    context_size = getattr(model.model.config, "max_position_embeddings", None)
+
+    def preprocess(example):
+        input_text = f"{example.get('question')} {example.get('schema')}"
+        label = int(example.get('infeasible', 0))
+        tokenized = tokenizer(
+            input_text,
+            truncation=True,
+            padding="max_length",
+            max_length=context_size)
+        tokenized['label'] = label
+        return tokenized
+
+    tokenized_dataset = dataset.map(preprocess)
+    train_dataset = tokenized_dataset.train_test_split(test_size=0.1)
+
+    args = TrainingArguments(
+        output_dir=f"{SAVE_LOCALE}/sql_coder_infeasible",
+        eval_strategy="epoch",
+        save_strategy="epoch",
+        learning_rate=1e-4,
+        per_device_train_batch_size=16,
+        bf16=True,
+        num_train_epochs=1,
+        save_total_limit=1,
+        load_best_model_at_end=True,
+        metric_for_best_model="eval_loss",
+        greater_is_better=False
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=args,
+        train_dataset=train_dataset['train'],
+        eval_dataset=train_dataset['eval'],
+        processing_class=tokenizer
+    )
+
+    trainer.train()
+    trainer.save_model(f"{SAVE_LOCALE}/sql_coder_infeasible/final")
+    tokenizer.save_pretrained(f"{SAVE_LOCALE}/sql_coder_infeasible/tokenizer")
 
 
 def train_sqlcoder_error_detect():
-    raise NotImplementedError()
+    dataset = load_dataset(DATASET_LOCALE)
+
+    tokenizer = AutoTokenizer(SQL_CODER_MODEL)
+    model = AutoModelForSequenceClassification(SQL_CODER_MODEL)
+    context_size = getattr(model.model.config, "max_position_embeddings", None)
+
+    def preprocess(example):
+        input_text = f"{example.get('question')} {example.get('sql')}"
+        label = int(example.get("infeasible", 0))
+        tokenized = tokenizer(
+            input_text,
+            truncation=True,
+            padding="max_length",
+            max_length=context_size)
+        tokenized['label'] = label
+        return tokenized
+
+    tokenized_dataset = dataset.map(preprocess)
+    train_dataset = tokenized_dataset.train_test_split(test_size=0.1)
+
+    args = TrainingArguments(
+        output_dir=f"{SAVE_LOCALE}/sql_coder_error",
+        eval_strategy="epoch",
+        save_strategy="epoch",
+        learning_rate=1e-4,
+        per_device_train_batch_size=16,
+        bf16=True,
+        num_train_epochs=1,
+        save_total_limit=1,
+        load_best_model_at_end=True,
+        metric_for_best_model="eval_loss",
+        greater_is_better=False
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=args,
+        train_dataset=train_dataset['train'],
+        eval_dataset=train_dataset['eval'],
+        processing_class=tokenizer
+    )
+
+    trainer.train()
+    trainer.save_model(f"{SAVE_LOCALE}/sql_coder_error/final")
+    tokenizer.save_pretrained(f"{SAVE_LOCALE}/sql_coder_error/tokenizer")
 
 
 def find_t5_maxent_threshold():

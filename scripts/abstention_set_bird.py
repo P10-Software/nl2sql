@@ -2,7 +2,7 @@ from sql_metadata import Parser
 from collections import Counter
 from typing import Literal, List, Dict
 from json import dump, load
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from mschema import schema_engine
 from tqdm import tqdm
 import os
@@ -10,9 +10,9 @@ import sqlite3
 
 
 SEARCH_DIRECTION = Literal['front', 'back']
-SQL_LOCALE = ".local\dev_20240627\dev.sql"
-DB_ROOT = ".local\dev_20240627\dev_databases\dev_databases"
-JSON_LOCALE = ".local\dev_20240627\dev.json"
+SQL_LOCALE = ".local/train/train/train_gold.sql"
+DB_ROOT = ".local/train/train/train_databases/train_databases"
+JSON_LOCALE = ".local/train/train/train.json"
 
 
 def extract_gold_sql_db(file_path=SQL_LOCALE) -> dict[str, list[str]]:
@@ -88,7 +88,14 @@ def extract_m_schemas(db_paths):
 
 
 def extract_ddl_schema(db_paths):
-    raise NotImplementedError()
+    ddl_schemas = {}
+    for db_id, db_path in tqdm(db_paths.items(), desc="DDL instructions"):
+        db_engine = create_engine(f'sqlite:///{db_path}')
+        with db_engine.connect() as conn:
+            result = conn.execute(text("SELECT sql FROM sqlite_master WHERE type IN ('table', 'index', 'trigger', 'view') AND sql NOT NULL;"))
+            ddl_statements = [row[0] for row in result]
+            ddl_schemas[db_id] = "\n".join(ddl_statements)
+    return ddl_schemas
 
 
 def select_columns_for_removal(sql_distribution: Dict, percentage_removal: int):
@@ -144,7 +151,7 @@ def select_columns_for_removal(sql_distribution: Dict, percentage_removal: int):
     return columns_to_remove
 
 
-def create_labelled_training_set(removable_columns: Dict, sql_queries: Dict, bird_train_locale: str = JSON_LOCALE):
+def create_labelled_training_set(removable_columns: Dict, sql_queries: Dict, bird_train_locale: str = JSON_LOCALE, with_ddl: bool = False):
     """
     Creates the training set with labels.
     Uses training set from bird to create new abstention training set.
@@ -162,7 +169,11 @@ def create_labelled_training_set(removable_columns: Dict, sql_queries: Dict, bir
     """
     feasible, infeasible = _label_queries(removable_columns, sql_queries)
     db_paths = _list_databases()
-    m_schemas = extract_m_schemas(db_paths)
+    m_schemas = {}
+    if with_ddl:
+        m_schemas = extract_ddl_schema(db_paths)
+    else:
+        m_schemas = extract_m_schemas(db_paths)
     with open(bird_train_locale, 'r') as fp:
         bird_train_set = load(fp)
 
@@ -323,7 +334,7 @@ def _find_table_recurs(token, direction: SEARCH_DIRECTION):
 
 
 if __name__ == '__main__':
-    infeasible_sql_percent = 30
+    infeasible_sql_percent = 50
 
     gold_sql_dict = extract_gold_sql_db()
 
@@ -336,7 +347,8 @@ if __name__ == '__main__':
 
     remove_cols_from_databases(cols_to_del)
 
-    new_dataset = create_labelled_training_set(cols_to_del, gold_sql_dict)
+    new_dataset = create_labelled_training_set(cols_to_del, gold_sql_dict, with_ddl=True)
 
-    with open(".local/bird_abstention_eval_set.json", 'w') as fp:
+    os.makedirs(".local/trust_sql/", exist_ok=True)
+    with open(".local/trust_sql/bird_abstention_eval_set.json", 'w') as fp:
         dump(new_dataset, fp, indent=4)

@@ -10,6 +10,8 @@ from transformers import (
     EarlyStoppingCallback)
 from datasets import load_dataset
 from src.common.logger import get_logger
+from scipy.stats import entropy
+import numpy as np
 
 logger = get_logger(__name__)
 SAVE_LOCALE = ""
@@ -162,8 +164,25 @@ def train_sqlcoder_error_detect():
     tokenizer.save_pretrained(f"{SAVE_LOCALE}/sql_coder_error/tokenizer")
 
 
-def find_t5_maxent_threshold():
-    raise NotImplementedError()
+def find_t5_maxent_threshold(logits_list, labels):
+    def compute_entropy(probs):
+        return 
+
+    entropies = []
+    for logits in logits_list:
+        probs = np.exp(logits) / np.sum(np.exp(logits), axis=-1, keepdims=True)
+        avg_entropy = np.mean([compute_entropy(p) for p in probs])
+        entropies.append(avg_entropy)
+
+    sample_scores = list(zip(entropies, [1 if is_correct else -1 for is_correct in labels]))
+
+    sorted_scores = sorted(sample_scores, key=lambda x: x[0])
+
+    cumulative = np.cumsum([s for _, s in sorted_scores])
+    best_idx = int(np.argmax(cumulative))
+    best_threshold = sorted_scores[best_idx][0]
+
+    return best_threshold
 
 
 if __name__ == "__main__":

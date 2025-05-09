@@ -12,11 +12,12 @@ from datasets import load_dataset
 from src.common.logger import get_logger
 from scipy.stats import entropy
 import numpy as np
+import torch
 
 logger = get_logger(__name__)
-SAVE_LOCALE = ""
+SAVE_LOCALE = ".local/trust_sql"
 DATASET_LOCALE = ""
-SQL_CODER_MODEL = ""
+SQL_CODER_MODEL = "defog/sqlcoder-7b-2"
 
 
 def train_t5_sql_gen():
@@ -64,6 +65,32 @@ def train_t5_sql_gen():
     )
 
     trainer.train()
+
+    logits_list = []
+    labels = []
+    model.eval()
+
+    for example in train_dataset['eval']:
+        input_text = f"{example['question']} {example['schema']}"
+        inputs = tokenizer(input_text, return_tensors="pt", padding=True, truncation=True)
+
+        output = model.generate(**inputs)
+
+        with torch.no_grad():
+            outputs = model(**inputs)
+            logits = outputs.logits
+
+        logits_list.append(logits)
+
+        generated_sql = tokenizer.decode(output[0], skip_special_tokens=True)
+
+        correct = 1 if generated_sql.strip() == example['sql'].strip() else 0
+        labels.append(correct)
+
+    maxent_threshold = find_t5_maxent_threshold(logits_list, labels)
+
+    model.config.maxent_threshold = maxent_threshold
+
     trainer.save_model(f"{SAVE_LOCALE}/t5_sqlgen/final")
     tokenizer.save_pretrained(f"{SAVE_LOCALE}/t5_sqlgen/tokenizer")
 
@@ -166,11 +193,11 @@ def train_sqlcoder_error_detect():
 
 def find_t5_maxent_threshold(logits_list, labels):
     def compute_entropy(probs):
-        return 
+        return entropy(probs, base=2)
 
     entropies = []
     for logits in logits_list:
-        probs = np.exp(logits) / np.sum(np.exp(logits), axis=-1, keepdims=True)
+        probs = torch.softmax(logits, dim=-1).squeeze(0).cpu().numpy()
         avg_entropy = np.mean([compute_entropy(p) for p in probs])
         entropies.append(avg_entropy)
 
@@ -194,7 +221,5 @@ if __name__ == "__main__":
     logger.info("... Training SQLCoder-7b-2 for SQL error classification...")
     train_sqlcoder_error_detect()
     logger.info("...Finished training all models...")
-    logger.info("...Calculating MAXENT threshold...")
-    find_t5_maxent_threshold()
     logger.info("Finished all tasks for training TrustSQL...")
     logger.info(f"Results saved to: {SAVE_LOCALE}")

@@ -87,6 +87,10 @@ def extract_m_schemas(db_paths):
     return m_schemas             
 
 
+def extract_ddl_schema(db_paths):
+    raise NotImplementedError()
+
+
 def select_columns_for_removal(sql_distribution: Dict, percentage_removal: int):
     """
     Selects columns to remove from a database in order to make approximately [percentage_removal]% 

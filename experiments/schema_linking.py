@@ -1,6 +1,14 @@
-from src.core.extractive_schema_linking import load_schema_linker, predict_relevance_coarse, predict_relevance_for_chunks
+from src.core.extractive_schema_linking import load_schema_linker, predict_relevance_for_chunks
 from src.core.schema_chunking import mschema_to_k_chunks
 from tqdm import tqdm
+import json
+import statistics
+
+NUMBER_OF_TRIALS = 10
+EVALUATION_DATA_PATH = ".local/SchemaLinker/spider_exsl_all_to_single_test.json"
+SCHEMA_LINKER_PATH = "models/EXSL/xiyan_7B_optimal_params_coarse_grained_schema_linker_spider.pth"
+RESULT_DIRECTORY = ".local/experiments/schema_linking/exsl_xiyan/"
+NUMBER_OF_CHUNKS = 0
 
 def evaluate_extractive_schema_linking(schema_linker_path: str, dataset: list, chunk_amount: int = 0):
     schema_linker = load_schema_linker(schema_linker_path)
@@ -72,8 +80,41 @@ def evaluate_extractive_schema_linking(schema_linker_path: str, dataset: list, c
 
     questions_answered = len(dataset) - count_raises_chunk_size_error
     report.append({"Dataset Size": len(dataset), "Questions Answered": questions_answered, "Total column recall@5": sum_column_recall_at_5 / questions_answered, "Total table recall@5": sum_table_recall_at_5 / questions_answered, "Total column recall@10": sum_column_recall_at_10 / questions_answered, 
-                   "Total table recall@5": sum_table_recall_at_10 / questions_answered,  "Average column recall 100": sum_column_recall_100 / questions_answered, "Average table recall 100": sum_table_recall_100 / questions_answered})
+                   "Total table recall@10": sum_table_recall_at_10 / questions_answered,  "Average column recall 100": sum_column_recall_100 / questions_answered, "Average table recall 100": sum_table_recall_100 / questions_answered})
     return report
 
 if __name__ == "__main__":
-    pass
+    with open(EVALUATION_DATA_PATH, "r") as eval_file:
+        eval_set = json.load(eval_file)
+
+    column_recall_at_5_results = []
+    column_recall_at_10_results = []
+    table_recall_at_5_results = []
+    table_recall_at_10_results = []
+    column_recall_100_results = []
+    table_recall_100_results = []
+
+    for trial_num in tqdm(range(NUMBER_OF_TRIALS)):
+        report = evaluate_extractive_schema_linking(SCHEMA_LINKER_PATH, eval_set, NUMBER_OF_CHUNKS)
+
+        column_recall_at_5_results.append(report[-1]["Total column recall@5"])
+        column_recall_at_10_results.append(report[-1]["Total column recall@10"])
+        table_recall_at_5_results.append(report[-1]["Total table recall@5"])
+        table_recall_at_10_results.append(report[-1]["Total table recall@10"])
+        column_recall_100_results.append(report[-1]["Average column recall 100"])
+        table_recall_100_results.append(report[-1]["Average table recall 100"])
+
+        with open(f"{RESULT_DIRECTORY}chunks_{NUMBER_OF_CHUNKS}_trial_{trial_num}.json", "w") as file:
+            json.dump(report, file, indent=4)
+
+    overall_report = {
+        "Column recall@5": {"mean": statistics.mean(column_recall_at_5_results), "standard deviation": statistics.stdev(column_recall_at_5_results)},
+        "Column recall@10": {"mean": statistics.mean(column_recall_at_10_results), "standard deviation": statistics.stdev(column_recall_at_10_results)},
+        "Table recall@5": {"mean": statistics.mean(table_recall_at_5_results), "standard deviation": statistics.stdev(table_recall_at_5_results)},
+        "Table recall@10": {"mean": statistics.mean(table_recall_at_10_results), "standard deviation": statistics.stdev(table_recall_at_10_results)},
+        "Column recall 100": {"mean": statistics.mean(column_recall_100_results), "standard deviation": statistics.stdev(column_recall_100_results)},
+        "Table recall 100": {"mean": statistics.mean(table_recall_100_results), "standard deviation": statistics.stdev(table_recall_100_results)}
+    }
+
+    with open(f"{RESULT_DIRECTORY}chunks_{NUMBER_OF_CHUNKS}_overview.json", "w") as file:
+        json.dump(overall_report, file, indent=4)

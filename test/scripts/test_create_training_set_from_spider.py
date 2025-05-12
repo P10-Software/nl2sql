@@ -1,7 +1,7 @@
 import scripts.create_training_set_from_spider
 scripts.create_training_set_from_spider.PATH_TO_SPIDER_DIR = "test/scripts/mock_dataset"
 
-from scripts.create_training_set_from_spider import _load_schema_for_all_dbs, create_training_set, _lowercase_column_and_table_names
+from scripts.create_training_set_from_spider import _load_schema_for_all_dbs, create_training_set, _lowercase_column_and_table_names, m_schema_to_ddl
 import os
 import sqlite3
 import pytest

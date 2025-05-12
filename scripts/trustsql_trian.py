@@ -53,7 +53,7 @@ def train_t5_sql_gen():
         num_train_epochs=10
     )
 
-    early_stopping = EarlyStoppingCallback(early_stopping_patience=2)
+    early_stopping = EarlyStoppingCallback(early_stopping_patience=2, early_stopping_threshold=0.01)
 
     trainer = Seq2SeqTrainer(
         model=model,

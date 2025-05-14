@@ -19,9 +19,9 @@ def chunk_mschema_no_relations(mschema: str, model) -> list[str]:
     #     raise ValueError("Model context size (max_position_embeddings) is not set.")
 
     max_mschema_size = context_size // 1.5
-    
+
     if "【Foreign keys】" in mschema:
-        mschema = mschema.split("【Foreign keys】")[0] 
+        mschema = mschema.split("【Foreign keys】")[0]
 
     mschema_split = mschema.split("#")
     mschema_header_text = mschema_split[0]
@@ -55,10 +55,6 @@ def generate_mschema():
 
 
 if __name__ == "__main__":
-    mschema: str
-
-    # generate_mschema()
-
     with open(".local/mschema_chunking_test.txt", "r") as file:
         mschema = file.read()
 

@@ -5,7 +5,7 @@ import textwrap
 with patch.dict('sys.modules', {
     'torch': MagicMock()
 }):
-    from src.core.schema_chunking import chunk_mschema
+    from src.core.schema_chunking import chunk_mschema, _find_relations
 
     def test_chunk_mschema_no_relations():
         mschema = textwrap.dedent("""
@@ -186,8 +186,6 @@ with patch.dict('sys.modules', {
         【Foreign keys】
         test_4.col_a=test_1.col_a""")
 
-        # print(chunks[2].strip())
-        # print(expected_3)
         assert len(chunks) == 3
 
         actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
@@ -201,3 +199,55 @@ with patch.dict('sys.modules', {
         actual_lines = set(line.strip() for line in chunks[2].strip().splitlines() if line.strip())
         expected_lines = set(line.strip() for line in expected_3.strip().splitlines() if line.strip())
         assert actual_lines == expected_lines
+
+
+    def test_find_relations():
+        mschema = textwrap.dedent("""
+        【SB_ID】 trial_metadata
+        【Schema】
+        # Table: test_1
+        [(col_a:TEXT)]
+        # Table: test_2
+        [(col_c:INT)]
+        # Table: test_3
+        [(col_c:INT),
+        (col_a:TEXT)]
+        # Table: test_4
+        [(col_b:REAL),
+        (col_a:TEXT),
+        (col_c:INT)]
+        【Foreign keys】
+        test_3.col_a=test_1.col_a
+        test_4.col_a=test_1.col_a
+        test_4.col_c=test_2.col_c""")
+
+        table = textwrap.dedent("""# Table: test_4
+        [(col_b:REAL),
+        (col_a:TEXT),
+        (col_c:INT)]""")
+
+        # Create a mock tokenizer that returns a fixed number of tokens per table
+        mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+            "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+        })
+
+        # Mock model config
+        mock_model = MagicMock()
+        mock_model.model.config.max_position_embeddings = 8  # Tiny limit to force chunking
+        mock_model.tokenizer = mock_tokenizer
+
+        chunk_tables = set()
+        chunk_relations = set()
+
+        foreign_key_str = "【Foreign keys】"
+        relations = mschema.split(foreign_key_str)[1].split()
+        mschema_split = mschema.split("# ")
+        mschema_tables = ['# ' + table for table in mschema_split[1:]]
+
+        _find_relations(table, chunk_tables, chunk_relations, mschema_tables, relations, 8, mock_model)
+
+        expected_table_relations = {'# Table: test_1\n[(col_a:TEXT)]\n', '# Table: test_2\n[(col_c:INT)]\n'}
+        expected_chunk_relations = {'test_4.col_a=test_1.col_a', 'test_4.col_c=test_2.col_c'}
+
+        assert chunk_tables == expected_table_relations
+        assert chunk_relations == expected_chunk_relations

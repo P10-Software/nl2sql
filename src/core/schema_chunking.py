@@ -1,6 +1,9 @@
 # import torch
 from sqlalchemy import create_engine
 from mschema.schema_engine import SchemaEngine
+from src.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def chunk_mschema_no_relations(mschema: str, model) -> list[str]:
@@ -24,9 +27,9 @@ def chunk_mschema_no_relations(mschema: str, model) -> list[str]:
     if "【Foreign keys】" in mschema:
         mschema = mschema.split("【Foreign keys】")[0]
 
-    mschema_split = mschema.split("#")
+    mschema_split = mschema.split("# ")
     mschema_header_text = mschema_split[0]
-    mschema_tables = ['#' + table for table in mschema_split[1:]]
+    mschema_tables = ['# ' + table for table in mschema_split[1:]]
 
     chunks = []
     chunk = ""
@@ -67,43 +70,56 @@ def chunk_mschema(mschema: str, model) -> list[str]:
     max_mschema_size = context_size // 1.5
 
     relations = []
+    foreign_key_str = "【Foreign keys】"
 
     if "【Foreign keys】" in mschema:
-        relation = mschema.split("【Foreign keys】")[1].split()
+        relations = mschema.split("【Foreign keys】")[1].split()
         mschema = mschema.split("【Foreign keys】")[0]
 
-    mschema_split = mschema.split("#")
+    mschema_split = mschema.split("# ")
     mschema_header_text = mschema_split[0]
-    mschema_tables = ['#' + table for table in mschema_split[1:]]
+    mschema_tables = ['# ' + table for table in mschema_split[1:]]
 
     chunks = []
+    chunk_tables = set()
     chunk_relations = set()
-    chunk = set()
     new_chunk_size = 0
     for table in mschema_tables:
         # table_size = len(model.tokenizer(table, return_tensors="pt", truncation=False)["input_ids"][0])
+        # TODO Consider when to calculate chunk size as it might grow significantly.
         table_size = len(table)
         new_chunk_size = new_chunk_size + table_size
-        # find_relations(table, chunk_relations, chunk, relations)
+        find_relations(table, chunk_tables, chunk_relations, mschema_tables, relations)
+        chunk_tables.add(table)
         if new_chunk_size > max_mschema_size:
-            if chunk:
-                chunks.append(mschema_header_text + ' '.join(chunk))
-            chunk = set()
-            chunk.add(table)
+            if chunk_tables:
+                chunks.append(mschema_header_text + ' '.join(chunk_tables) + foreign_key_str + '\n' + '\n'.join(chunk_relations))
+            chunk_tables = set()
+            chunk_relations = set()
+            chunk_tables.add(table)
             new_chunk_size = table_size
         else:
-            chunk.add(table)
+            chunk_tables.add(table)
 
-    if chunk:
-        chunks.append(mschema_header_text + ' '.join(chunk))
+    if chunk_tables:
+        chunks.append(mschema_header_text + ' '.join(chunk_tables) + foreign_key_str + '\n' + '\n'.join(chunk_relations))
 
     return chunks
 
 
-def find_relations(table, chunk_relations, chunk, relations):
-    chunk_relations = []
+def find_relations(table, chunk_tables, chunk_relations, mschema_tables, relations):
     table_name = table.split('# Table:')[1].split('[')[0].strip()
-    print(table_name)
+
+    table_relations = {relation for relation in relations if table_name == relation.split('.')[0]}
+
+    # Identify tables from the relations and add to the M-Schema chunk
+    for relation in table_relations:
+        table_relation_name = relation.split('=')[1].split('.')[0]
+        for table in mschema_tables:
+            if "# Table: " + table_relation_name in table:
+                chunk_tables.add(table)
+
+    chunk_relations.update(table_relations)
 
 
 # def generate_mschema():

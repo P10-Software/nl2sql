@@ -5,7 +5,7 @@ import textwrap
 with patch.dict('sys.modules', {
     'torch': MagicMock()
 }):
-    from src.core.schema_chunking import chunk_mschema_no_relations
+    from src.core.schema_chunking import _chunk_mschema_no_relations
 
     def test_chunk_mschema():
         mschema = textwrap.dedent("""
@@ -33,7 +33,7 @@ with patch.dict('sys.modules', {
         mock_model.model.config.max_position_embeddings = 8  # Tiny limit to force chunking
         mock_model.tokenizer = mock_tokenizer
 
-        chunks = chunk_mschema_no_relations(mschema, mock_model)
+        chunks = _chunk_mschema_no_relations(mschema, mock_model)
 
         expected_1 = textwrap.dedent("""
         【SB_ID】 trial_metadata

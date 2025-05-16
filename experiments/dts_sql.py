@@ -32,6 +32,10 @@ class EosListStoppingCriteriaSchema(StoppingCriteria):
 def remove_spaces(text):
   return re.sub(r'\s+', ' ', text)
 
+def extract_db_id(m_schema: str) -> str:
+    match = re.search(r'【DB_ID】\s*(\w+)', m_schema)
+    return match.group(1) if match else None
+
 def get_all_table_names(db_uri: str) -> list[str]:
     conn = sqlite3.connect(db_uri)
     cursor = conn.cursor()

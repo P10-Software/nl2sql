@@ -271,6 +271,23 @@ def test_chunks_returned_correctly():
     assert chunks[1] == "HEADER#table3#table4"
     assert len(tokenizer(chunks[1])["input_ids"][0]) <= 100 
 
+def test_chunks_k_relations_returned_correctly():
+    tokenizer = MagicMock()
+    tokenizer.model_max_length = 150
+    tokenizer.side_effect = lambda text, **kwargs: {
+        "input_ids": [[0] * (len(text) // 5)]
+    }
+
+    mschema = "HEADER#table1#table2#table3#table4【Foreign keys】relation"
+    chunks = mschema_to_k_chunks(mschema, tokenizer, k=2)
+
+    assert len(chunks) == 2
+    assert chunks[0] == "HEADER#table1#table2"
+    assert len(tokenizer(chunks[0])["input_ids"][0]) <= 100 
+
+    assert chunks[1] == "HEADER#table3#table4"
+    assert len(tokenizer(chunks[1])["input_ids"][0]) <= 100 
+
 def test_k_greater_than_table_count():
     tokenizer = MagicMock()
     tokenizer.return_value = {"input_ids": [[0] * 10]}

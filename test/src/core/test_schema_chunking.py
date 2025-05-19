@@ -24,13 +24,9 @@ def test_chunk_mschema_no_relations():
     mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
         "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
     })
+    mock_tokenizer.model_max_length = 8
 
-    # Mock model config
-    mock_model = MagicMock()
-    mock_model.tokenizer = mock_tokenizer
-    mock_model.tokenizer.model_max_length = 8 # Tiny limit to force chunking
-
-    chunks = chunk_mschema(mschema, mock_model, False)
+    chunks = chunk_mschema(mschema, mock_tokenizer, False)
 
     expected_1 = textwrap.dedent("""
     【SB_ID】 trial_metadata
@@ -83,15 +79,9 @@ def test_chunk_mschema_no_relations_with_relations():
     mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
         "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
     })
+    mock_tokenizer.model_max_length = 8
 
-    # Mock model config
-    mock_model = MagicMock()
-    mock_model.tokenizer = mock_tokenizer
-    mock_model.tokenizer.model_max_length = 8 # Tiny limit to force chunking
-
-
-
-    chunks = chunk_mschema(mschema, mock_model, False)
+    chunks = chunk_mschema(mschema, mock_tokenizer, False)
 
     expected_1 = textwrap.dedent("""
     【SB_ID】 trial_metadata
@@ -145,13 +135,9 @@ def test_chunk_mschema_relations():
     mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
         "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
     })
+    mock_tokenizer.model_max_length = 8
 
-    # Mock model config
-    mock_model = MagicMock()
-    mock_model.tokenizer = mock_tokenizer
-    mock_model.tokenizer.model_max_length = 8 # Tiny limit to force chunking
-
-    chunks = chunk_mschema(mschema, mock_model, True)
+    chunks = chunk_mschema(mschema, mock_tokenizer, True)
 
     expected_1 = textwrap.dedent("""
     【SB_ID】 trial_metadata

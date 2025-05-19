@@ -1,8 +1,7 @@
-# import torch
+import numpy
 from src.common.logger import get_logger
 
 logger = get_logger(__name__)
-
 
 def chunk_mschema(mschema: str, model, with_relations: bool) -> list[str]:
     """
@@ -20,7 +19,7 @@ def chunk_mschema(mschema: str, model, with_relations: bool) -> list[str]:
 
 
 def _chunk_mschema_no_relations(mschema: str, model) -> list[str]:
-    context_size = _get_model_context_size(model)
+    context_size = _get_model_context_size(model.tokenizer)
 
     if "【Foreign keys】" in mschema:
         mschema = mschema.split("【Foreign keys】")[0]
@@ -45,9 +44,28 @@ def _chunk_mschema_no_relations(mschema: str, model) -> list[str]:
 
     return chunks
 
+def mschema_to_k_chunks(mschema: str, tokenizer, k: int) -> list[str]:
+    max_chunk_size = _get_model_context_size(tokenizer) // 1.5
+
+    if "【Foreign keys】" in mschema:
+        mschema = mschema.split("【Foreign keys】")[0]
+
+    mschema_split = mschema.split("#")
+    mschema_header_text = mschema_split[0]
+    mschema_tables = ['#' + table for table in mschema_split[1:]]
+    amount_of_tables = len(mschema_tables)
+    if k > amount_of_tables:
+        k = amount_of_tables
+
+    chunks = [mschema_header_text + "".join(x.tolist()) for x in numpy.array_split(mschema_tables, k)]
+    for chunk in chunks:
+        if len(tokenizer(chunk, return_tensors="pt", truncation=False)["input_ids"][0]) > max_chunk_size:
+            raise Exception("Chunk does not fit into model")
+
+    return chunks
 
 def _chunk_mschema_with_relations(mschema: str, model) -> list[str]:
-    context_size = _get_model_context_size(model)
+    context_size = _get_model_context_size(model.tokenizer)
 
     relations = []
     foreign_key_str = "【Foreign keys】"
@@ -106,8 +124,8 @@ def _find_relations(table: str, chunk_tables: set[str], chunk_relations: set[str
     chunk_relations.update(table_relations)
 
 
-def _get_model_context_size(model) -> int:
-    context_size = getattr(model.model.config, "max_position_embeddings", None)
+def _get_model_context_size(tokenizer) -> int:
+    context_size = getattr(tokenizer, "model_max_length", None)
     if context_size is None:
         logger.error("Could not get model context size.")
         raise ValueError("Model context size (max_position_embeddings) is not set.")

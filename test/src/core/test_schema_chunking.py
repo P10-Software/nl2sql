@@ -1,11 +1,11 @@
 from unittest.mock import patch, MagicMock
 import textwrap
-
+import pytest
 
 with patch.dict('sys.modules', {
     'torch': MagicMock()
 }):
-    from src.core.schema_chunking import chunk_mschema, _find_relations
+    from src.core.schema_chunking import chunk_mschema, _find_relations, mschema_to_k_chunks
 
     def test_chunk_mschema_no_relations():
         mschema = textwrap.dedent("""
@@ -30,8 +30,8 @@ with patch.dict('sys.modules', {
 
         # Mock model config
         mock_model = MagicMock()
-        mock_model.model.config.max_position_embeddings = 8  # Tiny limit to force chunking
         mock_model.tokenizer = mock_tokenizer
+        mock_model.tokenizer.model_max_length = 8 # Tiny limit to force chunking
 
         chunks = chunk_mschema(mschema, mock_model, False)
 
@@ -89,8 +89,10 @@ with patch.dict('sys.modules', {
 
         # Mock model config
         mock_model = MagicMock()
-        mock_model.model.config.max_position_embeddings = 8  # Tiny limit to force chunking
         mock_model.tokenizer = mock_tokenizer
+        mock_model.tokenizer.model_max_length = 8 # Tiny limit to force chunking
+
+
 
         chunks = chunk_mschema(mschema, mock_model, False)
 
@@ -149,8 +151,8 @@ with patch.dict('sys.modules', {
 
         # Mock model config
         mock_model = MagicMock()
-        mock_model.model.config.max_position_embeddings = 8  # Tiny limit to force chunking
         mock_model.tokenizer = mock_tokenizer
+        mock_model.tokenizer.model_max_length = 8 # Tiny limit to force chunking
 
         chunks = chunk_mschema(mschema, mock_model, True)
 
@@ -251,3 +253,59 @@ with patch.dict('sys.modules', {
 
         assert chunk_tables == expected_table_relations
         assert chunk_relations == expected_chunk_relations
+
+def test_chunks_returned_correctly():
+    tokenizer = MagicMock()
+    tokenizer.model_max_length = 150
+    tokenizer.side_effect = lambda text, **kwargs: {
+        "input_ids": [[0] * (len(text) // 5)]
+    }
+
+    mschema = "HEADER#table1#table2#table3#table4"
+    chunks = mschema_to_k_chunks(mschema, tokenizer, k=2)
+
+    assert len(chunks) == 2
+    assert chunks[0] == "HEADER#table1#table2"
+    assert len(tokenizer(chunks[0])["input_ids"][0]) <= 100 
+
+    assert chunks[1] == "HEADER#table3#table4"
+    assert len(tokenizer(chunks[1])["input_ids"][0]) <= 100 
+
+def test_chunks_k_relations_returned_correctly():
+    tokenizer = MagicMock()
+    tokenizer.model_max_length = 150
+    tokenizer.side_effect = lambda text, **kwargs: {
+        "input_ids": [[0] * (len(text) // 5)]
+    }
+
+    mschema = "HEADER#table1#table2#table3#table4【Foreign keys】relation"
+    chunks = mschema_to_k_chunks(mschema, tokenizer, k=2)
+
+    assert len(chunks) == 2
+    assert chunks[0] == "HEADER#table1#table2"
+    assert len(tokenizer(chunks[0])["input_ids"][0]) <= 100 
+
+    assert chunks[1] == "HEADER#table3#table4"
+    assert len(tokenizer(chunks[1])["input_ids"][0]) <= 100 
+
+def test_k_greater_than_table_count():
+    tokenizer = MagicMock()
+    tokenizer.return_value = {"input_ids": [[0] * 10]}
+    tokenizer.model_max_length = 100
+
+    mschema = "HEADER#table1#table2"
+    chunks = mschema_to_k_chunks(mschema, tokenizer, k=10)
+
+    assert len(chunks) == 2
+
+def test_raises_exception_when_chunk_too_large():
+    tokenizer = MagicMock()
+    tokenizer.model_max_length = 100
+    tokenizer.side_effect = lambda text, **kwargs: {
+        "input_ids": [[0] * 200]
+    }
+
+    mschema = "HEADER#table1#table2#table3"
+
+    with pytest.raises(Exception, match="Chunk does not fit into model"):
+        mschema_to_k_chunks(mschema, tokenizer, k=2)

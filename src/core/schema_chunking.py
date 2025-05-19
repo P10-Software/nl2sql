@@ -19,7 +19,7 @@ def chunk_mschema(mschema: str, model, with_relations: bool) -> list[str]:
 
 
 def _chunk_mschema_no_relations(mschema: str, model) -> list[str]:
-    context_size = _get_model_context_size(model)
+    context_size = _get_model_context_size(model.tokenizer)
 
     if "【Foreign keys】" in mschema:
         mschema = mschema.split("【Foreign keys】")[0]
@@ -44,8 +44,8 @@ def _chunk_mschema_no_relations(mschema: str, model) -> list[str]:
 
     return chunks
 
-def mschema_to_k_chunks(mschema: str, tokenizer, context_size, k: int) -> list[str]:
-    max_chunk_size = context_size // 1.5
+def mschema_to_k_chunks(mschema: str, tokenizer, k: int) -> list[str]:
+    max_chunk_size = _get_model_context_size(tokenizer) // 1.5
     mschema_split = mschema.split("#")
     mschema_header_text = mschema_split[0]
     mschema_tables = ['#' + table for table in mschema_split[1:]]
@@ -61,7 +61,7 @@ def mschema_to_k_chunks(mschema: str, tokenizer, context_size, k: int) -> list[s
     return chunks
 
 def _chunk_mschema_with_relations(mschema: str, model) -> list[str]:
-    context_size = _get_model_context_size(model)
+    context_size = _get_model_context_size(model.tokenizer)
 
     relations = []
     foreign_key_str = "【Foreign keys】"
@@ -120,8 +120,8 @@ def _find_relations(table: str, chunk_tables: set[str], chunk_relations: set[str
     chunk_relations.update(table_relations)
 
 
-def _get_model_context_size(model) -> int:
-    context_size = getattr(model.model.config, "max_position_embeddings", None)
+def _get_model_context_size(tokenizer) -> int:
+    context_size = getattr(tokenizer, "model_max_length", None)
     if context_size is None:
         logger.error("Could not get model context size.")
         raise ValueError("Model context size (max_position_embeddings) is not set.")

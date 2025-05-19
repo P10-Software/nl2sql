@@ -21,9 +21,7 @@ def evaluate_extractive_schema_linking(schema_linker_path: str, dataset: list, c
     report = []
 
     for example in tqdm(dataset):
-        context_size = getattr(schema_linker.base_model.config, "max_position_embeddings", None)
-
-        #chunks = mschema_to_k_chunks(example["schema"], schema_linker.tokenizer, context_size, chunk_amount)
+        #chunks = mschema_to_k_chunks(example["schema"], schema_linker.tokenizer, chunk_amount)
         chunks = chunk_mschema(example["schema"], schema_linker, False)
 
         goal_columns = example["goal answer"]

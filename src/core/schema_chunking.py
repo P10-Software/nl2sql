@@ -46,6 +46,10 @@ def _chunk_mschema_no_relations(mschema: str, model) -> list[str]:
 
 def mschema_to_k_chunks(mschema: str, tokenizer, k: int) -> list[str]:
     max_chunk_size = _get_model_context_size(tokenizer) // 1.5
+
+    if "【Foreign keys】" in mschema:
+        mschema = mschema.split("【Foreign keys】")[0]
+
     mschema_split = mschema.split("#")
     mschema_header_text = mschema_split[0]
     mschema_tables = ['#' + table for table in mschema_split[1:]]

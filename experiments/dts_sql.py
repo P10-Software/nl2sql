@@ -1,12 +1,11 @@
+# Parts of the code in this file is taken from the dts_sql repo: https://github.com/MohammadrezaPourreza/DTS-SQL
+
 import torch
 import re
 import sqlite3
 import pandas as pd
-from transformers import AutoTokenizer
-from transformers import AutoModelForCausalLM
-from transformers import StoppingCriteria
+from transformers import AutoTokenizer, AutoModelForCausalLM, StoppingCriteria
 from tqdm import tqdm
-from sql_metadata import Parser
 
 BASE_DATASET_DIR = "DTS-SQL/test.json"
 BASE_DABATASES_DIR =  "DTS-SQL/test_database"

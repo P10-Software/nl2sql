@@ -98,6 +98,30 @@ def generate_schema(inputs, merged_model):
   output_tokens = merged_model.generate(inputs, max_new_tokens=250, do_sample=False, pad_token_id=tokenizer.eos_token_id, eos_token_id=tokenizer.eos_token_id, stopping_criteria = [EosListStoppingCriteriaSchema()])
   return tokenizer.decode(output_tokens[0][len(inputs[0]):], skip_special_tokens=True)
 
+def get_relevant_tables(db_uri, question):
+    table_names = get_all_table_names(db_uri)
+    database_schema = ""
+    for table_name in table_names:
+        schema = get_table_schema_with_samples(db_uri, table_name, 0)
+        database_schema += schema + "\n"
+    user_message = f"""Given the following SQL tables, your job is to determine the columns and tables that the question is referring to.
+{database_schema}
+####
+Question: {question}
+"""
+    messages = [
+        {"role": "user", "content": user_message.strip()}
+    ]
+    inputs = tokenizer.apply_chat_template(messages, return_tensors="pt", add_generation_prompt=True,tokenize = True).to(schema_model.device)
+    response = generate_schema(inputs, schema_model)
+    print(response)
+    if "Tables: " in response:
+        response = response.split("Tables: ")[1]
+    if ";" in response:
+        response = response.split(";")[0]
+    schema_linking_tables = re.sub(r'\s+', ' ', response).strip()
+    return schema_linking_tables
+
 if __name__ == "__main__":
     results = []
     df = pd.read_json(BASE_DATASET_DIR)[0]
@@ -128,10 +152,7 @@ Question: {question}
             response = response.split(";")[0]
         schema_linking_tables = re.sub(r'\s+', ' ', response).strip()
         print(f"Predicted schema: {schema_linking_tables}")
-        try:
-            print(f"Original schema: {Parser(query).tables}")
-        except Exception:
-            pass
+
         schema_linking_tables = schema_linking_tables.split(", ")
         database_schema = ""
         try:

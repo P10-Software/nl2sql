@@ -1,5 +1,5 @@
 from src.core.extractive_schema_linking import load_schema_linker, predict_relevance_for_chunks
-from src.core.schema_chunking import mschema_to_k_chunks
+from src.core.schema_chunking import mschema_to_k_chunks, chunk_mschema
 from tqdm import tqdm
 import json
 import statistics
@@ -18,17 +18,13 @@ def evaluate_extractive_schema_linking(schema_linker_path: str, dataset: list, c
     sum_table_recall_at_10 = 0
     sum_column_recall_100 = 0
     sum_table_recall_100 = 0
-    count_raises_chunk_size_error = 0
     report = []
 
     for example in tqdm(dataset):
         context_size = getattr(schema_linker.base_model.config, "max_position_embeddings", None)
 
-        try:
-            chunks = mschema_to_k_chunks(example["schema"], schema_linker.tokenizer, context_size, chunk_amount)
-        except:
-            count_raises_chunk_size_error += 1
-            continue
+        #chunks = mschema_to_k_chunks(example["schema"], schema_linker.tokenizer, context_size, chunk_amount)
+        chunks = chunk_mschema(example["schema"], schema_linker, False)
 
         goal_columns = example["goal answer"]
         goal_tables = {column.split(" ")[0] for column in goal_columns}
@@ -39,12 +35,12 @@ def evaluate_extractive_schema_linking(schema_linker_path: str, dataset: list, c
         columns, relevance = list(columns), list(relevance)
     
         # Evaluate column level recall@5
-        relevant_columns_at_5 = [column for column in columns if column in goal_columns][:5]
+        relevant_columns_at_5 = [column for column in columns[:5] if column in goal_columns]
         column_recall_at_5 = len(relevant_columns_at_5) / len(goal_columns)
         sum_column_recall_at_5 += column_recall_at_5
 
         # Evaluate column level recall@10
-        relevant_columns_at_10 = [column for column in columns if column in goal_columns][:10]
+        relevant_columns_at_10 = [column for column in columns[:10] if column in goal_columns]
         column_recall_at_10 = len(relevant_columns_at_10) / len(goal_columns)
         sum_column_recall_at_10 += column_recall_at_10
 
@@ -80,9 +76,8 @@ def evaluate_extractive_schema_linking(schema_linker_path: str, dataset: list, c
         report.append({"question": example["question"], "goal columns": list(goal_columns), "top 5 columns": columns[:5], "top 5 relevance": relevance[:5], "column recall@5": column_recall_at_5, "table recall@5": table_recall_at_5,
                        "top 10 columns": columns[:10], "top 10 relevance": relevance[:10], "column recall@10": column_recall_at_10, "table recall@10": table_recall_at_10, "column recall 100 count": column_recall_100, "table recall 100 count": table_recall_100})
 
-    questions_answered = len(dataset) - count_raises_chunk_size_error
-    report.append({"Dataset Size": len(dataset), "Questions Answered": questions_answered, "Total column recall@5": sum_column_recall_at_5 / questions_answered, "Total table recall@5": sum_table_recall_at_5 / questions_answered, "Total column recall@10": sum_column_recall_at_10 / questions_answered, 
-                   "Total table recall@10": sum_table_recall_at_10 / questions_answered,  "Average column recall 100": sum_column_recall_100 / questions_answered, "Average table recall 100": sum_table_recall_100 / questions_answered})
+    report.append({"Dataset Size": len(dataset), "Total column recall@5": sum_column_recall_at_5 / len(dataset), "Total table recall@5": sum_table_recall_at_5 / len(dataset), "Total column recall@10": sum_column_recall_at_10 / len(dataset), 
+                   "Total table recall@10": sum_table_recall_at_10 / len(dataset),  "Average column recall 100": sum_column_recall_100 / len(dataset), "Average table recall 100": sum_table_recall_100 / len(dataset)})
     return report
 
 if __name__ == "__main__":

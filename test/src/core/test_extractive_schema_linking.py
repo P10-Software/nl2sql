@@ -65,13 +65,13 @@ users.user_id=orders.order_id
         ("users user_id", 0.1), ("users name", 0.2), ("users email", 0.05),
         ("orders order_id", 0.05), ("orders user_id", 0.09), ("orders amount", 0.01)
     ]
-    from src.core.extractive_schema_linking import get_focused_schema
 
     with patch.dict('sys.modules', {
              'torch': MagicMock(),
              'transformers': MagicMock(),
              'accelerate': MagicMock()
          }):
+        from src.core.extractive_schema_linking import get_focused_schema
         with patch('src.core.extractive_schema_linking.predict_relevance_for_chunks', return_value=mock_predictions), \
             patch('src.core.extractive_schema_linking.chunk_mschema', return_value=[schema]):
             focused_schema = get_focused_schema(None, "", schema, threshold=0.1, has_relations=False)

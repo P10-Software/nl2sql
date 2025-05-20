@@ -163,7 +163,7 @@ def get_focused_schema(schema_linker, question, schema, threshold: int = 0.1, ha
 
     focused_schema = schema_header_text + "".join(schema_tables)
 
-    if relations:
+    if foreign_key_str in schema:
         relevant_relations = []
         for relation in relations.split("\n"):
             operands = relation.split("=")

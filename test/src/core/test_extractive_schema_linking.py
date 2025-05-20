@@ -67,13 +67,13 @@ users.user_id=orders.order_id
     ]
     from src.core.extractive_schema_linking import get_focused_schema
 
-    with patch('src.core.extractive_schema_linking.predict_relevance_for_chunks', return_value=mock_predictions), \
-         patch('src.core.extractive_schema_linking.chunk_mschema', return_value=[schema]), \
-         patch.dict('sys.modules', {
+    with patch.dict('sys.modules', {
              'torch': MagicMock(),
              'transformers': MagicMock(),
              'accelerate': MagicMock()
          }):
-        focused_schema = get_focused_schema(None, "", schema, threshold=0.1, has_relations=False)
+        with patch('src.core.extractive_schema_linking.predict_relevance_for_chunks', return_value=mock_predictions), \
+            patch('src.core.extractive_schema_linking.chunk_mschema', return_value=[schema]):
+            focused_schema = get_focused_schema(None, "", schema, threshold=0.1, has_relations=False)
 
     assert focused_schema == expected_focused_schema

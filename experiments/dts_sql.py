@@ -100,7 +100,6 @@ def generate_schema(inputs, merged_model):
 
 def get_relevant_tables(db_uri, question):
     table_names = get_all_table_names(db_uri)
-    print(table_names)
     database_schema = ""
     for table_name in table_names:
         schema = get_table_schema_with_samples(db_uri, table_name, 0)
@@ -123,6 +122,7 @@ Question: {question}
     schema_linking_tables = schema_linking_tables.split(", ")
     for table in schema_linking_tables:
         table = table.replace("**", "").replace("--", "").replace("'","").strip()
+        table = table.lower()
     return schema_linking_tables
 
 def extract_db_id(mschema: str) -> str:

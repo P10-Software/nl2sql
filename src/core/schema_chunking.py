@@ -3,7 +3,7 @@ from src.common.logger import get_logger
 
 logger = get_logger(__name__)
 
-def chunk_mschema(mschema: str, tokenizer, with_relations: bool) -> list[str]:
+def chunk_mschema(mschema: str, tokenizer, with_relations: bool, k: int = 0) -> list[str]:
     """
     Transform the M-Schema into a list of M-Schemas that fits within a given context window.
     Each chunk contains only whole tables from the mschema.
@@ -14,7 +14,9 @@ def chunk_mschema(mschema: str, tokenizer, with_relations: bool) -> list[str]:
     - with_relations (bool): Generate chunks with or without relations
     """
     if with_relations:
-        return _chunk_mschema_with_relations(mschema, tokenizer)
+        return _chunk_mschema_with_relations(mschema, tokenizer, k)
+    if k:
+        return mschema_to_k_chunks(mschema, tokenizer, k)
     return _chunk_mschema_no_relations(mschema, tokenizer)
 
 
@@ -64,7 +66,8 @@ def mschema_to_k_chunks(mschema: str, tokenizer, k: int) -> list[str]:
 
     return chunks
 
-def _chunk_mschema_with_relations(mschema: str, tokenizer) -> list[str]:
+
+def _chunk_mschema_with_relations(mschema: str, tokenizer, k: int) -> list[str]:
     context_size = _get_context_size(tokenizer)
 
     relations = []
@@ -85,9 +88,12 @@ def _chunk_mschema_with_relations(mschema: str, tokenizer) -> list[str]:
     for table in mschema_tables:
         chunk_size = len(tokenizer(' '.join(chunk_tables | chunk_relations) + table, return_tensors="pt", truncation=False)["input_ids"][0])
 
-        if chunk_size > context_size // 2:
+        if (k > 0 and len(chunk_tables) >= k) or chunk_size > context_size // 2:
             if chunk_tables:
-                chunks.append(mschema_header_text + ' '.join(chunk_tables) + foreign_key_str + '\n' + '\n'.join(chunk_relations))
+                if chunk_relations:
+                    chunks.append(mschema_header_text + ' '.join(chunk_tables) + foreign_key_str + '\n' + '\n'.join(chunk_relations))
+                else:
+                    chunks.append(mschema_header_text + ' '.join(chunk_tables))
             chunk_tables = set()
             chunk_relations = set()
             chunk_tables.add(table)
@@ -96,8 +102,10 @@ def _chunk_mschema_with_relations(mschema: str, tokenizer) -> list[str]:
             chunk_tables.add(table)
             _find_relations(table, chunk_tables, chunk_relations, mschema_tables, relations, context_size, tokenizer)
     if chunk_tables:
-        chunks.append(mschema_header_text + ' '.join(chunk_tables) + foreign_key_str + '\n' + '\n'.join(chunk_relations))
-
+        if chunk_relations:
+            chunks.append(mschema_header_text + ' '.join(chunk_tables) + foreign_key_str + '\n' + '\n'.join(chunk_relations))
+        else:
+            chunks.append(mschema_header_text + ' '.join(chunk_tables))
     return chunks
 
 

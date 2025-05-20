@@ -10,7 +10,7 @@ import statistics
 
 NUMBER_OF_TRIALS = 10
 EVALUATION_DATA_PATH = ".local/SchemaLinker/spider_exsl_all_to_single_test.json"
-BASE_DABATASES_DIR =  "DTS-SQL/test_database"
+BASE_DABATASES_DIR =  "DTS-SQL/test_database/"
 OUTPUT_DIR = ".local/experiments/schema_linking/spider/dts_sql/"
 
 schema_linker_adapter_path = "MrezaPRZ/DeepSchema_BIRD"
@@ -100,6 +100,7 @@ def generate_schema(inputs, merged_model):
 
 def get_relevant_tables(db_uri, question):
     table_names = get_all_table_names(db_uri)
+    print(table_names)
     database_schema = ""
     for table_name in table_names:
         schema = get_table_schema_with_samples(db_uri, table_name, 0)
@@ -119,6 +120,9 @@ Question: {question}
     if ";" in response:
         response = response.split(";")[0]
     schema_linking_tables = re.sub(r'\s+', ' ', response).strip()
+    schema_linking_tables = schema_linking_tables.split(", ")
+    for table in schema_linking_tables:
+        table = table.replace("**", "").replace("--", "").replace("'","").strip()
     return schema_linking_tables
 
 def extract_db_id(mschema: str) -> str:
@@ -148,12 +152,9 @@ if __name__ == "__main__":
         report = []
         recall_sum = 0
         precision_sum = 0
-        for example in eval_set:
+        for example in tqdm(eval_set):
             db_id = extract_db_id(example["schema"])
-            if "spider" in BASE_DABATASES_DIR:
-                db_uri = f"{BASE_DABATASES_DIR}{db_id}/{db_id}.sqlite"
-            else:
-                db_uri = f"{BASE_DABATASES_DIR}trial_metadata_natural.sqlite"
+            db_uri = f"{BASE_DABATASES_DIR}{db_id}/{db_id}.sqlite"
 
             goal_tables = {column.split(" ")[0] for column in example["goal answer"]}
             predictions = get_relevant_tables(db_uri, example["question"])
@@ -163,11 +164,11 @@ if __name__ == "__main__":
             precision = len(correct_predictions) / len(predictions)
             
             recall_sum += recall
-            precision_sum += precision_sum
+            precision_sum += precision
 
-            report.add({"question": example["question"], "goal tables": goal_tables, "predictions": predictions, "precision": precision, "recall": recall})
+            report.append({"question": example["question"], "goal tables": list(goal_tables), "predictions": predictions, "precision": precision, "recall": recall})
 
-        report.add({"Dataset size": len(eval_set), "Total precision": precision_sum / len(eval_set), "Total recall": recall_sum / len(eval_set)})
+        report.append({"Dataset size": len(eval_set), "Total precision": precision_sum / len(eval_set), "Total recall": recall_sum / len(eval_set)})
         table_recall_results.append(report[-1]["Total recall"])
         table_precision_results.append(report[-1]["Total precision"])
 
@@ -176,7 +177,7 @@ if __name__ == "__main__":
 
     overall_report = {
         "Table recall": {"mean": statistics.mean(table_recall_results), "standard deviation": statistics.stdev(table_recall_results)},
-        "Table precision": {"mean": statistics.mean(table_precision_results), "standard deviation": statistics.stdev(table_precision_results)},
+        "Table precision": {"mean": statistics.mean(table_precision_results), "standard deviation": statistics.stdev(table_precision_results)}
     }
 
     with open(f"{OUTPUT_DIR}overview.json", "w") as file:

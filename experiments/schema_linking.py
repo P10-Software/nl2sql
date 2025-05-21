@@ -1,28 +1,28 @@
 from src.core.extractive_schema_linking import load_schema_linker, get_focused_schema
-from src.core.schema_chunking import mschema_to_k_chunks, chunk_mschema
+from src.core.schema_chunking import chunk_mschema
 from tqdm import tqdm
 import json
 
 EVALUATION_DATA_PATH = ".local/SchemaLinker/metadata_exsl.json"
 SCHEMA_LINKER_PATH = "models/EXSL/OmniSQL_7B_optimal_params_coarse_grained_schema_linker_spider.pth"
 RESULT_DIRECTORY = ".local/experiments/schema_linking/metadata/exsl_omni/"
-NUMBER_OF_CHUNKS = 1
+TABLES_PER_CHUNK = 1
+WITH_RELATIONS = False
 
 def get_table_names_from_schema(schema):
     schema_split = schema.split("# ")
     schema_tables = [table.split("\n")[0].split("Table: ")[1] for table in schema_split[1:]]
     return schema_tables
 
-def evaluate_extractive_schema_linking(schema_linker_path: str, dataset: list, chunk_amount: int = 0):
+def evaluate_extractive_schema_linking(schema_linker_path: str, dataset: list, k: int = 0):
     schema_linker = load_schema_linker(schema_linker_path)
     sum_recall = 0
     sum_precision = 0
     report = []
 
     for example in tqdm(dataset):
-        #chunks = mschema_to_k_chunks(example["schema"], schema_linker.tokenizer, chunk_amount)
-        #chunks = chunk_mschema(example["schema"], schema_linker, False)
-        chunks = [example["schema"]]
+        chunks = chunk_mschema(example["schema"], schema_linker, False, k)
+        #chunks = [example["schema"]]
 
         goal_columns = example["goal answer"]
         goal_tables = {column.split(" ")[0] for column in goal_columns}
@@ -51,7 +51,7 @@ if __name__ == "__main__":
     with open(EVALUATION_DATA_PATH, "r") as eval_file:
         eval_set = json.load(eval_file)
     
-    report = evaluate_extractive_schema_linking(SCHEMA_LINKER_PATH, eval_set, NUMBER_OF_CHUNKS)
+    report = evaluate_extractive_schema_linking(SCHEMA_LINKER_PATH, eval_set, TABLES_PER_CHUNK)
 
-    with open(f"{RESULT_DIRECTORY}chunks_{NUMBER_OF_CHUNKS}_overview.json", "w") as file:
+    with open(f"{RESULT_DIRECTORY}tables_per_chunk_{TABLES_PER_CHUNK}_overview.json", "w") as file:
         json.dump(report, file, indent=4)

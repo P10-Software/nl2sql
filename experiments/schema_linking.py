@@ -21,7 +21,7 @@ def evaluate_extractive_schema_linking(schema_linker_path: str, dataset: list, k
     report = []
 
     for example in tqdm(dataset):
-        chunks = chunk_mschema(example["schema"], schema_linker, False, k)
+        chunks = chunk_mschema(example["schema"], schema_linker.tokenizer, False, k)
         #chunks = [example["schema"]]
 
         goal_columns = example["goal answer"]

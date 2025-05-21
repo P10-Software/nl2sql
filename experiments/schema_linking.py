@@ -3,10 +3,9 @@ from src.core.schema_chunking import mschema_to_k_chunks, chunk_mschema
 from tqdm import tqdm
 import json
 
-NUMBER_OF_TRIALS = 10
-EVALUATION_DATA_PATH = ".local/SchemaLinker/spider_exsl_all_to_single_test.json"
+EVALUATION_DATA_PATH = ".local/SchemaLinker/metadata_exsl.json"
 SCHEMA_LINKER_PATH = "models/EXSL/OmniSQL_7B_optimal_params_coarse_grained_schema_linker_spider.pth"
-RESULT_DIRECTORY = ".local/experiments/schema_linking/exsl_omni/"
+RESULT_DIRECTORY = ".local/experiments/schema_linking/metadata/exsl_omni/"
 NUMBER_OF_CHUNKS = 1
 
 def get_column_names_from_schema(schema):
@@ -22,13 +21,14 @@ def evaluate_extractive_schema_linking(schema_linker_path: str, dataset: list, c
 
     for example in tqdm(dataset):
         #chunks = mschema_to_k_chunks(example["schema"], schema_linker.tokenizer, chunk_amount)
-        chunks = chunk_mschema(example["schema"], schema_linker, False)
+        #chunks = chunk_mschema(example["schema"], schema_linker, False)
+        chunks = [example["schema"]]
 
         goal_columns = example["goal answer"]
         goal_tables = {column.split(" ")[0] for column in goal_columns}
 
         # Predict focused schema
-        predicted_schema = get_focused_schema(schema_linker, example["question"], example["schema"], THRESHOLD, False) # TODO: Update function to take a chunk as input
+        predicted_schema = get_focused_schema(schema_linker, example["question"], chunks, example["schema"])
         predicted_tables = get_column_names_from_schema(predicted_schema)
 
         correct_predictions = [table for table in predicted_tables if table in goal_tables]
@@ -42,7 +42,7 @@ def evaluate_extractive_schema_linking(schema_linker_path: str, dataset: list, c
         sum_precision += precision
         sum_recall += recall
 
-        report.append({"question": example["question"], "goal tables": list(goal_tables), "predicted tables": predicted_tables, "recall": recall, "precision": table_recall_at_5})
+        report.append({"question": example["question"], "goal tables": list(goal_tables), "predicted tables": predicted_tables, "recall": recall, "precision": precision})
 
     report.append({"Dataset Size": len(dataset), "Total recall": sum_recall / len(dataset), "Total precision": sum_precision / len(dataset)})
     return report

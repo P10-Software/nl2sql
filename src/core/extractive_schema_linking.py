@@ -142,9 +142,7 @@ def parse_schema(schema: str):
 def load_schema_linker(model_path):
     return torch.load(model_path, weights_only=False)
 
-def get_focused_schema(schema_linker, question, schema, threshold: int = 0.1, has_relations: bool = False):
-    chunks = [schema]#chunk_mschema(schema_linker, schema_linker, has_relations)
-
+def get_focused_schema(schema_linker, question, chunks, schema, threshold: int = 0.1):
     # Make relevance predictions
     predictions = predict_relevance_for_chunks(schema_linker, question, chunks)
     relevant_columns = [column for column, relevance in predictions if relevance >= threshold]
@@ -152,10 +150,12 @@ def get_focused_schema(schema_linker, question, schema, threshold: int = 0.1, ha
 
     # Remove irrelevant tables from mschema
     foreign_key_str = "【Foreign keys】"
+    relations = None
 
     if foreign_key_str in schema:
         relations = schema.split(foreign_key_str)[1].split()
         schema = schema.split(foreign_key_str)[0]
+        print(relations)
 
     schema_split = schema.split("# ")
     schema_header_text = schema_split[0]
@@ -163,14 +163,15 @@ def get_focused_schema(schema_linker, question, schema, threshold: int = 0.1, ha
 
     focused_schema = schema_header_text + "".join(schema_tables)
 
-    if foreign_key_str in schema:
+    # Remove irrelevant relations
+    if relations:
         relevant_relations = []
-        for relation in relations.split("\n"):
+        for relation in relations:
             operands = relation.split("=")
             if operands[0].split(".")[0] in relevant_tables_names and operands[1].split(".")[0] in relevant_tables_names:
                 relevant_relations.append(relation)
 
         if relevant_relations:
-            focused_schema += foreign_key_str + "".join(relevant_relations)
+            focused_schema += foreign_key_str + "\n" + "".join(relevant_relations) + "\n"
     
     return focused_schema

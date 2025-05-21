@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     for example in tqdm(dataset):
         goal_tables = {column.split(" ")[0] for column in example["goal answer"]}
-        predicted_schema = get_focused_schema(schema_linker, example["question"], example["schema"], THRESHOLD, False)
+        predicted_schema = get_focused_schema(schema_linker, example["question"], [example["schema"]], example["schema"], THRESHOLD, False)
         predicted_tables = get_column_names_from_schema(predicted_schema)
 
         correct_predictions = [table for table in predicted_tables if table in goal_tables]

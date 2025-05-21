@@ -1,5 +1,6 @@
 import torch
 from transformers import AutoModel, AutoTokenizer
+from src.core.schema_chunking import chunk_mschema
 import re
 
 class ExSLcModel(torch.nn.Module):
@@ -140,3 +141,36 @@ def parse_schema(schema: str):
 
 def load_schema_linker(model_path):
     return torch.load(model_path, weights_only=False)
+
+def get_focused_schema(schema_linker, question, chunks, schema, threshold: int = 0.1):
+    # Make relevance predictions
+    predictions = predict_relevance_for_chunks(schema_linker, question, chunks)
+    relevant_columns = [column for column, relevance in predictions if relevance >= threshold]
+    relevant_tables_names = {column.split(" ")[0] for column in relevant_columns}
+
+    # Remove irrelevant tables from mschema
+    foreign_key_str = "【Foreign keys】"
+    relations = None
+
+    if foreign_key_str in schema:
+        relations = schema.split(foreign_key_str)[1].split()
+        schema = schema.split(foreign_key_str)[0]
+
+    schema_split = schema.split("# ")
+    schema_header_text = schema_split[0]
+    schema_tables = ['# ' + table for table in schema_split[1:] if table.split("\n")[0].split("Table: ")[1] in relevant_tables_names]
+
+    focused_schema = schema_header_text + "".join(schema_tables)
+
+    # Remove irrelevant relations
+    if relations:
+        relevant_relations = []
+        for relation in relations:
+            operands = relation.split("=")
+            if operands[0].split(".")[0] in relevant_tables_names and operands[1].split(".")[0] in relevant_tables_names:
+                relevant_relations.append(relation)
+
+        if relevant_relations:
+            focused_schema += foreign_key_str + "\n" + "".join(relevant_relations) + "\n"
+    
+    return focused_schema

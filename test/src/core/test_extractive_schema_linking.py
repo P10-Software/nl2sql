@@ -140,3 +140,32 @@ users.user_id=orders.order_id
             focused_schema = get_focused_schema(None, "", [schema], schema, threshold=0.05)
 
     assert focused_schema == expected_focused_schema
+
+def test_max_predictions():
+    with patch.dict('sys.modules', {
+        'torch': MagicMock(),
+        'transformers': MagicMock(),
+        'accelerate': MagicMock()
+    }):
+        from src.core.extractive_schema_linking import max_duplicate_prediction
+
+        mock_predictions = [
+            ("users user_id", 0.1), ("users name", 0.2), ("users email", 0.05),
+            ("orders order_id", 0.05), ("orders user_id", 0.09), ("orders amount", 0.01),
+            ("users user_id", 0.03), ("users name", 0.4), ("users email", 0.07),
+            ("location location_id", 0.02), ("location city", 0.03), ("location order_id", 0.04)
+        ]
+
+        expected_predictions = [
+            ("users user_id", 0.1), ("orders order_id", 0.05), ("orders user_id", 0.09),
+            ("orders amount", 0.01), ("users name", 0.4), ("users email", 0.07),
+            ("location location_id", 0.02), ("location city", 0.03), ("location order_id", 0.04)
+        ]
+
+        res_predictions = max_duplicate_prediction(mock_predictions)
+
+        res_predictions.sort(key=lambda pair: pair[1], reverse=True)
+        expected_predictions.sort(key=lambda pair: pair[1], reverse=True)
+        
+        assert res_predictions == expected_predictions
+

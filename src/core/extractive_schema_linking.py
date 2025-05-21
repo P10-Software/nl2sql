@@ -64,9 +64,24 @@ def predict_relevance_for_chunks(model, question, chunks):
 
     for chunk in chunks:
         predictions += predict_relevance_coarse(model, question, chunk).items()
+
+    predictions = max_duplicate_prediction(predictions)
     predictions.sort(key=lambda pair: pair[1], reverse=True)
+
     return predictions
-            
+
+def max_duplicate_prediction(predictions: list[tuple[str, float]]) -> list[tuple[str, float]]:
+    """
+    Takes a list of column predictions and returns the max prediction for each column
+    """
+    best_scores = {}
+
+    for key, score in predictions:
+        if key not in best_scores or score > best_scores[key]:
+            best_scores[key] = score
+
+    return [(key, best_scores[key]) for key in best_scores]
+
 def predict_relevance_coarse(model, question, schema):
     """
     Predict which schema elements are relevant to the question

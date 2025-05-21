@@ -155,7 +155,6 @@ def get_focused_schema(schema_linker, question, chunks, schema, threshold: int =
     if foreign_key_str in schema:
         relations = schema.split(foreign_key_str)[1].split()
         schema = schema.split(foreign_key_str)[0]
-        print(relations)
 
     schema_split = schema.split("# ")
     schema_header_text = schema_split[0]

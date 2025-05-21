@@ -7,7 +7,7 @@ SCHEMA_LINKER_PATH = "models/EXSL/xiyan_7B_optimal_params_coarse_grained_schema_
 RESULT_DIRECTORY = ".local/experiments/schema_linking_threshold/exsl_xiyan/"
 THRESHOLD = 0.4
 
-def get_column_names_from_schema(schema):
+def get_table_names_from_schema(schema):
     schema_split = schema.split("# ")
     schema_tables = [table.split("\n")[0].split("Table: ")[1] for table in schema_split[1:]]
     return schema_tables
@@ -24,7 +24,7 @@ if __name__ == "__main__":
     for example in tqdm(dataset):
         goal_tables = {column.split(" ")[0] for column in example["goal answer"]}
         predicted_schema = get_focused_schema(schema_linker, example["question"], [example["schema"]], example["schema"], THRESHOLD, False)
-        predicted_tables = get_column_names_from_schema(predicted_schema)
+        predicted_tables = get_table_names_from_schema(predicted_schema)
 
         correct_predictions = [table for table in predicted_tables if table in goal_tables]
 

@@ -20,8 +20,8 @@ def run_study():
     optimization.
     """
     study = optuna.create_study(
-        direction="minimize",
-        study_name="schema_linker_study_nrmc",
+        direction="maximize",
+        study_name="schema_linker_study_rmc_efficiency",
         storage="sqlite:///optuna_study_schema_linker_omnisql_nrmc.db",
         load_if_exists=True
     )
@@ -53,11 +53,11 @@ def objective(trial: optuna.trial):
 
     eval_result = evaluate_coarse_grained(trained_model, eval_set, K)
 
-    with open(RESULT_DIR_PATH + f"table_n_rmc_spider_exsl_recall_at_{K}_trial_{trial.number}.json", "w") as result_file:
+    with open(RESULT_DIR_PATH + f"rmc_efficiency_spider_exsl_trial_{trial.number}.json", "w") as result_file:
         json.dump(eval_result, result_file, indent=4)
     logger.info(eval_result[-1])
 
-    return eval_result[-1]["Average table-n-RMC"]
+    return eval_result[-1]["Average RMC efficiency"]
 
 def train_coarse_grained(model, train_data, config):
     # Initialize Accelerator
@@ -105,6 +105,7 @@ def train_coarse_grained(model, train_data, config):
     return model
 
 def evaluate_coarse_grained(model, eval_data, k):
+    # Prepare dataset
     dataset_contains_feasibility = "feasible" in eval_data[0].keys()
     if dataset_contains_feasibility:
         eval_set = [example for example in eval_data if example["feasible"] is not None]
@@ -114,16 +115,13 @@ def evaluate_coarse_grained(model, eval_data, k):
     eval_result = []
     sum_column_recall_at_k = 0
     sum_table_recall_at_k = 0
-    sum_table_nrmc = 0
-    total_valid_examples = 0
+    sum_rmc_efficiency = 0
 
     for example in tqdm(eval_set):
         if dataset_contains_feasibility:
             goal_columns = {" ".join(column.split(".")) for column in example["columns"]}
         else:
             goal_columns = set(example["goal answer"])
-
-        goal_tables = {col.split(" ")[0] for col in goal_columns}
 
         # Make relevance predictions
         predictions = predict_relevance_coarse(model, example["question"], example["schema"])
@@ -137,25 +135,24 @@ def evaluate_coarse_grained(model, eval_data, k):
         sum_column_recall_at_k += column_recall_at_k
 
         # Table recall@k
+        goal_tables = {column.split(" ")[0] for column in goal_columns}
         relevant_tables = {column.split(" ")[0] for column in columns if column.split(" ")[0] in goal_tables}
         table_recall_at_k = len(relevant_tables) / len(goal_tables)
         sum_table_recall_at_k += table_recall_at_k
 
-        # Table-level n-RMC
-        seen_tables = set()
-        table_nrmc_cutoff = len(predictions)
+        # Compute RMC (Recall-Minimal Cutoff)
+        seen = set()
+        rmc_cutoff = len(predictions)  # worst case: never fully recovered
 
         for i, (col, _) in enumerate(sorted_columns):
-            table = col.split(" ")[0]
-            if table in goal_tables:
-                seen_tables.add(table)
-            if seen_tables == goal_tables:
-                table_nrmc_cutoff = i + 1  # +1 for 1-based index
+            if col in goal_columns:
+                seen.add(col)
+            if seen == goal_columns:
+                rmc_cutoff = i + 1  # +1 for 1-based index
                 break
 
-        table_nrmc = table_nrmc_cutoff / max(len(goal_tables), 1)
-        sum_table_nrmc += table_nrmc
-        total_valid_examples += 1
+        rmc_efficiency = len(goal_columns) / rmc_cutoff
+        sum_rmc_efficiency += rmc_efficiency
 
         eval_result.append({
             "question": example["question"],
@@ -164,14 +161,14 @@ def evaluate_coarse_grained(model, eval_data, k):
             "top k relevance": relevance,
             "column recall@k": column_recall_at_k,
             "table recall@k": table_recall_at_k,
-            "table-n-RMC": table_nrmc
+            "RMC efficiency": rmc_efficiency
         })
 
     eval_result.append({
         "Amount of questions": len(eval_set),
         "Total column recall@k": sum_column_recall_at_k / len(eval_set),
         "Total table recall@k": sum_table_recall_at_k / len(eval_set),
-        "Average table-n-RMC": sum_table_nrmc / total_valid_examples,
+        "Average RMC efficiency": sum_rmc_efficiency / len(eval_set),
         "K": k
     })
 

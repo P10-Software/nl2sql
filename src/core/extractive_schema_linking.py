@@ -197,7 +197,7 @@ def get_focused_schema(schema_linker, question, chunks, schema, threshold: int =
             column_name = column.split(":")[0].strip()
             if column_name in relevant_table_columns[table_name]:
                 filtered_columns.append(f"({column})")
-        print(filtered_columns)
+
         # Construct output
         filtered_table = f"# Table: {table_name}\n[\n" + ",\n".join(filtered_columns) + "\n]\n"
         schema_tables.append(filtered_table)

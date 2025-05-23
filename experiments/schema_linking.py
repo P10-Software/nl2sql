@@ -1,11 +1,12 @@
 from src.core.extractive_schema_linking import load_schema_linker, get_focused_schema
 from src.core.schema_chunking import chunk_mschema
+from experiments.schema_linking_threshold import get_columns_from_schema
 from tqdm import tqdm
 import json
 
-EVALUATION_DATA_PATH = ".local/SchemaLinker/metadata_exsl.json"
-SCHEMA_LINKER_PATH = "models/EXSL/OmniSQL_7B_optimal_params_coarse_grained_schema_linker_spider.pth"
-RESULT_DIRECTORY = ".local/experiments/schema_linking/metadata/exsl_omni/"
+EVALUATION_DATA_PATH = ".local/SchemaLinker/spider_exsl_all_to_single_test.json"
+SCHEMA_LINKER_PATH = "models/EXSL/OmniSQL_7B_rmc_efficiency_schema_linker_trial_39.pth"
+RESULT_DIRECTORY = ".local/experiments/schema_linking/spider/exsl_omni/column_level/"
 TABLES_PER_CHUNK = 1
 WITH_RELATIONS = False
 
@@ -21,28 +22,29 @@ def evaluate_extractive_schema_linking(schema_linker_path: str, dataset: list, k
     report = []
 
     for example in tqdm(dataset):
-        chunks = chunk_mschema(example["schema"], schema_linker.tokenizer, False, k)
-        #chunks = [example["schema"]]
+        #chunks = chunk_mschema(example["schema"], schema_linker.tokenizer, False, k)
+        chunks = [example["schema"]]
 
-        goal_columns = example["goal answer"]
-        goal_tables = {column.split(" ")[0] for column in goal_columns}
+        goal_columns = set(example["goal answer"])
+        #goal_tables = {column.split(" ")[0] for column in goal_columns}
 
         # Predict focused schema
-        predicted_schema = get_focused_schema(schema_linker, example["question"], chunks, example["schema"])
-        predicted_tables = get_table_names_from_schema(predicted_schema)
+        predicted_schema = get_focused_schema(schema_linker, example["question"], chunks, example["schema"], 0.15)
+        #predicted_tables = get_table_names_from_schema(predicted_schema)
+        predicted_columns = get_columns_from_schema(predicted_schema)
 
-        correct_predictions = [table for table in predicted_tables if table in goal_tables]
+        correct_predictions = [table for table in predicted_columns if table in goal_columns]
 
-        if len(predicted_tables) == 0:
+        if len(predicted_columns) == 0:
             precision = 0
         else:
-            precision = len(correct_predictions) / len(predicted_tables)
-        recall = len(correct_predictions) / len(goal_tables)
+            precision = len(correct_predictions) / len(predicted_columns)
+        recall = len(correct_predictions) / len(goal_columns)
     
         sum_precision += precision
         sum_recall += recall
 
-        report.append({"question": example["question"], "goal tables": list(goal_tables), "predicted tables": predicted_tables, "recall": recall, "precision": precision})
+        report.append({"question": example["question"], "goal columns": list(goal_columns), "predicted tables": list(predicted_columns), "recall": recall, "precision": precision})
 
     report.append({"Dataset Size": len(dataset), "Total recall": sum_recall / len(dataset), "Total precision": sum_precision / len(dataset)})
     return report
@@ -53,5 +55,5 @@ if __name__ == "__main__":
     
     report = evaluate_extractive_schema_linking(SCHEMA_LINKER_PATH, eval_set, TABLES_PER_CHUNK)
 
-    with open(f"{RESULT_DIRECTORY}tables_per_chunk_{TABLES_PER_CHUNK}_overview.json", "w") as file:
+    with open(f"{RESULT_DIRECTORY}no_chunking_{TABLES_PER_CHUNK}_overview.json", "w") as file:
         json.dump(report, file, indent=4)

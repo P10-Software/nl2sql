@@ -1,4 +1,5 @@
 from src.core.extractive_schema_linking import get_focused_schema, load_schema_linker
+from src.core.schema_chunking import chunk_mschema
 import json
 import re
 from tqdm import tqdm
@@ -34,6 +35,7 @@ if __name__ == "__main__":
 
     for example in tqdm(dataset):
         goal_columns = set(example["goal answer"])
+        chunks = chunk_mschema(example["schema"], schema_linker.tokenizer, False, 1)
         predicted_schema = get_focused_schema(schema_linker, example["question"], [example["schema"]], example["schema"], THRESHOLD)
         predicted_columns = get_columns_from_schema(predicted_schema)
 

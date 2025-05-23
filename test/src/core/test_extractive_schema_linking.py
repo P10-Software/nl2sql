@@ -56,8 +56,7 @@ users.user_id=orders.order_id
 # Table: users
 [
 (user_id:INTEGER, Primary Key, Examples: [1, 2]),
-(name:TEXT, Examples: [Alice Johnson, Bob Smith]),
-(email:TEXT)
+(name:TEXT, Examples: [Alice Johnson, Bob Smith])
 ]
 """
 
@@ -116,8 +115,7 @@ orders.orders_id=location.order_id
 # Table: orders
 [
 (order_id:INTEGER, Primary Key, Examples: [1, 2, 3]),
-(user_id:INTEGER, Examples: [1, 2]),
-(amount:REAL, Examples: [99.99, 149.5, 200.0])
+(user_id:INTEGER, Examples: [1, 2])
 ]
 【Foreign keys】
 users.user_id=orders.order_id

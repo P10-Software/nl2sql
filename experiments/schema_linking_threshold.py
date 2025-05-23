@@ -3,9 +3,9 @@ import json
 from tqdm import tqdm
 
 EVALUATION_DATA_PATH = ".local/SchemaLinker/spider_exsl_dev.json"
-SCHEMA_LINKER_PATH = "models/EXSL/xiyan_7B_optimal_params_coarse_grained_schema_linker_spider.pth"
-RESULT_DIRECTORY = ".local/experiments/schema_linking_threshold/exsl_xiyan/"
-THRESHOLD = 0.4
+SCHEMA_LINKER_PATH = "models/EXSL/OmniSQL_7B_rmc_efficiency_schema_linker_trial_33.pth"
+RESULT_DIRECTORY = ".local/experiments/schema_linking_threshold/exsl_omni/"
+THRESHOLD = 0.40
 
 def get_table_names_from_schema(schema):
     schema_split = schema.split("# ")
@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     for example in tqdm(dataset):
         goal_tables = {column.split(" ")[0] for column in example["goal answer"]}
-        predicted_schema = get_focused_schema(schema_linker, example["question"], [example["schema"]], example["schema"], THRESHOLD, False)
+        predicted_schema = get_focused_schema(schema_linker, example["question"], [example["schema"]], example["schema"], THRESHOLD)
         predicted_tables = get_table_names_from_schema(predicted_schema)
 
         correct_predictions = [table for table in predicted_tables if table in goal_tables]
@@ -41,5 +41,5 @@ if __name__ == "__main__":
 
     report.append({"Total examples": len(dataset), "Total precision": precision_sum / len(dataset), "Total recall": recall_sum / len(dataset)})
 
-    with open(f"{RESULT_DIRECTORY}threshold_{int(THRESHOLD * 100)}_overview.json", "w") as file:
+    with open(f"{RESULT_DIRECTORY}trial_33_threshold_{int(THRESHOLD * 100)}_overview.json", "w") as file:
         json.dump(report, file, indent=4)

@@ -160,14 +160,16 @@ def load_schema_linker(model_path):
 def get_focused_schema(schema_linker, question, chunks, schema, threshold: int = 0.05):
     # Make relevance predictions
     predictions = predict_relevance_for_chunks(schema_linker, question, chunks)
-    relevant_columns = [column for column, relevance in predictions if relevance >= threshold]
-    relevant_table_columns = {}
-    for relevant_column in relevant_columns:
-        table, column = relevant_column.split(" ")
-        if table in relevant_table_columns.keys():
-            relevant_table_columns[table].append(column)
+    relevant_tables_with_columns = {}
+    for column, relevance in predictions:
+        if relevance < threshold:
+            continue
+
+        table_name, column_name = column.split(" ")
+        if table_name in relevant_tables_with_columns.keys():
+            relevant_tables_with_columns[table_name].append(column_name)
         else:
-            relevant_table_columns[table] = [column]
+            relevant_tables_with_columns[table_name] = [column_name]
 
     # Remove irrelevant tables from mschema
     foreign_key_str = "【Foreign keys】"
@@ -184,7 +186,7 @@ def get_focused_schema(schema_linker, question, chunks, schema, threshold: int =
     for table in schema_split[1:]:
         table_name = table.split("\n")[0].split("Table: ")[1]
 
-        if table_name not in relevant_table_columns.keys():
+        if table_name not in relevant_tables_with_columns.keys():
             continue # Table has no relevant columns
 
         # Extract individual column entries inside the brackets
@@ -195,7 +197,7 @@ def get_focused_schema(schema_linker, question, chunks, schema, threshold: int =
         filtered_columns = []
         for column in columns:
             column_name = column.split(":")[0].strip()
-            if column_name in relevant_table_columns[table_name]:
+            if column_name in relevant_tables_with_columns[table_name]:
                 filtered_columns.append(f"({column})")
 
         # Construct output
@@ -212,7 +214,8 @@ def get_focused_schema(schema_linker, question, chunks, schema, threshold: int =
             table1, column1 = operands[0].split(".")
             table2, column2 = operands[1].split(".")
 
-            if  (table1 in relevant_table_columns.keys() and column1 in relevant_table_columns[table1]) and (table2 in relevant_table_columns.keys() and column2 in relevant_table_columns[table2]):
+            if (table1 in relevant_tables_with_columns.keys() and column1 in relevant_tables_with_columns[table1]) and (
+             table2 in relevant_tables_with_columns.keys() and column2 in relevant_tables_with_columns[table2]):
                 relevant_relations.append(relation)
 
         if relevant_relations:

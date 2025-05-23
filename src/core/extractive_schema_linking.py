@@ -161,7 +161,13 @@ def get_focused_schema(schema_linker, question, chunks, schema, threshold: int =
     # Make relevance predictions
     predictions = predict_relevance_for_chunks(schema_linker, question, chunks)
     relevant_columns = [column for column, relevance in predictions if relevance >= threshold]
-    relevant_tables_names = {column.split(" ")[0] for column in relevant_columns}
+    relevant_table_columns = {}
+    for relevant_column in relevant_columns:
+        table, column = relevant_column.split(" ")
+        if table in relevant_table_columns.keys():
+            relevant_table_columns[table].append(column)
+        else:
+            relevant_table_columns[table] = [column]
 
     # Remove irrelevant tables from mschema
     foreign_key_str = "【Foreign keys】"
@@ -173,7 +179,13 @@ def get_focused_schema(schema_linker, question, chunks, schema, threshold: int =
 
     schema_split = schema.split("# ")
     schema_header_text = schema_split[0]
-    schema_tables = ['# ' + table for table in schema_split[1:] if table.split("\n")[0].split("Table: ")[1] in relevant_tables_names]
+
+    schema_tables = []
+    for table in schema_tables[:1]:
+        if  table.split("\n")[0].split("Table: ")[1] not in relevant_table_columns.keys():
+            continue
+
+        schema_tables.append("# " + table)
 
     focused_schema = schema_header_text + "".join(schema_tables)
 
@@ -182,7 +194,10 @@ def get_focused_schema(schema_linker, question, chunks, schema, threshold: int =
         relevant_relations = []
         for relation in relations:
             operands = relation.split("=")
-            if operands[0].split(".")[0] in relevant_tables_names and operands[1].split(".")[0] in relevant_tables_names:
+            table1, column1 = operands[0].split(".")
+            table2, column2 = operands[1].split(".")
+
+            if  (table1 in relevant_table_columns.keys() and column1 in relevant_table_columns[table1]) and (table2 in relevant_table_columns.keys() and column2 in relevant_table_columns[table2]):
                 relevant_relations.append(relation)
 
         if relevant_relations:

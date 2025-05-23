@@ -181,11 +181,26 @@ def get_focused_schema(schema_linker, question, chunks, schema, threshold: int =
     schema_header_text = schema_split[0]
 
     schema_tables = []
-    for table in schema_tables[:1]:
-        if  table.split("\n")[0].split("Table: ")[1] not in relevant_table_columns.keys():
-            continue
+    for table in schema_split[1:]:
+        table_name = table.split("\n")[0].split("Table: ")[1]
 
-        schema_tables.append("# " + table)
+        if table_name not in relevant_table_columns.keys():
+            continue # Table has no relevant columns
+
+        # Extract individual column entries inside the brackets
+        column_pattern = r"\((.*?)\)"
+        columns = re.findall(column_pattern, table)
+
+        # Filter based on columns
+        filtered_columns = []
+        for column in columns:
+            column_name = column.split(":")[0].strip()
+            if column_name in relevant_table_columns[table_name]:
+                filtered_columns.append(f"({column})")
+        print(filtered_columns)
+        # Construct output
+        filtered_table = f"# Table: {table_name}\n[\n" + ",\n".join(filtered_columns) + "\n]\n"
+        schema_tables.append(filtered_table)
 
     focused_schema = schema_header_text + "".join(schema_tables)
 

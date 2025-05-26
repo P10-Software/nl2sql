@@ -1,4 +1,3 @@
-import numpy
 from src.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -118,3 +117,33 @@ def _get_context_size(tokenizer) -> int:
         raise ValueError("Model context size (max_position_embeddings) is not set.")
 
     return context_size
+
+
+def chunk_dts_ddl(ddl_schema: str, tokenizer, k: int = 0) -> list[str]:
+    """
+    Chunks DDL schema, as defined by dts_sql implenentation, into smaller chunks.
+    Args:
+        - ddl_schema (str)
+        - toknizer: Model tokenizer
+        - k (int): The amount of tables in each chunk
+    """
+    context_size = _get_context_size(tokenizer)
+    split_schema = ddl_schema.split(";")
+    split_schema.pop() # Remove last empty entry due to splitting on ';'
+    tables = [table + ';' for table in split_schema]
+
+    chunks = []
+    chunk = set()
+    for table in tables:
+        chunk_size = len(tokenizer(' '.join(chunk) + table, return_tensors="pt", truncation=False)["input_ids"][0])
+        if (k > 0 and len(chunk) >= k) or chunk_size > context_size / 1.5:
+            if chunk:
+                chunks.append(' '.join(chunk))
+            chunk = set()
+            chunk.add(table)
+        else:
+            chunk.add(table)
+    if chunk:
+        chunks.append(' '.join(chunk))
+
+    return chunks

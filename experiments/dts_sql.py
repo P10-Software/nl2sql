@@ -125,21 +125,6 @@ Question: {question}
         table = table.lower()
     return schema_linking_tables
 
-def extract_db_id(mschema: str) -> str:
-    """
-    Extracts the DB_ID from an mschema string.
-
-    Args:
-        mschema (str): The mschema string.
-
-    Returns:
-        str: The extracted DB_ID or None if not found.
-    """
-    match = re.search(r'【DB_ID】\s*(\w+)', mschema)
-    if match:
-        return match.group(1)
-    return None
-
 
 if __name__ == "__main__":
     table_recall_results = []

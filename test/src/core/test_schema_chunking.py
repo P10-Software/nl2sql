@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 import textwrap
 import pytest
 
-from src.core.schema_chunking import chunk_mschema, _find_relations
+from src.core.schema_chunking import chunk_mschema, _find_relations, chunk_dts_ddl
 
 def test_chunk_mschema_no_relations():
     mschema = textwrap.dedent("""
@@ -623,3 +623,152 @@ def test_k10_chunk_mschema_no_relations():
     actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
     expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
     assert actual_lines == expected_lines
+
+def test_chunk_dts_sql_schema():
+    schema = textwrap.dedent("""
+    CREATE TABLE `Person` (
+      BusinessEntityID INTEGER REFERENCES BusinessEntity(BusinessEntityID),
+      FirstName TEXT,
+      MiddleName TEXT,
+      LastName TEXT,
+    );
+    CREATE TABLE `BusinessEntity` (
+      BusinessEntityID INTEGER,
+      rowguid TEXT PRIMARY KEY,
+      ModifiedDate DATETIME
+    );
+    CREATE TABLE `BusinessEntityContact` (
+      BusinessEntityID INTEGER PRIMARY KEY REFERENCES BusinessEntity(BusinessEntityID),
+      PersonID INTEGER PRIMARY KEY REFERENCES Person(BusinessEntityID),
+      ContactTypeID INTEGER PRIMARY KEY REFERENCES ContactType(ContactTypeID),
+    );
+    CREATE TABLE `EmailAddress` (
+      BusinessEntityID INTEGER PRIMARY KEY REFERENCES Person(BusinessEntityID),
+      EmailAddressID INTEGER PRIMARY KEY,
+      EmailAddress TEXT,
+    );
+    """)
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 8
+
+    chunks = chunk_dts_ddl(schema, mock_tokenizer)
+
+    expected_1 = textwrap.dedent("""
+    CREATE TABLE `Person` (
+      BusinessEntityID INTEGER REFERENCES BusinessEntity(BusinessEntityID),
+      FirstName TEXT,
+      MiddleName TEXT,
+      LastName TEXT,
+    );""")
+
+    expected_2 = textwrap.dedent("""
+    CREATE TABLE `BusinessEntity` (
+      BusinessEntityID INTEGER,
+      rowguid TEXT PRIMARY KEY,
+      ModifiedDate DATETIME
+    );""")
+
+    expected_3 = textwrap.dedent("""
+    CREATE TABLE `BusinessEntityContact` (
+      BusinessEntityID INTEGER PRIMARY KEY REFERENCES BusinessEntity(BusinessEntityID),
+      PersonID INTEGER PRIMARY KEY REFERENCES Person(BusinessEntityID),
+      ContactTypeID INTEGER PRIMARY KEY REFERENCES ContactType(ContactTypeID),
+    );""")
+
+    expected_4 = textwrap.dedent("""
+    CREATE TABLE `EmailAddress` (
+      BusinessEntityID INTEGER PRIMARY KEY REFERENCES Person(BusinessEntityID),
+      EmailAddressID INTEGER PRIMARY KEY,
+      EmailAddress TEXT,
+    );""")
+
+    assert len(chunks) == 4
+
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[1].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_2.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[2].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_3.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[3].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_4.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+def test_chunk_dts_sql_schema_two_chunks():
+    schema = textwrap.dedent("""
+    CREATE TABLE `Person` (
+      BusinessEntityID INTEGER REFERENCES BusinessEntity(BusinessEntityID),
+      FirstName TEXT,
+      MiddleName TEXT,
+      LastName TEXT,
+    );
+    CREATE TABLE `BusinessEntity` (
+      BusinessEntityID INTEGER,
+      rowguid TEXT PRIMARY KEY,
+      ModifiedDate DATETIME
+    );
+    CREATE TABLE `BusinessEntityContact` (
+      BusinessEntityID INTEGER PRIMARY KEY REFERENCES BusinessEntity(BusinessEntityID),
+      PersonID INTEGER PRIMARY KEY REFERENCES Person(BusinessEntityID),
+      ContactTypeID INTEGER PRIMARY KEY REFERENCES ContactType(ContactTypeID),
+    );
+    CREATE TABLE `EmailAddress` (
+      BusinessEntityID INTEGER PRIMARY KEY REFERENCES Person(BusinessEntityID),
+      EmailAddressID INTEGER PRIMARY KEY,
+      EmailAddress TEXT,
+    );
+    """)
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 25
+
+    chunks = chunk_dts_ddl(schema, mock_tokenizer)
+
+    expected_1 = textwrap.dedent("""
+    CREATE TABLE `Person` (
+      BusinessEntityID INTEGER REFERENCES BusinessEntity(BusinessEntityID),
+      FirstName TEXT,
+      MiddleName TEXT,
+      LastName TEXT,
+    );
+    CREATE TABLE `BusinessEntity` (
+      BusinessEntityID INTEGER,
+      rowguid TEXT PRIMARY KEY,
+      ModifiedDate DATETIME
+    );""")
+
+    expected_2 = textwrap.dedent("""
+    CREATE TABLE `BusinessEntityContact` (
+      BusinessEntityID INTEGER PRIMARY KEY REFERENCES BusinessEntity(BusinessEntityID),
+      PersonID INTEGER PRIMARY KEY REFERENCES Person(BusinessEntityID),
+      ContactTypeID INTEGER PRIMARY KEY REFERENCES ContactType(ContactTypeID),
+    );
+    CREATE TABLE `EmailAddress` (
+      BusinessEntityID INTEGER PRIMARY KEY REFERENCES Person(BusinessEntityID),
+      EmailAddressID INTEGER PRIMARY KEY,
+      EmailAddress TEXT,
+    );""")
+
+    assert len(chunks) == 2
+
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[1].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_2.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+

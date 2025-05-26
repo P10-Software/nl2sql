@@ -64,7 +64,7 @@ class AbstentionClassifier(nn.Module):
         self.classifier.load_state_dict(state_dict)
         self.classifier.to(self.model.device)
 
-    def fine_tune(self, data, epochs=3, lr=1e-4, batch_size=8, val_split=0.1, weight_decay=0.01):
+    def fine_tune(self, data, epochs=3, lr=1e-4, batch_size=8, val_split=0.1, weight_decay=0.01, save_path=HEAD_SAVE_LOCALE):
         dataset = SQLFeasibilityDataset(data, self.model.config.max_position_embeddings)
         torch.manual_seed(42)
         random.seed(42)
@@ -106,6 +106,7 @@ class AbstentionClassifier(nn.Module):
                 os.makedirs(os.path.dirname(HEAD_SAVE_LOCALE), exist_ok=True)
                 torch.save(self.state_dict(), HEAD_SAVE_LOCALE)
                 logger.info(f"Saved best classifier with F2: {best_f2:.4f}")
+        return best_f2
 
     def evaluate(self, dataloader, return_f2=False):
         self.eval()

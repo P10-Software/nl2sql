@@ -251,9 +251,11 @@ def find_relations_tables_dts(table: str, chunk: set[str], tables: list[str], co
     for table in tables:
         for table_reference_name in table_references:
             if f"TABLE `{table_reference_name}`" in table:
-                chunk_size = len(tokenizer(' '.join(chunk) + table, return_tensors="pt", truncation=False)["input_ids"][0])
-                if chunk_size > context_size:
-                    return chunk.update(selected_tables)
+                temp_chunk = chunk | selected_tables | {table}
+                chunk_size = len(tokenizer(' '.join(temp_chunk), return_tensors="pt", truncation=False)["input_ids"][0])
+                if chunk_size > context_size / 1.5:
+                    chunk.update(selected_tables)
+                    return
                 selected_tables.add(table)
 
     chunk.update(selected_tables)

@@ -795,7 +795,7 @@ CREATE TABLE `SalesOrderHeader` (
     mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
         "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
     })
-    mock_tokenizer.model_max_length = 25
+    mock_tokenizer.model_max_length = 1000
 
     chunk = set()
     tables = ["CREATE TABLE `OrderDate`", "CREATE TABLE `Customer`", "CREATE TABLE `SalesPerson`","CREATE TABLE `SalesTerritory`","CREATE TABLE `Address`","CREATE TABLE `TestColumn`", "CREATE TABLE `CurrencyRate`"]
@@ -804,5 +804,5 @@ CREATE TABLE `SalesOrderHeader` (
 
     find_relations_tables_dts(table, chunk, tables, 10000, mock_tokenizer)
 
-    print(chunk)
     assert chunk == expected
+

@@ -15,7 +15,7 @@ def objective(trial: optuna.Trial):
 
     model = AbstentionClassifier(frozen=True)
 
-    with open('', 'r') as fp:
+    with open(DATA_LOCALE, 'r') as fp:
         data = json.load(fp)
 
     f2_score = model.fine_tune(

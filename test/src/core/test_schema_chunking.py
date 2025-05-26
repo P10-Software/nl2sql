@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 import textwrap
 import pytest
 
-from src.core.schema_chunking import chunk_mschema, _find_relations, chunk_dts_ddl
+from src.core.schema_chunking import chunk_mschema, _find_relations, chunk_dts_ddl, find_relations_tables_dts
 
 def test_chunk_mschema_no_relations():
     mschema = textwrap.dedent("""
@@ -259,7 +259,7 @@ def test_k1_chunk_mschema_relations():
     【Schema】
     # Table: test_4
     [(col_b:REAL),
-    (col_a:TEXT),
+(col_a:TEXT),
     (col_t:TEXT)]
     【Foreign keys】
     test_4.col_a=test_1.col_a""")
@@ -772,3 +772,37 @@ def test_chunk_dts_sql_schema_two_chunks():
     expected_lines = set(line.strip() for line in expected_2.strip().splitlines() if line.strip())
     assert actual_lines == expected_lines
 
+def test_find_dts_relations():  
+    table = textwrap.dedent("""
+CREATE TABLE `SalesOrderHeader` (
+  SalesOrderID INTEGER,
+  OrderDate DATETIME,
+  SalesOrderNumber TEXT PRIMARY KEY,
+  PurchaseOrderNumber TEXT,
+  AccountNumber TEXT,
+  CustomerID INTEGER REFERENCES Customer(None),
+  SalesPersonID INTEGER REFERENCES SalesPerson(None),
+  TerritoryID INTEGER REFERENCES SalesTerritory(None),
+  BillToAddressID INTEGER REFERENCES Address(None),
+  ShipToAddressID INTEGER REFERENCES Address(None),
+  CreditCardApprovalCode TEXT,
+  CurrencyRateID INTEGER REFERENCES CurrencyRate(None),
+  rowguid TEXT PRIMARY KEY,
+  ModifiedDate DATETIME
+);""")
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 25
+
+    chunk = set()
+    tables = ["CREATE TABLE `OrderDate`", "CREATE TABLE `Customer`", "CREATE TABLE `SalesPerson`","CREATE TABLE `SalesTerritory`","CREATE TABLE `Address`","CREATE TABLE `TestColumn`", "CREATE TABLE `CurrencyRate`"]
+
+    expected = {"CREATE TABLE `Customer`", "CREATE TABLE `SalesPerson`","CREATE TABLE `SalesTerritory`","CREATE TABLE `Address`","CREATE TABLE `CurrencyRate`"}
+
+    find_relations_tables_dts(table, chunk, tables, 10000, mock_tokenizer)
+
+    print(chunk)
+    assert chunk == expected

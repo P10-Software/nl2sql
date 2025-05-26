@@ -1,6 +1,67 @@
 from src.common.logger import get_logger
+import sqlite3
+
+from src.database import database
 
 logger = get_logger(__name__)
+
+def get_all_table_names(db_uri: str) -> list[str]:
+    conn = sqlite3.connect(db_uri)
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    table_names = cursor.fetchall()
+    conn.close()
+    return [table_name[0] for table_name in table_names]
+
+def get_table_schema_with_samples(
+    db_uri: str, table_name: str, sample_limit: int = 0
+) -> str:
+    conn = sqlite3.connect(db_uri)
+    cursor = conn.cursor()
+
+    # Fetch table schema
+    cursor.execute(f"PRAGMA table_info(`{table_name}`);")
+    columns = cursor.fetchall()
+    cursor.execute(f"PRAGMA foreign_key_list(`{table_name}`);")
+    foreign_keys = cursor.fetchall()
+    cursor.execute(f"PRAGMA index_list(`{table_name}`);")
+    primary_key_indices = cursor.fetchall()
+    primary_key_columns = []
+
+    for index_info in primary_key_indices:
+        index_name = index_info[1]
+        cursor.execute(f"PRAGMA index_info(`{index_name}`);")
+        index_columns = cursor.fetchall()
+        primary_key_columns.extend(column[2] for column in index_columns)
+
+    # Construct CREATE TABLE statement
+    schema_str = f"CREATE TABLE `{table_name}` (\n"
+    for column in columns:
+        column_name = column[1]
+        data_type = column[2]
+        schema_str += f"  {column_name} {data_type}"
+        if column_name in primary_key_columns:
+            schema_str += " PRIMARY KEY"
+        for foreign_key in foreign_keys:
+            if column_name == foreign_key[3]:
+                schema_str += f" REFERENCES {foreign_key[2]}({foreign_key[4]})"
+
+        schema_str += ",\n"
+    schema_str = schema_str.rstrip(",\n")
+    schema_str += "\n);\n"
+
+    
+    cursor.execute(f"SELECT * FROM `{table_name}` LIMIT {sample_limit};")
+    sample_rows = cursor.fetchall()
+
+    if len(sample_rows) > 0:
+        schema_str += f"Sample rows from `{table_name}`:\n"
+        for row in sample_rows:
+            formatted_row = ", ".join(str(item) for item in row)
+            schema_str += f"{formatted_row}\n"
+
+    conn.close()
+    return schema_str
 
 def chunk_mschema(mschema: str, tokenizer, with_relations: bool, k: int = 0) -> list[str]:
     """
@@ -147,3 +208,104 @@ def chunk_dts_ddl(ddl_schema: str, tokenizer, k: int = 0) -> list[str]:
         chunks.append(' '.join(chunk))
 
     return chunks
+
+def chunk_dts_ddl_relations(ddl_schema: str, tokenizer, k: int = 0) -> list[str]:
+    """
+    Chunks DDL schema, as defined by dts_sql implenentation, into smaller chunks with reltions.
+    Args:
+        - ddl_schema (str)
+        - toknizer: Model tokenizer
+        - k (int): The amount of tables in each chunk
+    """
+    context_size = _get_context_size(tokenizer)
+
+    split_schema = ddl_schema.split(";")
+    split_schema.pop() # Remove last empty entry due to splitting on ';'
+    tables = [table + ';' for table in split_schema]
+
+    chunks = []
+    chunk = set()
+    for table in tables:
+        chunk_size = len(tokenizer(' '.join(chunk) + table, return_tensors="pt", truncation=False)["input_ids"][0])
+
+        if (k > 0 and len(chunk) >= k) or chunk_size > chunk_size // 2:
+            if chunk:
+                chunks.append(' '.join(chunk))
+            chunk = set()
+            chunk.add(table)
+            find_relations_tables_dts(table, chunk, tables, context_size, tokenizer)
+        else:
+            chunk.add(table)
+            find_relations_tables_dts(table, chunk, tables, context_size, tokenizer)
+    if chunk:
+        chunks.append(' '.join(chunk))
+
+    return chunks
+
+def find_relations_tables_dts(table: str, chunk: set[str], tables: list[str], context_size: int, tokenizer) -> None:
+    table_reference_split = table.split('REFERENCES')[1:]
+    table_references = {reference.split('(')[0].strip() for reference in table_reference_split}
+
+    selected_tables = set()
+
+    for table in tables:
+        for table_reference_name in table_references:
+            if f"TABLE `{table_reference_name}`" in table:
+                chunk_size = len(tokenizer(' '.join(chunk) + table, return_tensors="pt", truncation=False)["input_ids"][0])
+                if chunk_size > context_size:
+                    return chunk.update(selected_tables)
+                selected_tables.add(table)
+
+    chunk.update(selected_tables)
+
+
+if __name__ == "__main__":
+    db_uri = ".local/train/train_databases/works_cycles/works_cycles.sqlite"
+    # table_names = get_all_table_names(db_uri)
+    # database_schema = ""
+    # for table_name in table_names:
+    #     database_schema = database_schema + get_table_schema_with_samples(db_uri, table_name, 0) + '\n'
+    test = """CREATE TABLE `SalesOrderHeader` (
+  SalesOrderID INTEGER,
+  RevisionNumber INTEGER,
+  OrderDate DATETIME,
+  DueDate DATETIME,
+  ShipDate DATETIME,
+  Status INTEGER,
+  OnlineOrderFlag INTEGER,
+  SalesOrderNumber TEXT PRIMARY KEY,
+  PurchaseOrderNumber TEXT,
+  AccountNumber TEXT,
+  CustomerID INTEGER REFERENCES Customer(None),
+  SalesPersonID INTEGER REFERENCES SalesPerson(None),
+  TerritoryID INTEGER REFERENCES SalesTerritory(None),
+  BillToAddressID INTEGER REFERENCES Address(None),
+  ShipToAddressID INTEGER REFERENCES Address(None),
+  ShipMethodID INTEGER REFERENCES Address(None),
+  CreditCardID INTEGER REFERENCES CreditCard(None),
+  CreditCardApprovalCode TEXT,
+  CurrencyRateID INTEGER REFERENCES CurrencyRate(None),
+  SubTotal REAL,
+  TaxAmt REAL,
+  Freight REAL,
+  TotalDue REAL,
+  Comment TEXT,
+  rowguid TEXT PRIMARY KEY,
+  ModifiedDate DATETIME
+);"""
+
+    find_relations_tables_dts(test, [], [], 10000, 2)
+    
+    # reference_split = database_schema.split("REFERENCES")
+    # for reference in reference_split:
+    #     reference = reference.split("(")[0]
+    # print(database_schema)
+    # print(reference_split[1])
+    # print(reference_split[1].split("(")[0].strip())
+    # for reference in reference_split:
+    #     print(reference)
+    # chunks = chunk_dts_ddl_relations(database_schema, 2)
+    # for chunk in chunks:
+    #     print(chunk)
+    #
+    # print(len(chunks))

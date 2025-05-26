@@ -864,7 +864,6 @@ def test_chunk_dts_sql_schema_relations():
         Name TEXT
     );""")
 
-    print(chunks[1])
     assert len(chunks) == 3
 
     actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
@@ -879,5 +878,109 @@ def test_chunk_dts_sql_schema_relations():
     expected_lines = set(line.strip() for line in expected_3.strip().splitlines() if line.strip())
     assert actual_lines == expected_lines
 
+def test_chunk_dts_sql_schema_relations_single_chunk():
+    ddl_schema = textwrap.dedent("""
+    CREATE TABLE `test1` (
+        ID1 INTEGER,
+        Name TEXT
+    );
+    CREATE TABLE `test2` (
+        ID2 INTEGER
+    );
+    CREATE TABLE `test3` (
+        ID3 INTEGER,
+        ID4 INTEGER REFERENCES test4(None)
+    );
+    CREATE TABLE `test4` (
+        ID4 INTEGER,
+        ID1 INTEGER REFERENCES test1(None),
+        Values REAL
+    );""")
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 100
+
+    chunks = chunk_dts_ddl_relations(ddl_schema, mock_tokenizer, 0)
+
+    expected = textwrap.dedent("""
+    CREATE TABLE `test1` (
+        ID1 INTEGER,
+        Name TEXT
+    );
+    CREATE TABLE `test2` (
+        ID2 INTEGER
+    );
+    CREATE TABLE `test3` (
+        ID3 INTEGER,
+        ID4 INTEGER REFERENCES test4(None)
+    );
+    CREATE TABLE `test4` (
+        ID4 INTEGER,
+        ID1 INTEGER REFERENCES test1(None),
+        Values REAL
+    );""")
+
+    assert len(chunks) == 1
+
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+def test_chunk_dts_sql_schema_relations_k_1():
+    ddl_schema = textwrap.dedent("""
+    CREATE TABLE `test1` (
+        ID1 INTEGER,
+        Name TEXT
+    );
+    CREATE TABLE `test2` (
+        ID2 INTEGER
+    );
+    CREATE TABLE `test3` (
+        ID3 INTEGER,
+        ID4 INTEGER REFERENCES test4(None)
+    );""")
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 1000
+
+    # Expects a chunk for each table event with large context.
+    chunks = chunk_dts_ddl_relations(ddl_schema, mock_tokenizer, 1)
+
+    expected_1 = textwrap.dedent("""
+    CREATE TABLE `test1` (
+        ID1 INTEGER,
+        Name TEXT
+    );""")
+
+    expected_2 = textwrap.dedent("""
+    CREATE TABLE `test2` (
+        ID2 INTEGER
+    );""")
+
+    expected_3 = textwrap.dedent("""
+    CREATE TABLE `test3` (
+        ID3 INTEGER,
+        ID4 INTEGER REFERENCES test4(None)
+    );""")
+
+    assert len(chunks) == 3
+
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[1].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_2.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[2].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_3.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
 
 

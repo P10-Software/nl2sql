@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 import textwrap
 import pytest
 
-from src.core.schema_chunking import chunk_mschema, _find_relations, chunk_dts_ddl, find_relations_tables_dts
+from src.core.schema_chunking import chunk_mschema, _find_relations, chunk_dts_ddl, chunk_dts_ddl_relations, find_relations_tables_dts
 
 def test_chunk_mschema_no_relations():
     mschema = textwrap.dedent("""
@@ -805,4 +805,79 @@ CREATE TABLE `SalesOrderHeader` (
     find_relations_tables_dts(table, chunk, tables, 10000, mock_tokenizer)
 
     assert chunk == expected
+
+def test_chunk_dts_sql_schema_relations():
+    ddl_schema = textwrap.dedent("""
+    CREATE TABLE `test1` (
+        ID1 INTEGER,
+        Name TEXT
+    );
+    CREATE TABLE `test2` (
+        ID2 INTEGER
+    );
+    CREATE TABLE `test3` (
+        ID3 INTEGER,
+        ID4 INTEGER REFERENCES test4(None)
+    );
+    CREATE TABLE `test4` (
+        ID4 INTEGER,
+        ID1 INTEGER REFERENCES test1(None),
+        Values REAL
+    );""")
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 20
+
+    chunks = chunk_dts_ddl_relations(ddl_schema, mock_tokenizer, 0)
+
+    expected_1 = textwrap.dedent("""
+    CREATE TABLE `test1` (
+        ID1 INTEGER,
+        Name TEXT
+    );
+    CREATE TABLE `test2` (
+        ID2 INTEGER
+    );""")
+
+    expected_2 = textwrap.dedent("""
+    CREATE TABLE `test3` (
+        ID3 INTEGER,
+        ID4 INTEGER REFERENCES test4(None)
+    );
+    CREATE TABLE `test4` (
+        ID4 INTEGER,
+        ID1 INTEGER REFERENCES test1(None),
+        Values REAL
+    );""")
+
+    expected_3 = textwrap.dedent("""
+    CREATE TABLE `test4` (
+        ID4 INTEGER,
+        ID1 INTEGER REFERENCES test1(None),
+        Values REAL
+    );
+    CREATE TABLE `test1` (
+        ID1 INTEGER,
+        Name TEXT
+    );""")
+
+    print(chunks[1])
+    assert len(chunks) == 3
+
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[1].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_2.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[2].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_3.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+
 

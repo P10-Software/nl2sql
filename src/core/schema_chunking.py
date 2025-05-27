@@ -147,3 +147,49 @@ def chunk_dts_ddl(ddl_schema: str, tokenizer, k: int = 0) -> list[str]:
         chunks.append(' '.join(chunk))
 
     return chunks
+
+def chunk_dts_ddl_relations(ddl_schema: str, tokenizer, k: int = 0) -> list[str]:
+    """
+    Chunks DDL schema, as defined by dts_sql implenentation, into smaller chunks with reltions.
+    Args:
+        - ddl_schema (str)
+        - toknizer: Model tokenizer
+        - k (int): The amount of tables in each chunk
+    """
+    context_size = _get_context_size(tokenizer)
+
+    split_schema = ddl_schema.split(";")
+    split_schema.pop() # Remove last empty entry due to splitting on ';'
+    tables = [table + ';' for table in split_schema]
+
+    chunks = []
+    chunk = set()
+    for table in tables:
+        chunk_size = len(tokenizer(' '.join(chunk) + table, return_tensors="pt", truncation=False)["input_ids"][0])
+
+        if (k > 0 and len(chunk) >= k) or chunk_size > context_size // 2:
+            if chunk:
+                chunks.append(' '.join(chunk))
+            chunk = set()
+            chunk.add(table)
+            find_relations_tables_dts(table, chunk, tables, context_size, tokenizer)
+        else:
+            chunk.add(table)
+            find_relations_tables_dts(table, chunk, tables, context_size, tokenizer)
+    if chunk:
+        chunks.append(' '.join(chunk))
+
+    return chunks
+
+def find_relations_tables_dts(table: str, chunk: set[str], tables: list[str], context_size: int, tokenizer) -> None:
+    table_reference_split = table.split('REFERENCES')[1:]
+    table_references = {reference.split('(')[0].strip() for reference in table_reference_split}
+
+    for table in tables:
+        for table_reference_name in table_references:
+            if f"TABLE `{table_reference_name}`" in table:
+                chunk_size = len(tokenizer(' '.join(chunk) + table, return_tensors="pt", truncation=False)["input_ids"][0])
+                if chunk_size < context_size // 1.5:
+                    chunk.add(table)
+                else:
+                    return

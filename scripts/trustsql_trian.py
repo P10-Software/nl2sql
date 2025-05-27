@@ -5,12 +5,13 @@ from transformers import (
     EarlyStoppingCallback,
     DataCollatorWithPadding,
     AutoModelForSeq2SeqLM,
-    AutoModelForCausalLM)
+    AutoModelForCausalLM,
+    BitsAndBytesConfig
+)
 from datasets import load_dataset
 from src.common.logger import get_logger
 import numpy as np
 import torch
-from transformers import BitsAndBytesConfig
 from peft import get_peft_model, LoraConfig, TaskType
 import gc
 

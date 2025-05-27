@@ -10,38 +10,9 @@ def extract_db_id(m_schema: str) -> str:
 
 def extract_table_blocks(mschema: str):
     """Extract each table name and its column block (everything between square brackets)."""
-    table_blocks = []
     pattern = r"# Table: (\w+)\s*\[\s*(.*?)\s*\](?=\s*# Table:|\s*【|\Z)"  # match until next table or end
     matches = re.findall(pattern, mschema, re.DOTALL)
     return matches
-
-def split_columns(block: str):
-    """Split column definitions on top-level commas only."""
-    columns = []
-    current = ''
-    bracket_depth = 0
-    paren_depth = 0
-
-    for char in block:
-        if char == '[':
-            bracket_depth += 1
-        elif char == ']':
-            bracket_depth -= 1
-        elif char == '(':
-            paren_depth += 1
-        elif char == ')':
-            paren_depth -= 1
-
-        if char == ',' and bracket_depth == 0 and paren_depth == 0:
-            if current.strip():
-                columns.append(current.strip())
-            current = ''
-        else:
-            current += char
-
-    if current.strip():
-        columns.append(current.strip())
-    return columns
 
 def parse_mschema(mschema: str) -> dict:
     table_column_counts = {}

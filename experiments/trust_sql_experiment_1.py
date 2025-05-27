@@ -8,6 +8,7 @@ PRE_ABSTENTION_PATH = ".local/trust_sql/sql_coder_infeasible/final/"
 POST_ABSTENTION_PATH = ".local/trust_sql/sql_coder_error/final/"
 TEST_SET_PATH = ".local/bird_abstention_eval_set.json"
 RESULT_PATH = ".local/abstention/bird/trust_pipe.json"
+PRE_FEASIBLE_PATH = ".local/abstention/pre_feasible_dataset_trust.json"
 
 with open(TEST_SET_PATH, "r") as file:
     test_set = json.load(file)
@@ -63,6 +64,7 @@ def get_error_detect_prompt(schema, question, sql):
 """
 
 result = []
+pre_feasible_set = []
 true_pos = 0
 false_pos = 0
 true_neg = 0
@@ -79,7 +81,7 @@ for example in tqdm(test_set):
     )
     pre_classification = sqlcoder_tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-    if pre_classification.strip() == "I do not know":
+    if "I do not know" in pre_classification.strip():
         result.append({"question": example["question"], "goal feasibility": example["label"], "predicted feasibility": 0})
 
         if example["label"] == 0:
@@ -88,6 +90,8 @@ for example in tqdm(test_set):
             false_pos += 1
 
         continue
+    else:
+        pre_feasible_set.append(example)
 
     sql_prompt = get_t5_prompt(example["question"], example["schema"])
     inputs = t5_tokenizer(sql_prompt, return_tensors="pt").to(t5_model.device)
@@ -104,7 +108,7 @@ for example in tqdm(test_set):
     )
     post_classification = sqlcoder_tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-    if post_classification.strip() == "incorrect":
+    if  "incorrect" in post_classification.strip():
         feasibility_prediction = 0
 
         if example["label"] == 0:
@@ -128,3 +132,6 @@ result.append({"precision": precision, "recall": recall, "f2": f2})
 
 with open(RESULT_PATH, "w") as file:
     json.dump(result, file, indent=4)
+
+with open(PRE_FEASIBLE_PATH, "w") as file:
+    json.dump(pre_feasible_set, file, indent=4)

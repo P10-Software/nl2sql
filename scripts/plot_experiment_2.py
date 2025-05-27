@@ -19,12 +19,12 @@ plt.plot(thresholds, recall_ExSL_column, 'bs-', label='Recall Column')
 plt.plot(thresholds, size_reduction_ExSL_column, 'r:*', label='Schema size reduction Column')
 
 # Axis labels and title
-plt.xlabel('Schema Linking Threshold')
-plt.ylabel('Performance')
-plt.title('Balance between schema size reduction and recall based on threshold')
+plt.xlabel('Schema Linking Threshold', fontsize=16)
+plt.ylabel('Performance', fontsize=16)
+plt.title('Balance between schema size reduction and recall based on threshold', fontsize=16)
 
 # Add legend and grid
-plt.legend()
+plt.legend(fontsize=16)
 plt.grid(True)
 
 # Show plot

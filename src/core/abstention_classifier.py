@@ -1,4 +1,4 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 from torch.utils.data import Dataset, DataLoader, random_split
 from src.common.logger import get_logger
@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 class AbstentionClassifier(nn.Module):
     def __init__(self, frozen=True):
         super().__init__()
-        self.model = AutoModelForCausalLM.from_pretrained(
+        self.model = AutoModel.from_pretrained(
             MODEL_NAME,
             device_map='auto',
             torch_dtype='auto'
@@ -31,11 +31,10 @@ class AbstentionClassifier(nn.Module):
 
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
         self.hidden_size = self.model.config.hidden_size
-        self.classifier = nn.Linear(self.hidden_size, 1)
-        self.classifier.to(self.model.device)
+        self.classifier = nn.Linear(self.hidden_size, 1).to(self.model.device, dtype=self.model.dtype)
 
     def forward(self, input_ids, attention_mask=None):
-        outputs = self.model.transformer(input_ids=input_ids, attention_mask=attention_mask)
+        outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False)
         last_hidden = outputs.last_hidden_state
 
         pooled = last_hidden[:, -1, :]
@@ -65,7 +64,7 @@ class AbstentionClassifier(nn.Module):
         self.classifier.to(self.model.device)
 
     def fine_tune(self, data, epochs=3, lr=1e-4, batch_size=8, val_split=0.1, weight_decay=0.01, save_path=HEAD_SAVE_LOCALE):
-        dataset = SQLFeasibilityDataset(data, self.model.config.max_position_embeddings)
+        dataset = SQLFeasibilityDataset(data, 8192, MODEL_NAME, self.model.dtype)
         torch.manual_seed(42)
         random.seed(42)
 
@@ -141,11 +140,12 @@ def load_abstention_classifier(path: str):
 
 
 class SQLFeasibilityDataset(Dataset):
-    def __init__(self, data, max_length, model=MODEL_NAME):
+    def __init__(self, data, max_length, model=MODEL_NAME, dtype=torch.float):
         super().__init__()
         self.tokenizer = AutoTokenizer.from_pretrained(model)
         self.data = data
         self.max_length = max_length
+        self.dtype = dtype
 
     def __len__(self):
         return len(self.data)
@@ -161,7 +161,7 @@ class SQLFeasibilityDataset(Dataset):
         inputs = self.tokenizer(prompt, return_tensors='pt', padding='max_length', max_length=self.max_length, truncation=True)
         input_ids = inputs['input_ids'].squeeze(0)
         attention_mask = inputs['attention_mask'].squeeze(0)
-        label = torch.tensor(sample['feasible'], dtype=torch.float)
+        label = torch.tensor(sample['feasible'], dtype=self.dtype)
 
         return {
             'input_ids': input_ids,

@@ -8,7 +8,6 @@ from transformers import (
     AutoModelForCausalLM)
 from datasets import load_dataset
 from src.common.logger import get_logger
-from scipy.stats import entropy
 import numpy as np
 import torch
 from transformers import BitsAndBytesConfig
@@ -73,8 +72,7 @@ def train_t5_sql_gen():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    logits_list = []
-    labels = []
+    entropy_label_pairs = []
 
     model.eval()
 
@@ -92,15 +90,16 @@ def train_t5_sql_gen():
         with torch.no_grad():
             outputs = model(**inputs)
             logits = outputs.logits
-
-        logits_list.append(logits.cpu())  # move to CPU to save memory
+            probs = torch.softmax(logits, dim=-1)
+            entropy = -(probs * probs.log()).sum(dim=-1).mean().item()  # mean over sequence length
 
         # Decode and compare
         generated_sql = tokenizer.decode(output[0], skip_special_tokens=True)
-        correct = 1 if generated_sql.strip() == example['sql'].strip() else 0
-        labels.append(correct)
+        label = 1 if generated_sql.strip() == example['sql'].strip() else 0
 
-    maxent_threshold = find_t5_maxent_threshold(logits_list, labels)
+        entropy_label_pairs.append((label, entropy))
+
+    maxent_threshold = find_t5_maxent_threshold(entropy_label_pairs)
 
     model.config.maxent_threshold = maxent_threshold
 
@@ -313,19 +312,12 @@ def train_sqlcoder_error_detect():
     tokenizer.save_pretrained(f"{SAVE_LOCALE}/sql_coder_error/tokenizer")
 
 
-def find_t5_maxent_threshold(logits_list, labels):
-    def compute_entropy(probs):
-        return entropy(probs, base=2)
+def find_t5_maxent_threshold(entropy_label_pairs):
+    # for label, entropy in entropy_label_pairs:
 
-    entropies = []
-    for logits in logits_list:
-        probs = torch.softmax(logits, dim=-1).squeeze(0).cpu().numpy()
-        avg_entropy = np.mean([compute_entropy(p) for p in probs])
-        entropies.append(avg_entropy)
+    # sample_scores = list(zip(entropies, [1 if is_correct else -1 for is_correct in labels]))
 
-    sample_scores = list(zip(entropies, [1 if is_correct else -1 for is_correct in labels]))
-
-    sorted_scores = sorted(sample_scores, key=lambda x: x[0])
+    sorted_scores = sorted(entropy_label_pairs, key=lambda x: x[0])
 
     cumulative = np.cumsum([s for _, s in sorted_scores])
     best_idx = int(np.argmax(cumulative))

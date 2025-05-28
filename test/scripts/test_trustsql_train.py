@@ -22,6 +22,4 @@ with patch.dict('sys.modules', {
     def test_find_t5_maxent_threshold(input, expected_threshold):
         threshold = find_t5_maxent_threshold(input)
 
-        print(threshold)
-
         assert pytest.approx(threshold, 0.001) == expected_threshold

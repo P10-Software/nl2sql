@@ -319,7 +319,6 @@ def find_t5_maxent_threshold(entropy_label_pairs: list[tuple[int, float]]) -> fl
     temp_score = 0
 
     sorted_scores = sorted(entropy_label_pairs, key=lambda x: x[1])
-    print(sorted_scores)
 
     for label, entropy in sorted_scores:
         temp_score = temp_score + 1 if label == 1 else temp_score - 1

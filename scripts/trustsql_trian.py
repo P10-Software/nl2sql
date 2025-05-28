@@ -313,18 +313,22 @@ def train_sqlcoder_error_detect():
     tokenizer.save_pretrained(f"{SAVE_LOCALE}/sql_coder_error/tokenizer")
 
 
-def find_t5_maxent_threshold(entropy_label_pairs):
-    # for label, entropy in entropy_label_pairs:
+def find_t5_maxent_threshold(entropy_label_pairs: list[tuple[int, float]]) -> float:
+    cumulative_score = 0
+    threshold = 0
+    temp_score = 0
 
-    # sample_scores = list(zip(entropies, [1 if is_correct else -1 for is_correct in labels]))
+    sorted_scores = sorted(entropy_label_pairs, key=lambda x: x[1])
+    print(sorted_scores)
 
-    sorted_scores = sorted(entropy_label_pairs, key=lambda x: x[0])
+    for label, entropy in sorted_scores:
+        temp_score = temp_score + 1 if label == 1 else temp_score - 1
+        
+        if temp_score > cumulative_score:
+            cumulative_score = temp_score
+            threshold = entropy
 
-    cumulative = np.cumsum([s for _, s in sorted_scores])
-    best_idx = int(np.argmax(cumulative))
-    best_threshold = sorted_scores[best_idx][0]
-
-    return best_threshold
+    return  threshold
 
 
 def cleanup_memory():

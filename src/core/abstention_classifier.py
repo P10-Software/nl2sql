@@ -32,6 +32,12 @@ class AbstentionClassifier(nn.Module):
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
         self.hidden_size = self.model.config.hidden_size
         self.classifier = nn.Linear(self.hidden_size, 1).to(self.model.device, dtype=self.model.dtype)
+        self.prompt_template = (
+            "You are a data scientist, who has to vet questions from users.\n"
+            "You have received the question: \"{question}\" "
+            "for the database described by the following instructions: {schema}\n\n"
+            "You decide the question is: "
+        )
 
     def forward(self, input_ids, attention_mask=None):
         outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False)
@@ -42,12 +48,7 @@ class AbstentionClassifier(nn.Module):
         return logit
 
     def classify(self, user_question, schema, threshold=0.5):
-        prompt = (
-            "You are a data scientist, who has to vet questions from users.\n"
-            f"You have received the question: \"{user_question}\" "
-            f"for the database described by the following instructions: {schema}\n\n"
-            "You decide the question is: "
-        )
+        prompt = self.prompt_template.format(question=user_question, schema=schema)
         inputs = self.tokenizer(prompt, return_tensors='pt')
         with torch.no_grad():
             attention_mask = inputs.get('attention_mask')
@@ -64,7 +65,7 @@ class AbstentionClassifier(nn.Module):
         self.classifier.to(self.model.device)
 
     def fine_tune(self, data, epochs=3, lr=1e-4, batch_size=8, val_split=0.1, weight_decay=0.01, save_path=HEAD_SAVE_LOCALE):
-        dataset = SQLFeasibilityDataset(data, 8192, MODEL_NAME, self.model.dtype)
+        dataset = SQLFeasibilityDataset(data, 8192, prompt_template=self.prompt_template, model=MODEL_NAME, dtype=self.model.dtype)
         torch.manual_seed(42)
         random.seed(42)
 
@@ -139,25 +140,71 @@ def load_abstention_classifier(path: str):
     return model
 
 
+class AbstentionClassifierEmbeddingBased(AbstentionClassifier):
+    def __init__(self, frozen=True):
+        super().__init__(frozen)
+        self.yes_token, self.no_token = '<<yes>>', '<<no>>'
+        self.classifier = nn.Linear(self.hidden_size * 2, 1).to(self.device)
+        self.prompt_template = (
+            "You are a data scientist, who has to vet questions from users.\n"
+            "You have received the question: \"{question}\" "
+            "for the database described by the following instructions: {schema}\n\n"
+            "You decide the question is: <<yes>> or <<no>>"
+        )
+
+    def forward(self, input_ids, attention_mask=None):
+        outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+        hidden_states = outputs.last_hidden_state
+
+        batch_size = input_ids.size(0)
+        logits = []
+
+        tokens = [self.tokenizer.convert_ids_to_tokens(seq) for seq in input_ids]
+
+        for i in range(batch_size):
+            try:
+                yes_idx = tokens[i].index(self.yes_token)
+                no_idx = tokens[i].index(self.no_token)
+            except ValueError:
+                logger.error(f"Missing <<yes>> or <<no>> token in input sample.")
+
+            yes_emb = hidden_states[i, yes_idx, :]
+            no_emb = hidden_states[i, no_idx, :]
+            combined = torch.cat([yes_emb, no_emb], dim=1)
+            logit = self.classifier(combined)
+            logits.append(logit)
+
+        return torch.stack(logits)
+
+    def classify(self, user_question, schema, threshold=0.5):
+        prompt = self.prompt_template.format(question=user_question, schema=schema)
+
+        inputs = self.tokenizer(prompt, return_tensors='pt')
+        input_ids = inputs['input_ids'].to(self.device)
+        attention_mask = inputs['attention_mask'].to(self.device)
+
+        with torch.no_grad():
+            logit = self.forward(input_ids, attention_mask)
+            prob = torch.sigmoid(logit).item()
+
+        return "feasible" if prob > threshold else "infeasible"
+
+
 class SQLFeasibilityDataset(Dataset):
-    def __init__(self, data, max_length, model=MODEL_NAME, dtype=torch.float):
+    def __init__(self, data, max_length, prompt_template, model=MODEL_NAME, dtype=torch.float):
         super().__init__()
         self.tokenizer = AutoTokenizer.from_pretrained(model)
         self.data = data
         self.max_length = max_length
         self.dtype = dtype
+        self.prompt_template = prompt_template
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, index):
         sample = self.data[index]
-        prompt = (
-            "You are a data scientist, who has to vet questions from users.\n"
-            f"You have received the question: \"{sample['question']}\" "
-            f"for the database described by the following instructions: {sample['schema']}\n\n"
-            "You decide the question is: "
-        )
+        prompt = self.prompt_template.format(question=sample['question'], schema=sample['schema'])
         inputs = self.tokenizer(prompt, return_tensors='pt', padding='max_length', max_length=self.max_length, truncation=True)
         input_ids = inputs['input_ids'].squeeze(0)
         attention_mask = inputs['attention_mask'].squeeze(0)

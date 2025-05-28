@@ -314,7 +314,7 @@ def train_sqlcoder_error_detect():
 
 
 def find_t5_maxent_threshold(entropy_label_pairs: list[tuple[int, float]]) -> float:
-    cumulative_score = 0
+    cumulative_score = float('-inf')
     threshold = 0
     temp_score = 0
 

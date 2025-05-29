@@ -170,8 +170,11 @@ class AbstentionClassifierEmbeddingBased(AbstentionClassifier):
 
             yes_emb = hidden_states[i, yes_idx, :]
             no_emb = hidden_states[i, no_idx, :]
-            combined = torch.cat([yes_emb, no_emb], dim=1)
-            logit = self.classifier(combined)
+
+            yes_score = self.classifier(yes_emb)
+            no_score = self.classifier(no_emb)
+
+            logit = torch.stack([no_score, yes_score], dim=0)
             logits.append(logit)
 
         return torch.stack(logits)

@@ -318,7 +318,7 @@ def find_t5_maxent_threshold(entropy_label_pairs: list[tuple[int, float]]) -> fl
     Returns the calibrated threshold for TrustSQL unified, based on uncertainty
     Returns -1 if no positive cumulative_score is possible
     """
-    cumulative_score = float('-inf')
+    cumulative_score = 0
     threshold = -1
     temp_score = 0
 

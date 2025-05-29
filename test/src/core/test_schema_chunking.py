@@ -1,253 +1,986 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 import textwrap
+import pytest
+
+from src.core.schema_chunking import chunk_mschema, _find_relations, chunk_dts_ddl, chunk_dts_ddl_relations, find_relations_tables_dts
+
+def test_chunk_mschema_no_relations():
+    mschema = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]
+    # Table: test_2
+    [(col_c:INT)]
+    # Table: test_3
+    [(col_c:INT)]
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_t:TEXT)]
+    """)
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 8
+
+    chunks = chunk_mschema(mschema, mock_tokenizer, False)
+
+    expected_1 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]
+    # Table: test_2
+    [(col_c:INT)]""")
+
+    expected_2 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_3
+    [(col_c:INT)]""")
+
+    expected_3 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_t:TEXT)]
+    """)
+
+    assert len(chunks) == 3
+
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[1].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_2.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[2].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_3.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
 
 
-with patch.dict('sys.modules', {
-    'torch': MagicMock()
-}):
-    from src.core.schema_chunking import chunk_mschema, _find_relations
+def test_chunk_mschema_no_relations_with_relations():
+    mschema = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]
+    # Table: test_2
+    [(col_c:INT)]
+    # Table: test_3
+    [(col_c:INT)]
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_t:TEXT)]
+    【Foreign keys】
+    test_4.col_a=test_1.col_a
+    """)
 
-    def test_chunk_mschema_no_relations():
-        mschema = textwrap.dedent("""
-        【SB_ID】 trial_metadata
-        【Schema】
-        # Table: test_1
-        [(col_a:TEXT)]
-        # Table: test_2
-        [(col_c:INT)]
-        # Table: test_3
-        [(col_c:INT)]
-        # Table: test_4
-        [(col_b:REAL),
-        (col_a:TEXT),
-        (col_t:TEXT)]
-        """)
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 8
 
-        # Create a mock tokenizer that returns a fixed number of tokens per table
-        mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
-            "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
-        })
+    chunks = chunk_mschema(mschema, mock_tokenizer, False)
 
-        # Mock model config
-        mock_model = MagicMock()
-        mock_model.model.config.max_position_embeddings = 8  # Tiny limit to force chunking
-        mock_model.tokenizer = mock_tokenizer
+    expected_1 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]
+    # Table: test_2
+    [(col_c:INT)]""")
 
-        chunks = chunk_mschema(mschema, mock_model, False)
+    expected_2 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_3
+    [(col_c:INT)]""")
 
-        expected_1 = textwrap.dedent("""
-        【SB_ID】 trial_metadata
-        【Schema】
-        # Table: test_1
-        [(col_a:TEXT)]
-        # Table: test_2
-        [(col_c:INT)]""")
+    expected_3 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_t:TEXT)]
+    """)
 
-        expected_2 = textwrap.dedent("""
-        【SB_ID】 trial_metadata
-        【Schema】
-        # Table: test_3
-        [(col_c:INT)]""")
+    assert len(chunks) == 3
+    
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
 
-        expected_3 = textwrap.dedent("""
-        【SB_ID】 trial_metadata
-        【Schema】
-        # Table: test_4
-        [(col_b:REAL),
-        (col_a:TEXT),
-        (col_t:TEXT)]
-        """)
+    actual_lines = set(line.strip() for line in chunks[1].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_2.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
 
-        assert len(chunks) == 3
-        assert chunks[0].strip() == expected_1.strip()
-        assert chunks[1].strip() == expected_2.strip()
-        assert chunks[2].strip() == expected_3.strip()
-
-
-    def test_chunk_mschema_no_relations_with_relations():
-        mschema = textwrap.dedent("""
-        【SB_ID】 trial_metadata
-        【Schema】
-        # Table: test_1
-        [(col_a:TEXT)]
-        # Table: test_2
-        [(col_c:INT)]
-        # Table: test_3
-        [(col_c:INT)]
-        # Table: test_4
-        [(col_b:REAL),
-        (col_a:TEXT),
-        (col_t:TEXT)]
-        【Foreign keys】
-        test_4.col_a=test_1.col_a
-        """)
-
-        # Create a mock tokenizer that returns a fixed number of tokens per table
-        mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
-            "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
-        })
-
-        # Mock model config
-        mock_model = MagicMock()
-        mock_model.model.config.max_position_embeddings = 8  # Tiny limit to force chunking
-        mock_model.tokenizer = mock_tokenizer
-
-        chunks = chunk_mschema(mschema, mock_model, False)
-
-        expected_1 = textwrap.dedent("""
-        【SB_ID】 trial_metadata
-        【Schema】
-        # Table: test_1
-        [(col_a:TEXT)]
-        # Table: test_2
-        [(col_c:INT)]""")
-
-        expected_2 = textwrap.dedent("""
-        【SB_ID】 trial_metadata
-        【Schema】
-        # Table: test_3
-        [(col_c:INT)]""")
-
-        expected_3 = textwrap.dedent("""
-        【SB_ID】 trial_metadata
-        【Schema】
-        # Table: test_4
-        [(col_b:REAL),
-        (col_a:TEXT),
-        (col_t:TEXT)]
-        """)
-
-        assert len(chunks) == 3
-        assert chunks[0].strip() == expected_1.strip()
-        assert chunks[1].strip() == expected_2.strip()
-        assert chunks[2].strip() == expected_3.strip()
+    actual_lines = set(line.strip() for line in chunks[2].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_3.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
 
 
-    def test_chunk_mschema_relations():
-        mschema = textwrap.dedent("""
-        【SB_ID】 trial_metadata
-        【Schema】
-        # Table: test_1
-        [(col_a:TEXT)]
-        # Table: test_2
-        [(col_c:INT)]
-        # Table: test_3
-        [(col_c:INT),
-        (col_a:TEXT)]
-        # Table: test_4
-        [(col_b:REAL),
-        (col_a:TEXT),
-        (col_t:TEXT)]
-        【Foreign keys】
-        test_3.col_a=test_1.col_a
-        test_4.col_a=test_1.col_a""")
+def test_chunk_mschema_relations():
+    mschema = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]
+    # Table: test_2
+    [(col_c:INT)]
+    # Table: test_3
+    [(col_c:INT),
+    (col_a:TEXT)]
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_t:TEXT)]
+    【Foreign keys】
+    test_3.col_a=test_1.col_a
+    test_4.col_a=test_1.col_a""")
 
-        # Create a mock tokenizer that returns a fixed number of tokens per table
-        mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
-            "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
-        })
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 8
 
-        # Mock model config
-        mock_model = MagicMock()
-        mock_model.model.config.max_position_embeddings = 8  # Tiny limit to force chunking
-        mock_model.tokenizer = mock_tokenizer
+    chunks = chunk_mschema(mschema, mock_tokenizer, True)
 
-        chunks = chunk_mschema(mschema, mock_model, True)
+    expected_1 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]
+    # Table: test_2
+    [(col_c:INT)]""")
 
-        expected_1 = textwrap.dedent("""
-        【SB_ID】 trial_metadata
-        【Schema】
-        # Table: test_1
-        [(col_a:TEXT)]
-        # Table: test_2
-        [(col_c:INT)]
-        【Foreign keys】""")
+    # Expected to include the table 1 as there is a relation
+    expected_2 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_3
+    [(col_c:INT),
+    (col_a:TEXT)]
+    # Table: test_1
+    [(col_a:TEXT)]
+    【Foreign keys】
+    test_3.col_a=test_1.col_a""")
 
-        # Expected to include the table 1 as there is a relation
-        expected_2 = textwrap.dedent("""
-        【SB_ID】 trial_metadata
-        【Schema】
-        # Table: test_3
-        [(col_c:INT),
-        (col_a:TEXT)]
-        # Table: test_1
-        [(col_a:TEXT)]
-        【Foreign keys】
-        test_3.col_a=test_1.col_a""")
+    # Should not have space to repeat table 1 again
+    expected_3 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_t:TEXT)]
+    【Foreign keys】
+    test_4.col_a=test_1.col_a""")
 
-        # Should not have space to repeat table 1 again
-        expected_3 = textwrap.dedent("""
-        【SB_ID】 trial_metadata
-        【Schema】
-        # Table: test_4
-        [(col_b:REAL),
-        (col_a:TEXT),
-        (col_t:TEXT)]
-        【Foreign keys】
-        test_4.col_a=test_1.col_a""")
+    assert len(chunks) == 3
 
-        assert len(chunks) == 3
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
 
-        actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
-        expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
-        assert actual_lines == expected_lines
+    actual_lines = set(line.strip() for line in chunks[1].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_2.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
 
-        actual_lines = set(line.strip() for line in chunks[1].strip().splitlines() if line.strip())
-        expected_lines = set(line.strip() for line in expected_2.strip().splitlines() if line.strip())
-        assert actual_lines == expected_lines
-
-        actual_lines = set(line.strip() for line in chunks[2].strip().splitlines() if line.strip())
-        expected_lines = set(line.strip() for line in expected_3.strip().splitlines() if line.strip())
-        assert actual_lines == expected_lines
+    actual_lines = set(line.strip() for line in chunks[2].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_3.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
 
 
-    def test_find_relations():
-        mschema = textwrap.dedent("""
-        【SB_ID】 trial_metadata
-        【Schema】
-        # Table: test_1
-        [(col_a:TEXT)]
-        # Table: test_2
-        [(col_c:INT)]
-        # Table: test_3
-        [(col_c:INT),
-        (col_a:TEXT)]
-        # Table: test_4
-        [(col_b:REAL),
-        (col_a:TEXT),
-        (col_c:INT)]
-        【Foreign keys】
-        test_3.col_a=test_1.col_a
-        test_4.col_a=test_1.col_a
-        test_4.col_c=test_2.col_c""")
+def test_k1_chunk_mschema_relations():
+    mschema = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]
+    # Table: test_2
+    [(col_c:INT)]
+    # Table: test_3
+    [(col_c:INT),
+    (col_a:TEXT)]
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_t:TEXT)]
+    【Foreign keys】
+    test_3.col_a=test_1.col_a
+    test_4.col_a=test_1.col_a""")
 
-        table = textwrap.dedent("""# Table: test_4
-        [(col_b:REAL),
-        (col_a:TEXT),
-        (col_c:INT)]""")
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 8
 
-        # Create a mock tokenizer that returns a fixed number of tokens per table
-        mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
-            "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
-        })
+    chunks = chunk_mschema(mschema, mock_tokenizer, True, 1)
 
-        # Mock model config
-        mock_model = MagicMock()
-        mock_model.model.config.max_position_embeddings = 8  # Tiny limit to force chunking
-        mock_model.tokenizer = mock_tokenizer
+    expected_1 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]""")
 
-        chunk_tables = set()
-        chunk_relations = set()
+    expected_2 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_2
+    [(col_c:INT)]""")
+    
+    expected_3 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_3
+    [(col_c:INT),
+    (col_a:TEXT)]
+    # Table: test_1
+    [(col_a:TEXT)]
+    【Foreign keys】
+    test_3.col_a=test_1.col_a""")
 
-        foreign_key_str = "【Foreign keys】"
-        relations = mschema.split(foreign_key_str)[1].split()
-        mschema_split = mschema.split("# ")
-        mschema_tables = ['# ' + table for table in mschema_split[1:]]
+    # Should not have space to repeat table 1 again
+    expected_4 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_4
+    [(col_b:REAL),
+(col_a:TEXT),
+    (col_t:TEXT)]
+    【Foreign keys】
+    test_4.col_a=test_1.col_a""")
 
-        _find_relations(table, chunk_tables, chunk_relations, mschema_tables, relations, 8, mock_model)
+    assert len(chunks) == 4
 
-        expected_table_relations = {'# Table: test_1\n[(col_a:TEXT)]\n', '# Table: test_2\n[(col_c:INT)]\n'}
-        expected_chunk_relations = {'test_4.col_a=test_1.col_a', 'test_4.col_c=test_2.col_c'}
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
 
-        assert chunk_tables == expected_table_relations
-        assert chunk_relations == expected_chunk_relations
+    actual_lines = set(line.strip() for line in chunks[1].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_2.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[2].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_3.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[3].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_4.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+
+def test_k2_chunk_mschema_relations():
+    mschema = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]
+    # Table: test_2
+    [(col_c:INT)]
+    # Table: test_3
+    [(col_c:INT),
+    (col_a:TEXT)]
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_t:TEXT)]
+    【Foreign keys】
+    test_4.col_a=test_1.col_a""")
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 100
+
+    chunks = chunk_mschema(mschema, mock_tokenizer, True, 2)
+
+    expected_1 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]
+    # Table: test_2
+    [(col_c:INT)]""")
+
+    expected_2 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_3
+    [(col_c:INT),
+    (col_a:TEXT)]
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_t:TEXT)]
+    # Table: test_1
+    [(col_a:TEXT)]
+    【Foreign keys】
+    test_4.col_a=test_1.col_a""")
+
+    assert len(chunks) == 2
+    
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[1].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_2.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+def test_k10_chunk_mschema_relations():
+    mschema = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]
+    # Table: test_2
+    [(col_c:INT)]
+    # Table: test_3
+    [(col_c:INT),
+    (col_a:TEXT)]
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_t:TEXT)]
+    【Foreign keys】
+    test_3.col_a=test_1.col_a
+    test_4.col_a=test_1.col_a""")
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 100
+
+    chunks = chunk_mschema(mschema, mock_tokenizer, True, 10)
+
+    expected_1 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]
+    # Table: test_2
+    [(col_c:INT)]
+    # Table: test_3
+    [(col_c:INT),
+    (col_a:TEXT)]
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_t:TEXT)]
+    【Foreign keys】
+    test_3.col_a=test_1.col_a
+    test_4.col_a=test_1.col_a""")
+
+    assert len(chunks) == 1
+    
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+def test_find_relations():
+    mschema = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]
+    # Table: test_2
+    [(col_c:INT)]
+    # Table: test_3
+    [(col_c:INT),
+    (col_a:TEXT)]
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_c:INT)]
+    【Foreign keys】
+    test_3.col_a=test_1.col_a
+    test_4.col_a=test_1.col_a
+    test_4.col_c=test_2.col_c""")
+
+    table = textwrap.dedent("""# Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_c:INT)]""")
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+
+    # Mock model config
+    mock_model = MagicMock()
+    mock_model.model.config.max_position_embeddings = 8  # Tiny limit to force chunking
+    mock_model.tokenizer = mock_tokenizer
+
+    chunk_tables = set()
+    chunk_relations = set()
+
+    foreign_key_str = "【Foreign keys】"
+    relations = mschema.split(foreign_key_str)[1].split()
+    mschema_split = mschema.split("# ")
+    mschema_tables = ['# ' + table for table in mschema_split[1:]]
+
+    _find_relations(table, chunk_tables, chunk_relations, mschema_tables, relations, 8, mock_model)
+
+    expected_table_relations = {'# Table: test_1\n[(col_a:TEXT)]\n', '# Table: test_2\n[(col_c:INT)]\n'}
+    expected_chunk_relations = {'test_4.col_a=test_1.col_a', 'test_4.col_c=test_2.col_c'}
+
+    assert chunk_tables == expected_table_relations
+    assert chunk_relations == expected_chunk_relations
+
+
+def test_k1_chunk_mschema_no_relations():
+    mschema = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]
+    # Table: test_2
+    [(col_c:INT)]
+    # Table: test_3
+    [(col_c:INT),
+    (col_a:TEXT)]
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_t:TEXT)]
+    【Foreign keys】
+    test_3.col_a=test_1.col_a
+    test_4.col_a=test_1.col_a""")
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 8
+
+    chunks = chunk_mschema(mschema, mock_tokenizer, False, 1)
+
+    expected_1 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]""")
+
+    expected_2 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_2
+    [(col_c:INT)]""")
+    
+    expected_3 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_3
+    [(col_c:INT),
+    (col_a:TEXT)]""")
+
+    # Should not have space to repeat table 1 again
+    expected_4 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_t:TEXT)]""")
+
+    assert len(chunks) == 4
+
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[1].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_2.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[2].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_3.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[3].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_4.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+
+def test_k2_chunk_mschema_no_relations():
+    mschema = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]
+    # Table: test_2
+    [(col_c:INT)]
+    # Table: test_3
+    [(col_c:INT),
+    (col_a:TEXT)]
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_t:TEXT)]
+    【Foreign keys】
+    test_3.col_a=test_1.col_a
+    test_4.col_a=test_1.col_a""")
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 100
+
+    chunks = chunk_mschema(mschema, mock_tokenizer, False, 2)
+
+    expected_1 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]
+    # Table: test_2
+    [(col_c:INT)]""")
+    
+    expected_2 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_3
+    [(col_c:INT),
+    (col_a:TEXT)]
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_t:TEXT)]""")
+
+    assert len(chunks) == 2
+
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[1].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_2.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+
+def test_k10_chunk_mschema_no_relations():
+    mschema = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]
+    # Table: test_2
+    [(col_c:INT)]
+    # Table: test_3
+    [(col_c:INT),
+    (col_a:TEXT)]
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_t:TEXT)]
+    【Foreign keys】
+    test_3.col_a=test_1.col_a
+    test_4.col_a=test_1.col_a""")
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 100
+
+    chunks = chunk_mschema(mschema, mock_tokenizer, False, 10)
+
+    expected_1 = textwrap.dedent("""
+    【SB_ID】 trial_metadata
+    【Schema】
+    # Table: test_1
+    [(col_a:TEXT)]
+    # Table: test_2
+    [(col_c:INT)]
+    # Table: test_3
+    [(col_c:INT),
+    (col_a:TEXT)]
+    # Table: test_4
+    [(col_b:REAL),
+    (col_a:TEXT),
+    (col_t:TEXT)]""")
+
+    assert len(chunks) == 1
+
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+def test_chunk_dts_sql_schema():
+    schema = textwrap.dedent("""
+    CREATE TABLE `Person` (
+      BusinessEntityID INTEGER REFERENCES BusinessEntity(BusinessEntityID),
+      FirstName TEXT,
+      MiddleName TEXT,
+      LastName TEXT,
+    );
+    CREATE TABLE `BusinessEntity` (
+      BusinessEntityID INTEGER,
+      rowguid TEXT PRIMARY KEY,
+      ModifiedDate DATETIME
+    );
+    CREATE TABLE `BusinessEntityContact` (
+      BusinessEntityID INTEGER PRIMARY KEY REFERENCES BusinessEntity(BusinessEntityID),
+      PersonID INTEGER PRIMARY KEY REFERENCES Person(BusinessEntityID),
+      ContactTypeID INTEGER PRIMARY KEY REFERENCES ContactType(ContactTypeID),
+    );
+    CREATE TABLE `EmailAddress` (
+      BusinessEntityID INTEGER PRIMARY KEY REFERENCES Person(BusinessEntityID),
+      EmailAddressID INTEGER PRIMARY KEY,
+      EmailAddress TEXT,
+    );
+    """)
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 8
+
+    chunks = chunk_dts_ddl(schema, mock_tokenizer)
+
+    expected_1 = textwrap.dedent("""
+    CREATE TABLE `Person` (
+      BusinessEntityID INTEGER REFERENCES BusinessEntity(BusinessEntityID),
+      FirstName TEXT,
+      MiddleName TEXT,
+      LastName TEXT,
+    );""")
+
+    expected_2 = textwrap.dedent("""
+    CREATE TABLE `BusinessEntity` (
+      BusinessEntityID INTEGER,
+      rowguid TEXT PRIMARY KEY,
+      ModifiedDate DATETIME
+    );""")
+
+    expected_3 = textwrap.dedent("""
+    CREATE TABLE `BusinessEntityContact` (
+      BusinessEntityID INTEGER PRIMARY KEY REFERENCES BusinessEntity(BusinessEntityID),
+      PersonID INTEGER PRIMARY KEY REFERENCES Person(BusinessEntityID),
+      ContactTypeID INTEGER PRIMARY KEY REFERENCES ContactType(ContactTypeID),
+    );""")
+
+    expected_4 = textwrap.dedent("""
+    CREATE TABLE `EmailAddress` (
+      BusinessEntityID INTEGER PRIMARY KEY REFERENCES Person(BusinessEntityID),
+      EmailAddressID INTEGER PRIMARY KEY,
+      EmailAddress TEXT,
+    );""")
+
+    assert len(chunks) == 4
+
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[1].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_2.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[2].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_3.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[3].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_4.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+def test_chunk_dts_sql_schema_two_chunks():
+    schema = textwrap.dedent("""
+    CREATE TABLE `Person` (
+      BusinessEntityID INTEGER REFERENCES BusinessEntity(BusinessEntityID),
+      FirstName TEXT,
+      MiddleName TEXT,
+      LastName TEXT,
+    );
+    CREATE TABLE `BusinessEntity` (
+      BusinessEntityID INTEGER,
+      rowguid TEXT PRIMARY KEY,
+      ModifiedDate DATETIME
+    );
+    CREATE TABLE `BusinessEntityContact` (
+      BusinessEntityID INTEGER PRIMARY KEY REFERENCES BusinessEntity(BusinessEntityID),
+      PersonID INTEGER PRIMARY KEY REFERENCES Person(BusinessEntityID),
+      ContactTypeID INTEGER PRIMARY KEY REFERENCES ContactType(ContactTypeID),
+    );
+    CREATE TABLE `EmailAddress` (
+      BusinessEntityID INTEGER PRIMARY KEY REFERENCES Person(BusinessEntityID),
+      EmailAddressID INTEGER PRIMARY KEY,
+      EmailAddress TEXT,
+    );
+    """)
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 25
+
+    chunks = chunk_dts_ddl(schema, mock_tokenizer)
+
+    expected_1 = textwrap.dedent("""
+    CREATE TABLE `Person` (
+      BusinessEntityID INTEGER REFERENCES BusinessEntity(BusinessEntityID),
+      FirstName TEXT,
+      MiddleName TEXT,
+      LastName TEXT,
+    );
+    CREATE TABLE `BusinessEntity` (
+      BusinessEntityID INTEGER,
+      rowguid TEXT PRIMARY KEY,
+      ModifiedDate DATETIME
+    );""")
+
+    expected_2 = textwrap.dedent("""
+    CREATE TABLE `BusinessEntityContact` (
+      BusinessEntityID INTEGER PRIMARY KEY REFERENCES BusinessEntity(BusinessEntityID),
+      PersonID INTEGER PRIMARY KEY REFERENCES Person(BusinessEntityID),
+      ContactTypeID INTEGER PRIMARY KEY REFERENCES ContactType(ContactTypeID),
+    );
+    CREATE TABLE `EmailAddress` (
+      BusinessEntityID INTEGER PRIMARY KEY REFERENCES Person(BusinessEntityID),
+      EmailAddressID INTEGER PRIMARY KEY,
+      EmailAddress TEXT,
+    );""")
+
+    assert len(chunks) == 2
+
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[1].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_2.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+def test_find_dts_relations():  
+    table = textwrap.dedent("""
+CREATE TABLE `SalesOrderHeader` (
+  SalesOrderID INTEGER,
+  OrderDate DATETIME,
+  SalesOrderNumber TEXT PRIMARY KEY,
+  PurchaseOrderNumber TEXT,
+  AccountNumber TEXT,
+  CustomerID INTEGER REFERENCES Customer(None),
+  SalesPersonID INTEGER REFERENCES SalesPerson(None),
+  TerritoryID INTEGER REFERENCES SalesTerritory(None),
+  BillToAddressID INTEGER REFERENCES Address(None),
+  ShipToAddressID INTEGER REFERENCES Address(None),
+  CreditCardApprovalCode TEXT,
+  CurrencyRateID INTEGER REFERENCES CurrencyRate(None),
+  rowguid TEXT PRIMARY KEY,
+  ModifiedDate DATETIME
+);""")
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 1000
+
+    chunk = set()
+    tables = ["CREATE TABLE `OrderDate`", "CREATE TABLE `Customer`", "CREATE TABLE `SalesPerson`","CREATE TABLE `SalesTerritory`","CREATE TABLE `Address`","CREATE TABLE `TestColumn`", "CREATE TABLE `CurrencyRate`"]
+
+    expected = {"CREATE TABLE `Customer`", "CREATE TABLE `SalesPerson`","CREATE TABLE `SalesTerritory`","CREATE TABLE `Address`","CREATE TABLE `CurrencyRate`"}
+
+    find_relations_tables_dts(table, chunk, tables, 10000, mock_tokenizer)
+
+    assert chunk == expected
+
+def test_chunk_dts_sql_schema_relations():
+    ddl_schema = textwrap.dedent("""
+    CREATE TABLE `test1` (
+        ID1 INTEGER,
+        Name TEXT
+    );
+    CREATE TABLE `test2` (
+        ID2 INTEGER
+    );
+    CREATE TABLE `test3` (
+        ID3 INTEGER,
+        ID4 INTEGER REFERENCES test4(None)
+    );
+    CREATE TABLE `test4` (
+        ID4 INTEGER,
+        ID1 INTEGER REFERENCES test1(None),
+        Values REAL
+    );""")
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 20
+
+    chunks = chunk_dts_ddl_relations(ddl_schema, mock_tokenizer, 0)
+
+    expected_1 = textwrap.dedent("""
+    CREATE TABLE `test1` (
+        ID1 INTEGER,
+        Name TEXT
+    );
+    CREATE TABLE `test2` (
+        ID2 INTEGER
+    );""")
+
+    expected_2 = textwrap.dedent("""
+    CREATE TABLE `test3` (
+        ID3 INTEGER,
+        ID4 INTEGER REFERENCES test4(None)
+    );
+    CREATE TABLE `test4` (
+        ID4 INTEGER,
+        ID1 INTEGER REFERENCES test1(None),
+        Values REAL
+    );""")
+
+    expected_3 = textwrap.dedent("""
+    CREATE TABLE `test4` (
+        ID4 INTEGER,
+        ID1 INTEGER REFERENCES test1(None),
+        Values REAL
+    );
+    CREATE TABLE `test1` (
+        ID1 INTEGER,
+        Name TEXT
+    );""")
+
+    assert len(chunks) == 3
+
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[1].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_2.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[2].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_3.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+def test_chunk_dts_sql_schema_relations_single_chunk():
+    ddl_schema = textwrap.dedent("""
+    CREATE TABLE `test1` (
+        ID1 INTEGER,
+        Name TEXT
+    );
+    CREATE TABLE `test2` (
+        ID2 INTEGER
+    );
+    CREATE TABLE `test3` (
+        ID3 INTEGER,
+        ID4 INTEGER REFERENCES test4(None)
+    );
+    CREATE TABLE `test4` (
+        ID4 INTEGER,
+        ID1 INTEGER REFERENCES test1(None),
+        Values REAL
+    );""")
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 100
+
+    chunks = chunk_dts_ddl_relations(ddl_schema, mock_tokenizer, 0)
+
+    expected = textwrap.dedent("""
+    CREATE TABLE `test1` (
+        ID1 INTEGER,
+        Name TEXT
+    );
+    CREATE TABLE `test2` (
+        ID2 INTEGER
+    );
+    CREATE TABLE `test3` (
+        ID3 INTEGER,
+        ID4 INTEGER REFERENCES test4(None)
+    );
+    CREATE TABLE `test4` (
+        ID4 INTEGER,
+        ID1 INTEGER REFERENCES test1(None),
+        Values REAL
+    );""")
+
+    assert len(chunks) == 1
+
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+def test_chunk_dts_sql_schema_relations_k_1():
+    ddl_schema = textwrap.dedent("""
+    CREATE TABLE `test1` (
+        ID1 INTEGER,
+        Name TEXT
+    );
+    CREATE TABLE `test2` (
+        ID2 INTEGER
+    );
+    CREATE TABLE `test3` (
+        ID3 INTEGER,
+        ID4 INTEGER REFERENCES test4(None)
+    );""")
+
+    # Create a mock tokenizer that returns a fixed number of tokens per table
+    mock_tokenizer = MagicMock(side_effect=lambda x, **kwargs: {
+        "input_ids": [[0] * len(x.splitlines())]  # one token per line as a stand-in
+    })
+    mock_tokenizer.model_max_length = 1000
+
+    # Expects a chunk for each table event with large context.
+    chunks = chunk_dts_ddl_relations(ddl_schema, mock_tokenizer, 1)
+
+    expected_1 = textwrap.dedent("""
+    CREATE TABLE `test1` (
+        ID1 INTEGER,
+        Name TEXT
+    );""")
+
+    expected_2 = textwrap.dedent("""
+    CREATE TABLE `test2` (
+        ID2 INTEGER
+    );""")
+
+    expected_3 = textwrap.dedent("""
+    CREATE TABLE `test3` (
+        ID3 INTEGER,
+        ID4 INTEGER REFERENCES test4(None)
+    );""")
+
+    assert len(chunks) == 3
+
+    actual_lines = set(line.strip() for line in chunks[0].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_1.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[1].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_2.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+    actual_lines = set(line.strip() for line in chunks[2].strip().splitlines() if line.strip())
+    expected_lines = set(line.strip() for line in expected_3.strip().splitlines() if line.strip())
+    assert actual_lines == expected_lines
+
+

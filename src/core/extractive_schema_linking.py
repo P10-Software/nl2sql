@@ -1,5 +1,6 @@
 import torch
 from transformers import AutoModel, AutoTokenizer
+from src.core.schema_chunking import chunk_mschema
 import re
 
 class ExSLcModel(torch.nn.Module):
@@ -57,7 +58,30 @@ class ExSLcModel(torch.nn.Module):
         
         # Predict relevance (single logit per column)
         return self.w_relevance(column_embeddings).squeeze(-1)  # Shape: [num_columns]
-            
+    
+def predict_relevance_for_chunks(model, question, chunks):
+    predictions = list()
+
+    for chunk in chunks:
+        predictions += predict_relevance_coarse(model, question, chunk).items()
+
+    predictions = max_duplicate_prediction(predictions)
+    predictions.sort(key=lambda pair: pair[1], reverse=True)
+
+    return predictions
+
+def max_duplicate_prediction(predictions: list[tuple[str, float]]) -> list[tuple[str, float]]:
+    """
+    Takes a list of column predictions and returns the max prediction for each column
+    """
+    best_scores = {}
+
+    for key, score in predictions:
+        if key not in best_scores or score > best_scores[key]:
+            best_scores[key] = score
+
+    return [(key, best_scores[key]) for key in best_scores]
+
 def predict_relevance_coarse(model, question, schema):
     """
     Predict which schema elements are relevant to the question
@@ -132,3 +156,69 @@ def parse_schema(schema: str):
 
 def load_schema_linker(model_path):
     return torch.load(model_path, weights_only=False)
+
+def get_focused_schema(schema_linker, question, chunks, schema, threshold: int = 0.15):
+    # Make relevance predictions
+    predictions = predict_relevance_for_chunks(schema_linker, question, chunks)
+    relevant_tables_with_columns = {}
+    for column, relevance in predictions:
+        if relevance < threshold:
+            continue
+
+        table_name, column_name = column.split(" ")
+        if table_name in relevant_tables_with_columns.keys():
+            relevant_tables_with_columns[table_name].append(column_name)
+        else:
+            relevant_tables_with_columns[table_name] = [column_name]
+
+    # Remove irrelevant tables from mschema
+    foreign_key_str = "【Foreign keys】"
+    relations = None
+
+    if foreign_key_str in schema:
+        relations = schema.split(foreign_key_str)[1].split()
+        schema = schema.split(foreign_key_str)[0]
+
+    schema_split = schema.split("# ")
+    schema_header_text = schema_split[0]
+
+    schema_tables = []
+    for table in schema_split[1:]:
+        table_name = table.split("\n")[0].split("Table: ")[1]
+
+        if table_name not in relevant_tables_with_columns.keys():
+            continue # Table has no relevant columns
+
+        # Extract individual column entries inside the brackets
+        column_pattern = r"\((.*?)\)"
+        columns = re.findall(column_pattern, table)
+
+        # Filter based on columns
+        filtered_columns = []
+        for column in columns:
+            column_name = column.split(":")[0].strip()
+            if column_name in relevant_tables_with_columns[table_name]:
+                filtered_columns.append(f"({column})")
+
+        # Construct output
+        filtered_table = f"# Table: {table_name}\n[\n" + ",\n".join(filtered_columns) + "\n]\n"
+        schema_tables.append(filtered_table)
+
+    focused_schema = schema_header_text + "".join(schema_tables)
+
+    # Remove irrelevant relations
+    if relations:
+        relevant_relations = []
+        for relation in relations:
+            operands = relation.split("=")
+            table1, column1 = operands[0].split(".")
+            table2, column2 = operands[1].split(".")
+
+            if (table1 in relevant_tables_with_columns.keys() and column1 in relevant_tables_with_columns[table1]) and (
+             table2 in relevant_tables_with_columns.keys() and column2 in relevant_tables_with_columns[table2]):
+                relevant_relations.append(relation)
+
+        if relevant_relations:
+            focused_schema += foreign_key_str + "\n" + "".join(relevant_relations) + "\n"
+    
+    return focused_schema

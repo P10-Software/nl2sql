@@ -9,8 +9,9 @@ import torch.nn as nn
 import random
 import os
 
-MODEL_NAME = "XGenerationLab/XiYanSQL-QwenCoder-7B-2502"
+MODEL_NAME = "XGenerationLab/XiYanSQL-QwenCoder-7B-2504"
 HEAD_SAVE_LOCALE = '.local/AbstentionClassifier/BinaryHead/best_classifier.pt'
+
 logger = get_logger(__name__)
 
 
@@ -103,9 +104,10 @@ class AbstentionClassifier(nn.Module):
 
             if f2 > best_f2:
                 best_f2 = f2
-                os.makedirs(os.path.dirname(HEAD_SAVE_LOCALE), exist_ok=True)
-                torch.save(self.state_dict(), HEAD_SAVE_LOCALE)
-                logger.info(f"Saved best classifier with F2: {best_f2:.4f}")
+                new_path = HEAD_SAVE_LOCALE+'/f2_{best_f2:.3f}_epoch{epoch}'
+                os.makedirs(os.path.dirname(new_path), exist_ok=True)
+                torch.save(self.state_dict(), new_path)
+                logger.info(f"Current best Epoch: {epoch} saved to {new_path} with F2: {best_f2:.4f}")
         return best_f2
 
     def evaluate(self, dataloader, return_f2=False):
@@ -198,7 +200,6 @@ class SQLFeasibilityDataset(Dataset):
     def __init__(self, data, max_length, prompt_template, model=MODEL_NAME, dtype=torch.float):
         super().__init__()
         self.tokenizer = AutoTokenizer.from_pretrained(model)
-        self.data = data
         self.max_length = max_length
         self.dtype = dtype
         self.prompt_template = prompt_template
@@ -219,3 +220,21 @@ class SQLFeasibilityDataset(Dataset):
             'attention_mask': attention_mask,
             'label': label
         }
+
+    def _filter_examples(self, data):
+        filtered = []
+        removed = 0
+        for sample in data:
+            prompt = (
+                "You are a data scientist, who has to vet questions from users.\n"
+                f"You have received the question: \"{sample['question']}\" "
+                f"for the database described by the following instructions: {sample['schema']}\n\n"
+                "You decide the question is: "
+            )
+            tokens = self.tokenizer(prompt)
+            if len(tokens['input_ids']) <= self.max_length:
+                filtered.append(sample)
+            else:
+                removed +=1
+        
+        logger.info(f"Dataset filtering complete, removed {removed} examples.")

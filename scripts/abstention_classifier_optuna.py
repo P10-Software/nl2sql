@@ -5,7 +5,8 @@ import json
 
 logger = get_logger(__name__)
 
-DATA_LOCALE = 'local/AbstentionClassifier/bird_train' # Fix when in UCloud
+NUM_OF_TRIALS = 10
+DATA_LOCALE = ''
 
 
 def objective(trial: optuna.Trial):
@@ -35,7 +36,7 @@ study = optuna.create_study(
     storage="sqlite///.local/AbstentionClassifier/BinaryHead/optuna_trials.sqlite",
     load_if_exists=True
     )
-study.optimize(objective, n_trials=50)
+study.optimize(objective, n_trials=NUM_OF_TRIALS)
 
 trial = study.best_trial
 

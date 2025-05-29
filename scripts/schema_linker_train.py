@@ -6,7 +6,7 @@ from src.common.logger import get_logger
 from src.core.extractive_schema_linking import ExSLcModel, prepare_input, predict_relevance_coarse, load_schema_linker
 
 TRAIN_SET_PATH=".local/SchemaLinker/spider_exsl_all_to_single_train.json"
-EVAL_SET_PATH=".local/SchemaLinker/spider_exsl_all_to_single_test.json"
+EVAL_SET_PATH=".local/SchemaLinker/spider_exsl_dev.json"
 K=5
 RESULT_DIR_PATH=f".local/SchemaLinker/OmniSQL7B_optuna/"
 BASE_MODEL="seeklhy/OmniSQL-7B"
@@ -21,8 +21,8 @@ def run_study():
     """
     study = optuna.create_study(
         direction="maximize",
-        study_name="schema_linker_study",
-        storage="sqlite:///optuna_study_schema_linker_omnisql.db",
+        study_name="schema_linker_study_rmc_efficiency",
+        storage="sqlite:///optuna_study_schema_linker_omnisql_nrmc.db",
         load_if_exists=True
     )
     study.optimize(objective, n_trials=NUMBER_OF_TRIALS)
@@ -53,11 +53,11 @@ def objective(trial: optuna.trial):
 
     eval_result = evaluate_coarse_grained(trained_model, eval_set, K)
 
-    with open(RESULT_DIR_PATH + f"spider_exsl_recall_at_{K}_trial_{trial.number}.json", "w") as result_file:
+    with open(RESULT_DIR_PATH + f"rmc_efficiency_spider_exsl_trial_{trial.number}.json", "w") as result_file:
         json.dump(eval_result, result_file, indent=4)
     logger.info(eval_result[-1])
 
-    return eval_result[-1]["Total table recall@k"]
+    return eval_result[-1]["Average RMC efficiency"]
 
 def train_coarse_grained(model, train_data, config):
     # Initialize Accelerator
@@ -115,32 +115,63 @@ def evaluate_coarse_grained(model, eval_data, k):
     eval_result = []
     sum_column_recall_at_k = 0
     sum_table_recall_at_k = 0
+    sum_rmc_efficiency = 0
+
     for example in tqdm(eval_set):
         if dataset_contains_feasibility:
-            goal_columns = [" ".join(column.split(".")) for column in example["columns"]]
+            goal_columns = {" ".join(column.split(".")) for column in example["columns"]}
         else:
-            goal_columns = example["goal answer"]
+            goal_columns = set(example["goal answer"])
 
         # Make relevance predictions
         predictions = predict_relevance_coarse(model, example["question"], example["schema"])
-        columns, relevance = zip(*(sorted(predictions.items(), reverse=True, key= lambda pair: pair[1])[:k]))
+        sorted_columns = sorted(predictions.items(), reverse=True, key=lambda pair: pair[1])
+        columns, relevance = zip(*sorted_columns[:k]) if len(sorted_columns) >= k else zip(*sorted_columns)
         columns, relevance = list(columns), list(relevance)
-    
-        # Evaluate column level recall@k
+
+        # Column recall@k
         relevant_columns = {column for column in columns if column in goal_columns}
         column_recall_at_k = len(relevant_columns) / len(goal_columns)
         sum_column_recall_at_k += column_recall_at_k
 
-
-        # Evaluate table level recall@k
+        # Table recall@k
         goal_tables = {column.split(" ")[0] for column in goal_columns}
         relevant_tables = {column.split(" ")[0] for column in columns if column.split(" ")[0] in goal_tables}
         table_recall_at_k = len(relevant_tables) / len(goal_tables)
         sum_table_recall_at_k += table_recall_at_k
 
-        eval_result.append({"question": example["question"], "goal columns": list(goal_columns), "top k columns": columns, "top k relevance": relevance, "column recall@k": column_recall_at_k, "table recall@k": table_recall_at_k})
+        # Compute RMC (Recall-Minimal Cutoff)
+        seen = set()
+        rmc_cutoff = len(predictions)  # worst case: never fully recovered
 
-    eval_result.append({"Amount of questions": len(eval_set), "Total column recall@k": sum_column_recall_at_k / len(eval_set), "Total table recall@k": sum_table_recall_at_k / len(eval_set), "K": k})
+        for i, (col, _) in enumerate(sorted_columns):
+            if col in goal_columns:
+                seen.add(col)
+            if seen == goal_columns:
+                rmc_cutoff = i + 1  # +1 for 1-based index
+                break
+
+        rmc_efficiency = len(goal_columns) / rmc_cutoff
+        sum_rmc_efficiency += rmc_efficiency
+
+        eval_result.append({
+            "question": example["question"],
+            "goal columns": list(goal_columns),
+            "top k columns": columns,
+            "top k relevance": relevance,
+            "column recall@k": column_recall_at_k,
+            "table recall@k": table_recall_at_k,
+            "RMC efficiency": rmc_efficiency
+        })
+
+    eval_result.append({
+        "Amount of questions": len(eval_set),
+        "Total column recall@k": sum_column_recall_at_k / len(eval_set),
+        "Total table recall@k": sum_table_recall_at_k / len(eval_set),
+        "Average RMC efficiency": sum_rmc_efficiency / len(eval_set),
+        "K": k
+    })
+
     return eval_result
 
 class SchemaLinkingDatasetCoarse(torch.utils.data.Dataset):

@@ -157,7 +157,7 @@ def parse_schema(schema: str):
 def load_schema_linker(model_path):
     return torch.load(model_path, weights_only=False)
 
-def get_focused_schema(schema_linker, question, chunks, schema, threshold: int = 0.05):
+def get_focused_schema(schema_linker, question, chunks, schema, threshold: int = 0.15):
     # Make relevance predictions
     predictions = predict_relevance_for_chunks(schema_linker, question, chunks)
     relevant_tables_with_columns = {}

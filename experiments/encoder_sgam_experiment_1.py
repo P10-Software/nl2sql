@@ -1,16 +1,22 @@
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from src.core.extractive_schema_linking import load_schema_linker, get_focused_schema
+from src.core.schema_chunking import chunk_mschema
 from tqdm import tqdm
 import json
+import torch
 
-T5_PATH = ".local/trust_sql/t5_sqlgen/checkpoint-12723/"
+SCHEMA_LINKER_PATH = "models/EXSL/OmniSQL_7B_rmc_efficiency_schema_linker_trial_39.pth"
+ABSTENTION_MODEL_PATH  = ".local/AbstentionClassifier/encoder_best/checkpoint-2450/"
 TEST_SET_PATH = ".local/bird_abstention_eval_set.json"
-RESULT_PATH = ".local/experiments/abstention/bird/trust_pipe.json"
+RESULT_PATH = ".local/experiments/abstention/bird/sgam_encoder.json"
 
 with open(TEST_SET_PATH, "r") as file:
     test_set = json.load(file)
 
-t5_tokenizer = AutoTokenizer.from_pretrained(T5_PATH)
-t5_model = AutoModelForSeq2SeqLM.from_pretrained(T5_PATH, device_map="auto")
+abstention_tokenizer = AutoTokenizer.from_pretrained(ABSTENTION_MODEL_PATH, device_map="cuda")
+abstention_model = AutoModelForSequenceClassification.from_pretrained(ABSTENTION_MODEL_PATH, num_labels=2, device_map="cuda")
+abstention_model.eval()
+schema_linker = load_schema_linker(SCHEMA_LINKER_PATH)
 
 result = []
 true_pos = 0
@@ -19,33 +25,29 @@ true_neg = 0
 false_neg = 0
 
 for example in tqdm(test_set):
-    cls_prompt = get_pre_abstention_prompt(example["question"], example["schema"])
-    inputs = sqlcoder_tokenizer(cls_prompt, return_tensors="pt").to(pre_abstention_model.device)
-    input_length = inputs['input_ids'].shape[1] 
-    outputs = pre_abstention_model.generate(
-        **inputs,
-        max_new_tokens=256,
-        do_sample=False,
-        pad_token_id=sqlcoder_tokenizer.eos_token_id  # Ensure padding token is defined
-    )
-    generated_tokens = outputs[0][input_length:]  # Skip prompt
-    pre_classification = sqlcoder_tokenizer.decode(generated_tokens, skip_special_tokens=True)
-    if  "incorrect" in post_classification.strip():
-        feasibility_prediction = 0
+    chunks = chunk_mschema(example["schema"], schema_linker.tokenizer, False, k=1)
+    focused_schema = get_focused_schema(schema_linker, example["question"], chunks, example["schema"], threshold=0.15)
 
+    inputs = abstention_tokenizer(example["question"], focused_schema, return_tensors="pt", truncation=True, padding="max_length", max_length=8192).to("cuda")
+
+    # Run inference
+    with torch.no_grad():
+        outputs = abstention_model(**inputs)
+        logits = outputs.logits
+        prediction = torch.argmax(logits, dim=-1).item()
+
+    if prediction == 0:
         if example["label"] == 0:
             true_pos += 1
         else:
             false_pos += 1
     else:
-        feasibility_prediction = 1
-
         if example["label"] == 0:
             false_neg += 1
         else:
             true_neg += 1
     
-    result.append({"question": example["question"], "goal feasibility": example["label"], "predicted feasibility": feasibility_prediction})
+    result.append({"question": example["question"], "goal feasibility": example["label"], "predicted feasibility": prediction})
 
 precision = true_pos / (true_pos + false_pos)
 recall = true_pos / (true_pos + false_neg)

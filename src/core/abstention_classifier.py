@@ -104,7 +104,7 @@ class AbstentionClassifier(nn.Module):
 
             if f2 > best_f2:
                 best_f2 = f2
-                new_path = HEAD_SAVE_LOCALE+'/f2_{best_f2:.3f}_epoch{epoch}'
+                new_path = HEAD_SAVE_LOCALE+f'/f2_{best_f2:.3f}_epoch{epoch}'
                 os.makedirs(os.path.dirname(new_path), exist_ok=True)
                 torch.save(self.state_dict(), new_path)
                 logger.info(f"Current best Epoch: {epoch} saved to {new_path} with F2: {best_f2:.4f}")
@@ -146,12 +146,24 @@ class AbstentionClassifierEmbeddingBased(AbstentionClassifier):
     def __init__(self, frozen=True):
         super().__init__(frozen)
         self.yes_token, self.no_token = '<<yes>>', '<<no>>'
-        self.classifier = nn.Linear(self.hidden_size * 2, 1).to(self.device)
+
+        added_tokens = []
+        if self.yes_token not in self.tokenizer.get_vocab():
+            added_tokens.append(self.yes_token)
+        if self.no_token not in self.tokenizer.get_vocab():
+            added_tokens.append(self.no_token)
+        if added_tokens:
+            self.tokenizer.add_tokens(added_tokens)
+            self.model.resize_token_embeddings(len(self.tokenizer))
+
+        self.classifier = nn.Linear(self.hidden_size * 3, 1).to(self.device)
         self.prompt_template = (
-            "You are a data scientist, who has to vet questions from users.\n"
-            "You have received the question: \"{question}\" "
-            "for the database described by the following instructions: {schema}\n\n"
-            "You decide the question is: <<yes>> or <<no>>"
+            "You are a data scientist who has to create SQL queries for users, but the users do not know what content the database has.\n"
+            "You have to read over a users question, and compare it to the database schema that you recieve, and then decide if the users question can be answered based on the database.\n"
+            "You have received the question: \"{question}\" \n"
+            "The database that the user is asking the question of is described by the following schema: {schema}\n\n"
+            "After looking over the schema very carefully, and making sure to catch all questions that cannot be answered.\n"
+            "Is the question {question} answerable by the schema? <<yes>><<no>>"
         )
 
     def forward(self, input_ids, attention_mask=None):
@@ -161,39 +173,39 @@ class AbstentionClassifierEmbeddingBased(AbstentionClassifier):
         batch_size = input_ids.size(0)
         logits = []
 
-        tokens = [self.tokenizer.convert_ids_to_tokens(seq) for seq in input_ids]
+        tokens_batch = [self.tokenizer.convert_ids_to_tokens(seq) for seq in input_ids]
 
         for i in range(batch_size):
+            tokens = tokens_batch[i]
+
             try:
-                yes_idx = tokens[i].index(self.yes_token)
-                no_idx = tokens[i].index(self.no_token)
+                yes_idx = tokens.index(self.yes_token)
+                no_idx = tokens.index(self.no_token)
             except ValueError:
-                logger.error(f"Missing <<yes>> or <<no>> token in input sample.")
+                logger.error("Missing <<yes>> or <<no>> token in input sample.")
+                raise ValueError("Missing <<yes>> or <<no>> token in input sample.")
 
             yes_emb = hidden_states[i, yes_idx, :]
             no_emb = hidden_states[i, no_idx, :]
 
-            yes_score = self.classifier(yes_emb)
-            no_score = self.classifier(no_emb)
+            combined_emb = torch.cat([no_emb, yes_emb, no_emb - yes_emb], dim=-1)
+            logit = self.classifier(combined_emb)
 
-            logit = torch.stack([no_score, yes_score], dim=0)
             logits.append(logit)
 
-        return torch.stack(logits)
+        logits = torch.stack(logits).squeeze(-1)
+        return logits
 
     def classify(self, user_question, schema, threshold=0.5):
         prompt = self.prompt_template.format(question=user_question, schema=schema)
 
         inputs = self.tokenizer(prompt, return_tensors='pt')
-        input_ids = inputs['input_ids'].to(self.device)
-        attention_mask = inputs['attention_mask'].to(self.device)
 
         with torch.no_grad():
-            logit = self.forward(input_ids, attention_mask)
-            probs = torch.softmax(logit, dim=-1)
-            yes_prob = probs[0, 1].item()
+            logit = self.forward(inputs['input_ids'], inputs['attention_mask'])
+            prob = torch.sigmoid(logit).squeeze().item()
 
-        return "feasible" if yes_prob > threshold else "infeasible"
+        return "feasible" if prob > threshold else "infeasible"
 
 
 class SQLFeasibilityDataset(Dataset):

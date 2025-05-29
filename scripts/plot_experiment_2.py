@@ -8,6 +8,8 @@ recall_ExSL_table = [99.9, 99.1, 97.1, 94.7, 90.3, 83.7, 76.6, 69.5]
 size_reduction_ExSL_table = [3.28, 11.2, 19.6, 29.2, 39.8, 48.7, 55.9, 61.2]
 recall_ExSL_column = [98.8, 95.9, 91.0, 83.3, 75.2, 67.5, 58.9, 51.8]
 size_reduction_ExSL_column = [25.5, 47.8, 61.0, 69.8, 76.5, 81.5, 85.4, 88.1]
+precision_ExSL_table = [41.5, 45.8, 51.1, 58.4, 66.7, 71.5, 73.4, 70.5]
+precision_ExSL_column = [19.5, 27.0, 35.0, 41.9, 49.1, 54.5, 55.9, 56.7]
 
 
 plt.figure(figsize=(9, 6))
@@ -17,11 +19,13 @@ plt.plot(thresholds, recall_ExSL_table, 'k--^', label='Recall Table')
 plt.plot(thresholds, size_reduction_ExSL_table, 'go-', label='Schema size reduction Table')
 plt.plot(thresholds, recall_ExSL_column, 'bs-', label='Recall Column')
 plt.plot(thresholds, size_reduction_ExSL_column, 'r:*', label='Schema size reduction Column')
+plt.plot(thresholds, precision_ExSL_table, 'm--d', label='Precision Table')
+plt.plot(thresholds, precision_ExSL_column, 'c-.h', label='Precision Column')
 
 # Axis labels and title
 plt.xlabel('Schema Linking Threshold', fontsize=16)
 plt.ylabel('Performance', fontsize=16)
-plt.title('Balance between schema size reduction and recall based on threshold', fontsize=16)
+plt.title('Balance between schema size reduction, precision and recall based on threshold', fontsize=16)
 
 # Add legend and grid
 plt.legend(fontsize=16)

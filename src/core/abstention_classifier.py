@@ -188,9 +188,10 @@ class AbstentionClassifierEmbeddingBased(AbstentionClassifier):
 
         with torch.no_grad():
             logit = self.forward(input_ids, attention_mask)
-            prob = torch.sigmoid(logit).item()
+            probs = torch.softmax(logit, dim=-1)
+            yes_prob = probs[0, 1].item()
 
-        return "feasible" if prob > threshold else "infeasible"
+        return "feasible" if yes_prob > threshold else "infeasible"
 
 
 class SQLFeasibilityDataset(Dataset):

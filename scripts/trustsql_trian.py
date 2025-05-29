@@ -314,8 +314,12 @@ def train_sqlcoder_error_detect():
 
 
 def find_t5_maxent_threshold(entropy_label_pairs: list[tuple[int, float]]) -> float:
+    """
+    Returns the calibrated threshold for TrustSQL unified, based on uncertainty
+    Returns -1 if no positive cumulative_score is possible
+    """
     cumulative_score = float('-inf')
-    threshold = 0
+    threshold = -1
     temp_score = 0
 
     sorted_scores = sorted(entropy_label_pairs, key=lambda x: x[1])
@@ -327,7 +331,7 @@ def find_t5_maxent_threshold(entropy_label_pairs: list[tuple[int, float]]) -> fl
             cumulative_score = temp_score
             threshold = entropy
 
-    return  threshold
+    return threshold
 
 
 def cleanup_memory():

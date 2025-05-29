@@ -13,9 +13,9 @@ with patch.dict('sys.modules', {
     threshold_test_data = [
         ([(1, 0.3), (0, 0.5), (1, 0.1), (0, 0.9), (1, 2), (1, 0.3), (0, 0.2), (1, 0.3), (1, 1.8)], 0.3),
         ([(1, 0.2)], 0.2),
-        ([(0, 0.2)], 0.2),
+        ([(0, 0.2)], -1.0), # Should return -1 as there is no correct predictions
         ([(1, 0.2), (1, 0.5), (1, 1.0), (1, 1.2), (1, 2.2)], 2.2),
-        ([(0, 0.2), (0, 0.5), (0, 1.0), (0, 1.2), (0, 2.2), (1, 1.5)], 0.2), # How should this be handled??
+        ([(0, 0.2), (0, 0.5), (0, 1.0), (0, 1.2), (0, 2.2), (1, 1.5)], -1.0), # return -1.0 due to negative cumulative score
     ]
 
     @pytest.mark.parametrize("input, expected_threshold", threshold_test_data)

@@ -4,28 +4,28 @@ import matplotlib.pyplot as plt
 thresholds = [0.05, 0.1, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40]
 
 # Performance metrics
-recall_ExSL_table = [99.9, 99.1, 97.1, 94.7, 90.3, 83.7, 76.6, 69.5]
-size_reduction_ExSL_table = [3.28, 11.2, 19.6, 29.2, 39.8, 48.7, 55.9, 61.2]
-recall_ExSL_column = [98.8, 95.9, 91.0, 83.3, 75.2, 67.5, 58.9, 51.8]
-size_reduction_ExSL_column = [25.5, 47.8, 61.0, 69.8, 76.5, 81.5, 85.4, 88.1]
-precision_ExSL_table = [41.5, 45.8, 51.1, 58.4, 66.7, 71.5, 73.4, 70.5]
-precision_ExSL_column = [19.5, 27.0, 35.0, 41.9, 49.1, 54.5, 55.9, 56.7]
-
+recall_ExSL_table = [0.999, 0.991, 0.971, 0.947, 0.903, 0.837, 0.766, 0.695]
+size_reduction_ExSL_table = [0.0328, 0.112, 0.196, 0.292, 0.398, 0.487, 0.559, 0.612]
+recall_ExSL_column = [0.988, 0.959, 0.910, 0.833, 0.752, 0.675, 0.589, 0.518]
+size_reduction_ExSL_column = [0.255, 0.478, 0.610, 0.698, 0.765, 0.815, 0.854, 0.881]
+precision_ExSL_table = [0.415, 0.458, 0.511, 0.584, 0.667, 0.715, 0.734, 0.705]
+precision_ExSL_column = [0.195, 0.270, 0.350, 0.419, 0.491, 0.545, 0.559, 0.567]
 
 plt.figure(figsize=(9, 6))
 
 # Plot original precision and recall
 plt.plot(thresholds, recall_ExSL_table, 'k--^', label='Recall Table')
-plt.plot(thresholds, size_reduction_ExSL_table, 'go-', label='Schema size reduction Table')
-plt.plot(thresholds, recall_ExSL_column, 'bs-', label='Recall Column')
-plt.plot(thresholds, size_reduction_ExSL_column, 'r:*', label='Schema size reduction Column')
-plt.plot(thresholds, precision_ExSL_table, 'm--d', label='Precision Table')
-plt.plot(thresholds, precision_ExSL_column, 'c-.h', label='Precision Column')
+plt.plot(thresholds, recall_ExSL_column, 'b--s', label='Recall Column')
+
+plt.plot(thresholds, precision_ExSL_table, 'm:d', label='Precision Table')
+plt.plot(thresholds, precision_ExSL_column, 'c:h', label='Precision Column')
+
+plt.plot(thresholds, size_reduction_ExSL_table, 'g-o', label='Schema size reduction Table')
+plt.plot(thresholds, size_reduction_ExSL_column, 'r-*', label='Schema size reduction Column')
 
 # Axis labels and title
 plt.xlabel('Schema Linking Threshold', fontsize=16)
 plt.ylabel('Performance', fontsize=16)
-plt.title('Balance between schema size reduction, precision and recall based on threshold', fontsize=16)
 
 # Add legend and grid
 plt.legend(fontsize=16)

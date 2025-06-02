@@ -28,6 +28,8 @@ DATE = date.today()
 def load_dataset(dataset_path: str):
     with open(dataset_path, "r") as file:
         dataset = load(file)
+    if WITH_SGAM:
+        return dataset
 
     return [{"question": pair["question"], "golden_query": pair["goal_query"]} for pair in dataset]
 

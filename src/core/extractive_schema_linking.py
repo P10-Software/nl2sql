@@ -154,7 +154,7 @@ def parse_schema(schema: str):
 
     return columns_in_schema
 
-def load_schema_linker(model_path):
+def load_schema_linker(model_path = "models/EXSL/OmniSQL_7B_rmc_efficiency_schema_linker_trial_39.pth"):
     return torch.load(model_path, weights_only=False)
 
 def get_focused_schema(schema_linker, question, chunks, schema, threshold: int = 0.15):

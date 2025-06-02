@@ -2,7 +2,10 @@ from abc import abstractmethod, ABC
 import re
 from tqdm import tqdm
 from src.common.logger import get_logger
-from src.core.schema_format import get_mschema, get_DDL, schema_filtering
+from src.core.schema_format import get_mschema, get_DDL
+from src.core.schema_chunking import chunk_mschema
+from src.core.extractive_schema_linking import load_schema_linker, get_focused_schema
+from src.core.abstention_classifier import load_abstention_classifier
 
 logger = get_logger(__name__)
 
@@ -31,16 +34,28 @@ class NL2SQLModel(ABC):
         self.analysis = None
         self.mschema = mschema
 
-    def run(self):
+    def run(self, with_sgam):
         logger.info(f"Started benchmarking of {self.__class__.__name__}.")
 
         schema = get_mschema() if self.mschema else get_DDL()
+        if with_sgam:
+            schema_linker = load_schema_linker()
+            chunks = chunk_mschema(schema, schema_linker.tokenizer, False, k=1)
+            abstention_classfier = load_abstention_classifier()
 
         for idx, pair in enumerate(tqdm(self.benchmark)):
             question = pair['question']
             goal = pair['golden_query']
 
-            answer = self._answer_single_question(question, schema)
+            if with_sgam:
+                focused_schema = get_focused_schema(schema_linker, question, chunks, schema)
+                abstention_prediction = abstention_classfier.classify(question, focused_schema)
+                if abstention_prediction == "feasible":
+                    answer = self._answer_single_question(question, focused_schema)
+                else:
+                    answer = None
+            else:
+                answer = self._answer_single_question(question, schema)
 
             self.results[idx] = {
                 'question': question, 

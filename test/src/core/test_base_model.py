@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch, call, mock_open
 import sys
 sys.modules['torch'] = MagicMock()
 sys.modules['torch.nn'] = MagicMock()
@@ -82,7 +82,8 @@ def test_run(mock_benchmark_set, mock_logger):
     # Arrange
     model = MockNL2SQLModel(mock_benchmark_set)
 
-    with patch.object(model, "_answer_single_question", return_value="SELECT * FROM users;"):
+    with patch.object(model, "_answer_single_question", return_value="SELECT * FROM users;"), \
+         patch("builtins.open", mock_open(read_data="")):
         model.run(False)
 
     # Assert

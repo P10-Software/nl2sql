@@ -1,6 +1,5 @@
 import torch
 from transformers import AutoModel, AutoTokenizer
-from src.core.schema_chunking import chunk_mschema
 import re
 
 class ExSLcModel(torch.nn.Module):

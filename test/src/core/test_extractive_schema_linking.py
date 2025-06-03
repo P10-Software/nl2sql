@@ -71,8 +71,7 @@ users.user_id=orders.order_id
              'accelerate': MagicMock()
          }):
         from src.core.extractive_schema_linking import get_focused_schema
-        with patch('src.core.extractive_schema_linking.predict_relevance_for_chunks', return_value=mock_predictions), \
-            patch('src.core.extractive_schema_linking.chunk_mschema', return_value=[schema]):
+        with patch('src.core.extractive_schema_linking.predict_relevance_for_chunks', return_value=mock_predictions):
             focused_schema = get_focused_schema(None, "", [schema], schema, threshold=0.1)
 
     assert focused_schema == expected_focused_schema
@@ -133,8 +132,7 @@ users.user_id=orders.order_id
              'accelerate': MagicMock()
          }):
         from src.core.extractive_schema_linking import get_focused_schema
-        with patch('src.core.extractive_schema_linking.predict_relevance_for_chunks', return_value=mock_predictions), \
-            patch('src.core.extractive_schema_linking.chunk_mschema', return_value=[schema]):
+        with patch('src.core.extractive_schema_linking.predict_relevance_for_chunks', return_value=mock_predictions):
             focused_schema = get_focused_schema(None, "", [schema], schema, threshold=0.05)
 
     assert focused_schema == expected_focused_schema

@@ -48,7 +48,7 @@ class AbstentionClassifier(nn.Module):
         pooled = last_hidden[:, -1, :]
         logit = self.classifier(pooled)
         return logit
-
+      
     def classify(self, user_question, schema, threshold=0.5):
         prompt = self.prompt_template.format(question=user_question, schema=schema)
         inputs = self.tokenizer(prompt, return_tensors='pt')
@@ -135,7 +135,7 @@ class AbstentionClassifier(nn.Module):
         return f2 if return_f2 else None
 
 
-def load_abstention_classifier(path: str):
+def load_abstention_classifier(path: str = ".local/AbstentionClassifier/binary_head/optuna_trial_n14_f2_0.833_epoch0.pt"):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = AbstentionClassifier(frozen=True)
     model.load_state_dict(torch.load(path, map_location=device))

@@ -2,12 +2,14 @@ from transformers import AutoModel, AutoTokenizer
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 from torch.utils.data import Dataset, DataLoader, random_split
 from src.common.logger import get_logger
+from collections import defaultdict
 from tqdm import tqdm
 import torch.optim as optim
 import torch
 import torch.nn as nn
 import random
 import os
+
 
 MODEL_NAME = "XGenerationLab/XiYanSQL-QwenCoder-7B-2504"
 HEAD_SAVE_LOCALE = '.local/AbstentionClassifier/BinaryHead/best_classifier.pt'
@@ -41,76 +43,6 @@ class AbstentionClassifier(nn.Module):
             "You decide the question is: "
         )
 
-    def forward(self, input_ids, attention_mask=None):
-        outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False)
-        last_hidden = outputs.last_hidden_state
-
-        pooled = last_hidden[:, -1, :]
-        logit = self.classifier(pooled)
-        return logit
-      
-    def classify(self, user_question, schema, threshold=0.5):
-        prompt = self.prompt_template.format(question=user_question, schema=schema)
-        inputs = self.tokenizer(prompt, return_tensors='pt')
-        with torch.no_grad():
-            attention_mask = inputs.get('attention_mask')
-            if attention_mask is not None:
-                attention_mask = attention_mask.to(self.device)
-            logit = self.forward(inputs['input_ids'].to(self.model.device), attention_mask)
-            prob = torch.sigmoid(logit).item()
-
-        return 'feasible' if prob > threshold else 'infeasible'
-
-    def load_classifier(self, classifier_locale=HEAD_SAVE_LOCALE):
-        state_dict = torch.load(classifier_locale, map_location=self.model.device)
-        self.classifier.load_state_dict(state_dict)
-        self.classifier.to(self.model.device)
-
-    def fine_tune(self, data, epochs=3, lr=1e-4, batch_size=8, val_split=0.1, weight_decay=0.01, save_path=HEAD_SAVE_LOCALE):
-        dataset = SQLFeasibilityDataset(data, 8192, prompt_template=self.prompt_template, model=MODEL_NAME, dtype=self.model.dtype)
-        torch.manual_seed(42)
-        random.seed(42)
-
-        val_size = int(len(dataset) * val_split)
-        train_size = len(dataset) - val_size
-        train_set, val_set = random_split(dataset, [train_size, val_size])
-
-        train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=NUM_WORKERS)
-        val_loader = DataLoader(val_set, batch_size=batch_size, num_workers=NUM_WORKERS)
-
-        optimizer = optim.AdamW(self.classifier.parameters(), lr=lr, weight_decay=weight_decay)
-        loss_func = nn.BCEWithLogitsLoss()
-
-        best_f2 = 0.0
-
-        for epoch in range(epochs):
-            self.train()
-            total_loss = 0
-            for batch in tqdm(train_loader):
-                input_ids = batch["input_ids"].to(self.model.device)
-                attention_mask = batch["attention_mask"].to(self.model.device)
-                labels = batch["label"].to(self.model.device).unsqueeze(1)
-
-                logits = self.forward(input_ids, attention_mask)
-                loss = loss_func(logits, labels)
-
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-
-                total_loss += loss.item()
-            avg_loss = total_loss / len(train_loader)
-            logger.info(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_loss:.4f}")
-            f2 = self.evaluate(val_loader, True)
-
-            if f2 > best_f2:
-                best_f2 = f2
-                new_path = HEAD_SAVE_LOCALE+f'/f2_{best_f2:.3f}_epoch{epoch}'
-                os.makedirs(os.path.dirname(new_path), exist_ok=True)
-                torch.save(self.state_dict(), new_path)
-                logger.info(f"Current best Epoch: {epoch} saved to {new_path} with F2: {best_f2:.4f}")
-        return best_f2
-
     def evaluate(self, dataloader, return_f2=False):
         self.eval()
         all_preds, all_labels = [], []
@@ -135,14 +67,6 @@ class AbstentionClassifier(nn.Module):
         return f2 if return_f2 else None
 
 
-def load_abstention_classifier(path: str = ".local/AbstentionClassifier/binary_head/optuna_trial_n14_f2_0.833_epoch0.pt"):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = AbstentionClassifier(frozen=True)
-    model.load_state_dict(torch.load(path, map_location=device))
-    model.to(device)
-    return model
-
-
 def load_abstention_classifier_embed(path: str = ".local/AbstentionClassifier/binary_head/optuna_trial_n14_f2_0.833_epoch0.pt"):
     device = torch.device("cuda")
     model = AbstentionClassifierEmbeddingBased(frozen=True)
@@ -152,9 +76,10 @@ def load_abstention_classifier_embed(path: str = ".local/AbstentionClassifier/bi
 
 
 class AbstentionClassifierEmbeddingBased(AbstentionClassifier):
-    def __init__(self, frozen=True):
+    def __init__(self, frozen=True, dropout_rate=0.3):
         super().__init__(frozen)
         self.classifier = nn.Linear(self.hidden_size * 3, 1).to(self.device)
+        self.dropout = nn.Dropout(p=dropout_rate)
 
         if frozen:
             for param in self.model.parameters():
@@ -203,6 +128,9 @@ class AbstentionClassifierEmbeddingBased(AbstentionClassifier):
             no_emb = hidden_states[i, no_start + 1, :]
 
             combined_emb = torch.cat([no_emb, yes_emb, no_emb - yes_emb], dim=-1).to(dtype=self.model.dtype)
+
+            combined_emb = self.dropout(combined_emb)
+
             logit = self.classifier(combined_emb)
 
             logits.append(logit)
@@ -211,6 +139,7 @@ class AbstentionClassifierEmbeddingBased(AbstentionClassifier):
         return logits
 
     def classify(self, user_question, schema, threshold=0.5):
+        self.eval()
         prompt = self.prompt_template.format(question=user_question, schema=schema)
 
         inputs = self.tokenizer(prompt, return_tensors='pt')
@@ -290,6 +219,7 @@ class SQLFeasibilityDataset(Dataset):
         self.max_length = max_length
         self.dtype = dtype
         self.prompt_template = prompt_template
+        self.data = self._filter_examples(data)
 
     def __len__(self):
         return len(self.data)
@@ -325,3 +255,39 @@ class SQLFeasibilityDataset(Dataset):
                 removed += 1
 
         logger.info(f"Dataset filtering complete, removed {removed} examples.")
+    
+    def train_val_split(self, val_fraction=0.1, seed=33):
+        db_id_to_samples = defaultdict(list)
+
+        for sample in self.data:
+            db_id_to_samples[sample['db_id']].append(sample)
+        
+        db_ids = list(db_id_to_samples.keys())
+        random.seed(seed)
+        random.shuffle(db_ids)
+
+        total_samples = len(self.data)
+        target_val_samples = int(total_samples * val_fraction)
+
+        val_data = []
+        train_data = []
+        cum_val = 0
+
+        val_db_ids = set()
+
+        for db_id in db_ids:
+            db_samples = db_id_to_samples[db_id]
+            if cum_val < target_val_samples:
+                val_data.extend(db_samples)
+                cum_val += len(db_samples)
+                val_db_ids.add(db_id)
+            else:
+                train_data.extend(db_samples)
+        logger.info(
+            f"Train/Eval split complete — Train Samples: {len(train_data)}, Eval Samples: {len(val_data)}, "
+            f"Eval DBs: {len(val_db_ids)}, Total Samples: {total_samples}"
+        )
+        return (
+            SQLFeasibilityDataset(train_data, self.max_length, self.prompt_template, model=self.tokenizer.name_or_path, dtype=self.dtype),
+            SQLFeasibilityDataset(val_data, self.max_length, self.prompt_template, model=self.tokenizer.name_or_path, dtype=self.dtype)
+        )

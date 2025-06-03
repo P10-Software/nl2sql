@@ -1,6 +1,15 @@
 import pytest
+from unittest.mock import MagicMock, patch, call, mock_open
+import sys
+sys.modules['torch'] = MagicMock()
+sys.modules['torch.nn'] = MagicMock()
+sys.modules['torch.utils'] = MagicMock()
+sys.modules['torch.utils.data'] = MagicMock()
+sys.modules['torch.optim'] = MagicMock()
+sys.modules['transformers'] = MagicMock()
+sys.modules['sklearn'] = MagicMock()
+sys.modules['sklearn.metrics'] = MagicMock()
 from src.core.base_model import NL2SQLModel, PromptStrategy
-from unittest.mock import MagicMock, patch, call
 
 
 @pytest.fixture
@@ -73,8 +82,9 @@ def test_run(mock_benchmark_set, mock_logger):
     # Arrange
     model = MockNL2SQLModel(mock_benchmark_set)
 
-    with patch.object(model, "_answer_single_question", return_value="SELECT * FROM users;"):
-        model.run()
+    with patch.object(model, "_answer_single_question", return_value="SELECT * FROM users;"), \
+         patch("builtins.open", mock_open(read_data="")):
+        model.run(False)
 
     # Assert
     assert len(model.results) == len(mock_benchmark_set)

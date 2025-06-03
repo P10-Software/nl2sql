@@ -1,5 +1,5 @@
-from src.core.model_implementations import LlamaModel, DeepSeekLlamaModel, DeepSeekQwenModel, XiYanSQLModel, ModelWithSQLCoderAbstentionModule
-from src.core.prompt_strategies import Llama3PromptStrategy, DeepSeekPromptStrategy, XiYanSQLPromptStrategy, SQLCoderAbstentionPromptStrategy
+from src.core.model_implementations import LlamaModel, DeepSeekLlamaModel, DeepSeekQwenModel, XiYanSQLModel, TrustUnifiedModel
+from src.core.prompt_strategies import Llama3PromptStrategy, DeepSeekPromptStrategy, XiYanSQLPromptStrategy
 from src.database.database import verify_database, get_conn
 from src.core.base_model import NL2SQLModel
 from src.common.logger import get_logger
@@ -21,14 +21,15 @@ MODEL = os.getenv('MODEL')
 NUMBER_OF_RUNS = int(os.getenv('NUMBER_OF_RUNS', 1))
 DB_NATURAL = bool(int(os.getenv('DB_NATURAL', 0)))
 MSCHEMA = bool(int(os.getenv('MSCHEMA', 1)))
-PRE_ABSTENTION = bool(int(os.getenv('PRE_ABSTENTION', 0)))
-POST_ABSTENTION = bool(int(os.getenv('POST_ABSTENTION', 0)))
+WITH_SGAM = bool(int(os.getenv('WITH_SGAM', 0)))
 DATE = date.today()
 
 
 def load_dataset(dataset_path: str):
     with open(dataset_path, "r") as file:
         dataset = load(file)
+    if WITH_SGAM:
+        return dataset
 
     return [{"question": pair["question"], "golden_query": pair["goal_query"]} for pair in dataset]
 
@@ -55,18 +56,16 @@ def get_model() -> NL2SQLModel:
         case "DeepSeekLlama":
             prompt_strategy = DeepSeekPromptStrategy(SQL_DIALECT)
             model = DeepSeekLlamaModel(dataset, prompt_strategy, MSCHEMA)
-
-    if PRE_ABSTENTION or POST_ABSTENTION:
-        abstention_prompt_strategy = SQLCoderAbstentionPromptStrategy(SQL_DIALECT)
-        model = ModelWithSQLCoderAbstentionModule(dataset, abstention_prompt_strategy, model, PRE_ABSTENTION, POST_ABSTENTION, MSCHEMA)
+        case "TrustUnified":
+            model = TrustUnifiedModel(dataset, None, mschema=MSCHEMA)
 
     return model
 
 
 def run_experiments(model: NL2SQLModel) -> None:
     for i in range(NUMBER_OF_RUNS):
-        model.run()
-        file_name = f"{MODEL}{DATASET_NAME}{'Natural' if DB_NATURAL else 'Abbreviated'}{'MSchema' if MSCHEMA else ''}{'PreAbstention' if PRE_ABSTENTION else ''}{'PostAbstention' if POST_ABSTENTION else ''}_{i + 1}.json"
+        model.run(WITH_SGAM)
+        file_name = f"{MODEL}{DATASET_NAME}{'Natural' if DB_NATURAL else 'Abbreviated'}{'MSchema' if MSCHEMA else ''}{'SGAM' if WITH_SGAM else ''}_{i + 1}.json"
         save_results(f"{RESULTS_DIR}/{DB_NAME}/{MODEL}/{'Natural' if DB_NATURAL else 'Abbreviated'}/{DATE}/{file_name}", model)
         model.results = {}
 

@@ -11,6 +11,7 @@ import os
 
 MODEL_NAME = "XGenerationLab/XiYanSQL-QwenCoder-7B-2504"
 HEAD_SAVE_LOCALE = '.local/AbstentionClassifier/BinaryHead/best_classifier.pt'
+NUM_WORKERS = 8
 
 logger = get_logger(__name__)
 
@@ -74,8 +75,8 @@ class AbstentionClassifier(nn.Module):
         train_size = len(dataset) - val_size
         train_set, val_set = random_split(dataset, [train_size, val_size])
 
-        train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_set, batch_size=batch_size)
+        train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=NUM_WORKERS)
+        val_loader = DataLoader(val_set, batch_size=batch_size, num_workers=NUM_WORKERS)
 
         optimizer = optim.AdamW(self.classifier.parameters(), lr=lr, weight_decay=weight_decay)
         loss_func = nn.BCEWithLogitsLoss()
@@ -142,6 +143,14 @@ def load_abstention_classifier(path: str):
     return model
 
 
+def load_abstention_classifier_embed(path: str = ".local/AbstentionClassifier/binary_head/optuna_trial_n14_f2_0.833_epoch0.pt"):
+    device = torch.device("cuda")
+    model = AbstentionClassifierEmbeddingBased(frozen=True)
+    model.load_state_dict(torch.load(path, map_location=device))
+    model.to(device)
+    return model
+
+
 class AbstentionClassifierEmbeddingBased(AbstentionClassifier):
     def __init__(self, frozen=True):
         super().__init__(frozen)
@@ -155,12 +164,14 @@ class AbstentionClassifierEmbeddingBased(AbstentionClassifier):
             "You are a data scientist who has to create SQL queries for users, but the users do not know what content the database has.\n"
             "You have to read over a users question, and compare it to the database schema that you recieve, and then decide if the users question can be answered based on the database.\n"
             "You have received the question: \"{question}\" \n"
-            "The database that the user is asking the question of is described by the following schema: {schema}\n\n"
+            "The database that the user is asking the question of is described by the following schema: \n {schema}\n\n"
             "After looking over the schema very carefully, and making sure to catch all questions that cannot be answered.\n"
             "Is the question {question} answerable by the schema? [yes] or [no]"
         )
 
     def forward(self, input_ids, attention_mask=None):
+        input_ids = input_ids.to(self.model.device)
+        attention_mask = attention_mask.to(self.model.device)
         outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
         hidden_states = outputs.last_hidden_state
 
@@ -185,13 +196,13 @@ class AbstentionClassifierEmbeddingBased(AbstentionClassifier):
             no_start = find_token_span(tokens, no_span)
 
             if yes_start == -1 or no_start == -1:
-                logger.error(f"Missing [yes] or [no] in token sequence")
+                logger.error("Missing [yes] or [no] in token sequence")
                 raise ValueError("Missing [yes] or [no] token span.")
 
             yes_emb = hidden_states[i, yes_start + 1, :]
             no_emb = hidden_states[i, no_start + 1, :]
 
-            combined_emb = torch.cat([no_emb, yes_emb, no_emb - yes_emb], dim=-1)
+            combined_emb = torch.cat([no_emb, yes_emb, no_emb - yes_emb], dim=-1).to(dtype=self.model.dtype)
             logit = self.classifier(combined_emb)
 
             logits.append(logit)
@@ -226,8 +237,8 @@ class AbstentionClassifierEmbeddingBased(AbstentionClassifier):
         train_size = len(dataset) - val_size
         train_set, val_set = random_split(dataset, [train_size, val_size])
 
-        train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_set, batch_size=batch_size)
+        train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=NUM_WORKERS)
+        val_loader = DataLoader(val_set, batch_size=batch_size, num_workers=NUM_WORKERS)
 
         optimizer = optim.AdamW(
             list(filter(lambda p: p.requires_grad, self.parameters())),

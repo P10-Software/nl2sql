@@ -1,5 +1,5 @@
-from src.core.model_implementations import LlamaModel, DeepSeekLlamaModel, DeepSeekQwenModel, XiYanSQLModel, ModelWithSQLCoderAbstentionModule
-from src.core.prompt_strategies import Llama3PromptStrategy, DeepSeekPromptStrategy, XiYanSQLPromptStrategy, SQLCoderAbstentionPromptStrategy
+from src.core.model_implementations import LlamaModel, DeepSeekLlamaModel, DeepSeekQwenModel, XiYanSQLModel, TrustUnifiedModel
+from src.core.prompt_strategies import Llama3PromptStrategy, DeepSeekPromptStrategy, XiYanSQLPromptStrategy
 from src.database.database import verify_database, get_conn
 from src.core.base_model import NL2SQLModel
 from src.common.logger import get_logger
@@ -56,6 +56,8 @@ def get_model() -> NL2SQLModel:
         case "DeepSeekLlama":
             prompt_strategy = DeepSeekPromptStrategy(SQL_DIALECT)
             model = DeepSeekLlamaModel(dataset, prompt_strategy, MSCHEMA)
+        case "TrustUnified":
+            model = TrustUnifiedModel(dataset, None, mschema=MSCHEMA)
 
     return model
 

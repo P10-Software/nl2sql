@@ -66,13 +66,13 @@ class TrustUnifiedModel(NL2SQLModel):
         return self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
 
-    def _compute_entropy(logits):
+    def _compute_entropy(self, logits):
         """
         Compute the average entropy over all tokens in the sequence.
         logits: [batch_size, seq_len, vocab_size]
         """
-        probs = torch.nn.functional.F.softmax(logits, dim=-1)
-        log_probs = torch.nn.functional.F.log_softmax(logits, dim=-1)
+        probs = torch.nn.functional.softmax(logits, dim=-1)
+        log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
         entropy = -(probs * log_probs).sum(dim=-1)  # shape: [batch_size, seq_len]
         return entropy.mean(dim=-1).item()  # average over sequence length
 

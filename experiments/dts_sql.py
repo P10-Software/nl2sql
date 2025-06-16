@@ -7,11 +7,12 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, StoppingCriteria
 from tqdm import tqdm
 import json
 import statistics
+from src.core.schema_chunking import chunk_dts_ddl
 
-NUMBER_OF_TRIALS = 10
-EVALUATION_DATA_PATH = ".local/SchemaLinker/spider_exsl_all_to_single_test.json"
-BASE_DABATASES_DIR =  "DTS-SQL/test_database/"
-OUTPUT_DIR = ".local/experiments/schema_linking/spider/dts_sql/"
+NUMBER_OF_TRIALS = 1
+EVALUATION_DATA_PATH = ".local/SchemaLinker/metadata_exsl.json"
+BASE_DABATASES_DIR =  ".local/trial_metadata_natural.sqlite"
+OUTPUT_DIR = ".local/experiments/schema_linking/metadata/dts_sql/"
 
 schema_linker_adapter_path = "MrezaPRZ/DeepSchema_BIRD"
 
@@ -104,26 +105,31 @@ def get_relevant_tables(db_uri, question):
     for table_name in table_names:
         schema = get_table_schema_with_samples(db_uri, table_name, 0)
         database_schema += schema + "\n"
-    user_message = f"""Given the following SQL tables, your job is to determine the columns and tables that the question is referring to.
-{database_schema}
-####
-Question: {question}
-"""
-    messages = [
-        {"role": "user", "content": user_message.strip()}
-    ]
-    inputs = tokenizer.apply_chat_template(messages, return_tensors="pt", add_generation_prompt=True,tokenize = True).to(schema_model.device)
-    response = generate_schema(inputs, schema_model)
-    if "Tables: " in response:
-        response = response.split("Tables: ")[1]
-    if ";" in response:
-        response = response.split(";")[0]
-    schema_linking_tables = re.sub(r'\s+', ' ', response).strip()
-    schema_linking_tables = schema_linking_tables.split(", ")
-    for table in schema_linking_tables:
-        table = table.replace("**", "").replace("--", "").replace("'","").strip()
-        table = table.lower()
-    return schema_linking_tables
+
+    chunks = chunk_dts_ddl(database_schema, tokenizer, k=5)
+    focused_schema = set()
+
+    for chunk in chunks:
+        user_message = f"""Given the following SQL tables, your job is to determine the columns and tables that the question is referring to.
+    {chunk}
+    ####
+    Question: {question}
+    """
+        messages = [
+            {"role": "user", "content": user_message.strip()}
+        ]
+        inputs = tokenizer.apply_chat_template(messages, return_tensors="pt", add_generation_prompt=True,tokenize = True).to(schema_model.device)
+        response = generate_schema(inputs, schema_model)
+        if "Tables: " in response:
+            response = response.split("Tables: ")[1]
+        if ";" in response:
+            response = response.split(";")[0]
+        schema_linking_tables = re.sub(r'\s+', ' ', response).strip()
+        schema_linking_tables = schema_linking_tables.split(", ")
+        for table in schema_linking_tables:
+            table = table.replace("**", "").replace("--", "").replace("'","").strip()
+            focused_schema.add(table.lower())
+    return focused_schema
 
 
 if __name__ == "__main__":
@@ -138,10 +144,10 @@ if __name__ == "__main__":
         recall_sum = 0
         precision_sum = 0
         for example in tqdm(eval_set):
-            db_id = extract_db_id(example["schema"])
-            db_uri = f"{BASE_DABATASES_DIR}{db_id}/{db_id}.sqlite"
+            #db_id = extract_db_id(example["schema"])
+            db_uri = BASE_DABATASES_DIR#f"{BASE_DABATASES_DIR}{db_id}/{db_id}.sqlite"
 
-            goal_tables = {column.split(" ")[0] for column in example["goal answer"]}
+            goal_tables = {column.split(" ")[0].lower() for column in example["goal answer"]}
             predictions = get_relevant_tables(db_uri, example["question"])
             correct_predictions = [table for table in predictions if table in goal_tables]
 
@@ -151,13 +157,13 @@ if __name__ == "__main__":
             recall_sum += recall
             precision_sum += precision
 
-            report.append({"question": example["question"], "goal tables": list(goal_tables), "predictions": predictions, "precision": precision, "recall": recall})
+            report.append({"question": example["question"], "goal tables": list(goal_tables), "predictions": list(predictions), "precision": precision, "recall": recall})
 
         report.append({"Dataset size": len(eval_set), "Total precision": precision_sum / len(eval_set), "Total recall": recall_sum / len(eval_set)})
         table_recall_results.append(report[-1]["Total recall"])
         table_precision_results.append(report[-1]["Total precision"])
 
-        with open(f"{OUTPUT_DIR}trial_{trial_num}.json", "w") as file:
+        with open(f"{OUTPUT_DIR}chunk_5_trial_{trial_num}.json", "w") as file:
             json.dump(report, file, indent=4)
 
     overall_report = {
@@ -165,5 +171,5 @@ if __name__ == "__main__":
         "Table precision": {"mean": statistics.mean(table_precision_results), "standard deviation": statistics.stdev(table_precision_results)}
     }
 
-    with open(f"{OUTPUT_DIR}overview.json", "w") as file:
+    with open(f"{OUTPUT_DIR}chunk_5_overview.json", "w") as file:
         json.dump(overall_report, file, indent=4)
